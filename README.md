@@ -49,6 +49,28 @@ anywhere.
 3. Upload that `.zip` to the portal. It contains `conversations.json`, which
    includes your Project chats.
 
+### No "Export data" button? (ChatGPT Business / Team)
+
+**ChatGPT Business and Team workspaces have self-serve export disabled** — there
+is no Export button in Data Controls, and it can't be turned on (the bulk
+Compliance export is Enterprise-only). Use the included **browser extractor**
+instead: it reads your chats from your own logged-in session and saves a
+`conversations.json` in the same format.
+
+1. Open [`extractor/extract-chatgpt.js`](extractor/extract-chatgpt.js) and copy
+   the whole file.
+2. Go to [chatgpt.com](https://chatgpt.com), logged in to the right workspace.
+3. Open DevTools (**F12** → **Console**). If pasting is blocked, type
+   `allow pasting`, press Enter.
+4. Paste the script, press Enter, and wait — it downloads `conversations.json`
+   (Project chats included).
+5. Upload that `conversations.json` to the portal, exactly like the `.zip`.
+
+The extractor only **reads** your own conversations and downloads them to your
+browser — nothing is sent anywhere else. It relies on ChatGPT's internal API, so
+it may need updating if OpenAI changes it; the console log will say which step
+failed if so. See [`extractor/README.md`](extractor/README.md) for details.
+
 ## Import into Claude
 
 1. Open [claude.ai](https://claude.ai) and create (or open) a **Project**.
