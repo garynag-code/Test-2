@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tool output — may contain private chat data
+chatgpt_export_output/
+chatgpt-chats-for-claude.md
+upload-*.zip
+upload-*.json
+
+# ChatGPT export archives (may contain private data)
+*.zip
+conversations.json

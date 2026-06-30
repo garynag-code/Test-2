@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatgpt-export"
+version = "1.0.0"
+description = "Extract ChatGPT conversations (including Project chats) and turn them into a file you can import into Claude."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+# The web portal (the CLI needs no third-party packages at all).
+web = ["Flask>=2.3.0"]
+dev = ["pytest>=7.0", "Flask>=2.3.0"]
+
+[project.scripts]
+chatgpt-export = "chatgpt_export.cli:main"
+chatgpt-export-portal = "chatgpt_export.web:main"
+
+[tool.setuptools]
+packages = ["chatgpt_export"]

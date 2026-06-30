@@ -1,0 +1,5 @@
+# Web portal
+Flask>=2.3.0
+
+# (The core parsing/rendering and the CLI use only the Python standard
+# library — Flask is needed only to run the browser portal.)
