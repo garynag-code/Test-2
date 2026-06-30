@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tool output and secrets — NEVER commit these
+chatgpt_export_output/
+token.json
+client_secrets.json
+*.credentials.json
+service_account*.json
+
+# ChatGPT export archives (may contain private data)
+*.zip
+conversations.json
