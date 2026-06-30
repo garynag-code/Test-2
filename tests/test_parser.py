@@ -10,7 +10,11 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from chatgpt_export.parser import parse_archive  # noqa: E402
-from chatgpt_export.render import conversation_to_markdown, safe_filename  # noqa: E402
+from chatgpt_export.render import (  # noqa: E402
+    conversation_to_markdown,
+    conversations_to_combined_markdown,
+    safe_filename,
+)
 
 
 def _make_conversation():
@@ -137,6 +141,20 @@ def test_safe_filename():
     assert safe_filename('a/b:c*?"<>|') != ""
     assert "/" not in safe_filename("a/b")
     assert safe_filename("   ") == "untitled"
+
+
+def test_combined_markdown(tmp_path):
+    zpath = _write_zip(tmp_path, [_make_conversation()])
+    convs = parse_archive(zpath)
+    md = conversations_to_combined_markdown(convs)
+    # Header, table of contents, grouped section, and a linkable anchor.
+    assert md.startswith("# ChatGPT export")
+    assert "## Contents" in md
+    assert "# Project: Travel" in md
+    assert "(#trip-planning)" in md
+    assert '<a id="trip-planning"></a>' in md
+    assert "Here is your plan." in md
+    assert "IGNORED BRANCH" not in md
 
 
 def test_ungrouped_when_no_project(tmp_path):

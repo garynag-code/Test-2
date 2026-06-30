@@ -5,29 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chatgpt-export"
 version = "1.0.0"
-description = "Extract ChatGPT conversations (including Project chats) and import them into Google Drive."
+description = "Extract ChatGPT conversations (including Project chats) and turn them into a file you can import into Claude."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = []
 
 [project.optional-dependencies]
-# The web portal.
-web = [
-    "Flask>=2.3.0",
-    "google-api-python-client>=2.0.0",
-    "google-auth>=2.0.0",
-    "google-auth-oauthlib>=1.0.0",
-    "google-auth-httplib2>=0.1.0",
-]
-# Just the Google Drive client (for the CLI's --upload-drive).
-drive = [
-    "google-api-python-client>=2.0.0",
-    "google-auth>=2.0.0",
-    "google-auth-oauthlib>=1.0.0",
-    "google-auth-httplib2>=0.1.0",
-]
-dev = ["pytest>=7.0"]
+# The web portal (the CLI needs no third-party packages at all).
+web = ["Flask>=2.3.0"]
+dev = ["pytest>=7.0", "Flask>=2.3.0"]
 
 [project.scripts]
 chatgpt-export = "chatgpt_export.cli:main"

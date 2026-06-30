@@ -1,5 +1,5 @@
 """A synthetic ChatGPT export used by ``--demo`` so the tool can be tried
-without a real export or any Google credentials."""
+without a real export."""
 
 from __future__ import annotations
 

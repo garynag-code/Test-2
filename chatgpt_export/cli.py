@@ -1,16 +1,20 @@
-"""Command-line interface tying together parsing, local rendering, and the
-optional Google Drive upload."""
+"""Command-line interface: parse a ChatGPT export and render it to files you can
+import into Claude (a single combined Markdown file, plus per-chat files)."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections import Counter
 
 from . import __version__
 from .parser import parse_archive, parse_conversation
-from .render import write_local
+from .render import conversations_to_combined_markdown, write_local
 from .sample import sample_conversations
+
+
+COMBINED_NAME = "chatgpt-chats-for-claude.md"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="chatgpt-export",
         description=(
             "Extract ChatGPT conversations (including Project chats) from an "
-            "official data-export .zip and import them into Google Drive."
+            "official data-export .zip and render them for import into Claude."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -31,53 +35,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--demo",
         action="store_true",
-        help="Run on built-in sample data (no real export or credentials "
-        "needed) to see how the output looks.",
+        help="Run on built-in sample data (no real export needed) to see how "
+        "the output looks.",
     )
     p.add_argument(
         "-o",
         "--out-dir",
         default="chatgpt_export_output",
-        help="Local directory for rendered Markdown/JSON.",
+        help="Directory for the rendered files.",
     )
     p.add_argument(
         "--no-json",
         action="store_true",
-        help="Write only Markdown locally, skip the per-chat JSON.",
+        help="Skip the per-chat .json sidecar files.",
     )
     p.add_argument(
-        "--no-local",
+        "--no-split",
         action="store_true",
-        help="Skip writing local files (only meaningful with --upload-drive).",
+        help="Write only the single combined file, not per-chat files.",
     )
-
-    g = p.add_argument_group("Google Drive")
-    g.add_argument(
-        "--upload-drive",
+    p.add_argument(
+        "--no-combined",
         action="store_true",
-        help="Upload the rendered chats to Google Drive.",
+        help="Skip the single combined-Markdown file.",
     )
-    g.add_argument(
-        "--client-secrets",
-        help="OAuth Desktop-app client_secrets.json (first run only; a token "
-        "is cached afterwards). Not needed in service-account mode.",
-    )
-    g.add_argument(
-        "--token",
-        default="token.json",
-        help="Where to cache/read the OAuth token.",
-    )
-    g.add_argument(
-        "--drive-folder",
-        default="ChatGPT Export",
-        help="Name of the root Drive folder to create/use.",
-    )
-    g.add_argument(
-        "--drive-parent",
-        help="Id of an existing Drive folder (or Shared Drive) to nest the "
-        "root folder under. Defaults to My Drive root.",
-    )
-
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
@@ -115,32 +96,22 @@ def main(argv: list[str] | None = None) -> int:
     for name, count in groups.most_common():
         print(f"  - {name}: {count} chat(s)")
 
-    if not args.no_local:
-        print(f"\nWriting local files to: {args.out_dir}")
+    os.makedirs(args.out_dir, exist_ok=True)
+    print(f"\nWriting to: {args.out_dir}")
+
+    if not args.no_combined:
+        combined_path = os.path.join(args.out_dir, COMBINED_NAME)
+        with open(combined_path, "w", encoding="utf-8") as fh:
+            fh.write(conversations_to_combined_markdown(conversations))
+        print(f"  combined file (import this into Claude): {combined_path}")
+
+    if not args.no_split:
         written = write_local(
             conversations, args.out_dir, write_json=not args.no_json
         )
-        print(f"Wrote {len(written)} Markdown file(s).")
+        print(f"  per-chat Markdown files: {len(written)}")
 
-    if args.upload_drive:
-        # Imported here so the local path has no hard dependency on the
-        # Google client libraries.
-        from .drive import build_service, upload_conversations
-
-        print("\nAuthenticating with Google Drive...")
-        service = build_service(
-            client_secrets=args.client_secrets, token_path=args.token
-        )
-        print(f"Uploading to Drive folder: {args.drive_folder}")
-        results = upload_conversations(
-            conversations,
-            service,
-            root_folder_name=args.drive_folder,
-            parent_id=args.drive_parent,
-        )
-        print(f"Uploaded {len(results)} conversation(s) to Google Drive.")
-
-    print("\nDone.")
+    print("\nDone. Import the combined .md into a Claude Project's knowledge.")
     return 0
 
 

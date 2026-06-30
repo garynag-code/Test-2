@@ -30,14 +30,25 @@ def test_index(client):
     assert b"ChatGPT" in r.data
 
 
-def test_demo_then_summary_and_download(client):
+def test_demo_then_summary_and_downloads(client):
     r = client.get("/demo", follow_redirects=True)
     assert r.status_code == 200
     assert b"chats ready" in r.data
     assert b"Italy Trip" in r.data  # project grouping shown
 
-    job_id = re.search(rb"/download/([0-9a-f]+)", r.data).group(1).decode()
-    r = client.get(f"/download/{job_id}")
+    job_id = re.search(rb"/download/([0-9a-f]+)/", r.data).group(1).decode()
+
+    # Combined single-file download (the one you import into Claude).
+    r = client.get(f"/download/{job_id}/combined.md")
+    assert r.status_code == 200
+    assert r.headers["Content-Type"].startswith("text/markdown")
+    body = r.data.decode()
+    assert "# ChatGPT export" in body
+    assert "## Contents" in body
+    assert "Project: Italy Trip" in body
+
+    # Per-chat zip download.
+    r = client.get(f"/download/{job_id}/chats.zip")
     assert r.status_code == 200
     assert r.headers["Content-Type"].startswith("application/zip")
     names = zipfile.ZipFile(io.BytesIO(r.data)).namelist()

@@ -6,7 +6,9 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections import OrderedDict
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 from .parser import Conversation, format_timestamp
 
@@ -42,6 +44,84 @@ def conversation_to_markdown(conv: Conversation) -> str:
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _slug(text: str) -> str:
+    """A GitHub-style anchor slug for in-document links."""
+    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+    return re.sub(r"[\s_]+", "-", s)
+
+
+def conversations_to_combined_markdown(
+    conversations: list[Conversation],
+    title: str = "ChatGPT export",
+) -> str:
+    """Render every conversation into a single Markdown document, grouped by
+    Project, with a table of contents. This is the file you import into a
+    Claude Project's knowledge (or attach in a chat)."""
+    exported = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    total_msgs = sum(len(c.messages) for c in conversations)
+
+    # Group preserving first-seen order.
+    grouped: "OrderedDict[str, list[Conversation]]" = OrderedDict()
+    for conv in conversations:
+        grouped.setdefault(conv.group, []).append(conv)
+
+    out: list[str] = [
+        f"# {title}",
+        "",
+        f"_{len(conversations)} conversations · {total_msgs} messages · "
+        f"exported {exported}._",
+        "",
+        "## Contents",
+        "",
+    ]
+
+    # Anchors must be unique even when chat titles repeat.
+    seen_anchors: dict[str, int] = {}
+    anchors: list[str] = []
+    for conv in conversations:
+        base = _slug(conv.title) or "chat"
+        n = seen_anchors.get(base, 0)
+        seen_anchors[base] = n + 1
+        anchors_id = base if n == 0 else f"{base}-{n}"
+        anchors.append(anchors_id)
+
+    idx = 0
+    for group, convs in grouped.items():
+        out.append(f"- **{group}**")
+        for conv in convs:
+            out.append(f"  - [{conv.title}](#{anchors[idx]})")
+            idx += 1
+    out.append("")
+
+    idx = 0
+    for group, convs in grouped.items():
+        out.append("\n---\n")
+        out.append(f"# Project: {group}\n")
+        for conv in convs:
+            out.append(f'<a id="{anchors[idx]}"></a>')
+            out.append(f"## {conv.title}")
+            out.append("")
+            meta = [
+                f"Updated {format_timestamp(conv.update_time)}",
+                f"created {format_timestamp(conv.create_time)}",
+            ]
+            if conv.gizmo_id:
+                meta.append(f"custom GPT `{conv.gizmo_id}`")
+            out.append(f"_{' · '.join(meta)}._")
+            out.append("")
+            for msg in conv.messages:
+                label = _ROLE_LABELS.get(msg.role, msg.role.capitalize())
+                if msg.author_name and msg.role == "tool":
+                    label = f"{label} ({msg.author_name})"
+                out.append(f"**{label}:**")
+                out.append("")
+                out.append(msg.text.rstrip())
+                out.append("")
+            idx += 1
+
+    return "\n".join(out).rstrip() + "\n"
 
 
 def safe_filename(name: str, max_len: int = 120) -> str:
