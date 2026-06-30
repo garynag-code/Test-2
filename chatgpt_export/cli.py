@@ -8,8 +8,9 @@ import sys
 from collections import Counter
 
 from . import __version__
-from .parser import parse_archive
+from .parser import parse_archive, parse_conversation
 from .render import write_local
+from .sample import sample_conversations
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,8 +24,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "archive",
+        nargs="?",
         help="Path to the ChatGPT export .zip, its extracted folder, or "
         "conversations.json directly.",
+    )
+    p.add_argument(
+        "--demo",
+        action="store_true",
+        help="Run on built-in sample data (no real export or credentials "
+        "needed) to see how the output looks.",
     )
     p.add_argument(
         "-o",
@@ -77,12 +85,22 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    print(f"Parsing export: {args.archive}")
-    try:
-        conversations = parse_archive(args.archive)
-    except FileNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+    if args.demo:
+        print("Running in demo mode with built-in sample data.")
+        conversations = [parse_conversation(c) for c in sample_conversations()]
+    elif not args.archive:
+        print(
+            "error: provide an export path, or use --demo to try sample data.",
+            file=sys.stderr,
+        )
         return 2
+    else:
+        print(f"Parsing export: {args.archive}")
+        try:
+            conversations = parse_archive(args.archive)
+        except FileNotFoundError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
     if not conversations:
         print("No conversations found in the export.", file=sys.stderr)

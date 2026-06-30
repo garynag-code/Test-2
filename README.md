@@ -1,12 +1,39 @@
-# ChatGPT → Google Drive exporter
+# ChatGPT → Google Drive portal
 
 Extract **all** your ChatGPT conversations — including chats inside **Projects**
-— from an official data export, render them as clean Markdown, and upload them
+— from an official data export, render them as clean Markdown, and import them
 into **Google Drive**, organised one folder per Project.
 
-Works with **ChatGPT Team** accounts (and Plus/Free). Pure standard-library for
-parsing/rendering; the Google client libraries are only needed for the upload
-step.
+Works with **ChatGPT Team** accounts (and Plus/Free). Use it two ways:
+
+- **🖥️ Web portal** — a browser app: drag in your export, preview your chats,
+  download a Markdown `.zip`, and one-click import to Google Drive.
+- **⌨️ Command line** — the same engine as a scriptable CLI.
+
+---
+
+## Quick start (the portal)
+
+```bash
+git clone <this-repo>
+cd <this-repo>
+pip install -r requirements.txt
+
+python -m chatgpt_export.web      # then open http://localhost:5000
+```
+
+Then in the browser:
+
+1. **Upload** your ChatGPT export `.zip` (see Step 1 below to get it) — or click
+   **Try the demo** to see it work instantly with sample chats.
+2. **Preview** every chat, grouped by Project.
+3. **Download** them as a Markdown `.zip`, and/or **Connect Google Drive** and
+   import them straight into your Drive.
+
+The portal runs entirely on your own machine. Your chats are never sent
+anywhere except to Google Drive, and only when you click *Import*. Downloading
+the `.zip` needs no Google setup at all; enabling the Drive button is described
+under [Google Drive setup](#google-drive-setup).
 
 ---
 
@@ -28,24 +55,44 @@ consumes that export, so it's reliable and doesn't risk your account.
      so this tool handles it too.)
 2. Wait for the email from OpenAI ("Your ChatGPT data export is ready") and
    download the `.zip`. The link expires after ~24 hours.
-3. Keep the `.zip` — you'll point the tool at it. It contains
+3. Keep the `.zip` — you'll upload it to the portal. It contains
    `conversations.json`, which includes your Project chats.
 
-## Step 2 — Install
+## Google Drive setup
+
+Downloading your chats as a `.zip` needs **no** Google setup. To enable the
+one-click Drive import, you create a free OAuth client once:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/),
+   create (or pick) a project.
+2. **Enable the Google Drive API** for that project.
+3. **APIs & Services → OAuth consent screen** → add your own Google account as a
+   **Test user**.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID:**
+   - **For the portal:** choose **Web application** and add the redirect URI
+     shown on the portal's summary page (by default
+     `http://localhost:5000/oauth2callback`). Download the JSON and save it as
+     **`client_secrets.json`** next to the app, then restart the portal. The
+     **Connect Google Drive** button will light up.
+   - **For the CLI:** choose **Desktop app** instead and pass the downloaded
+     JSON with `--client-secrets`.
+
+The scope requested is `drive.file` — the app can only see and manage the files
+**it creates**, never the rest of your Drive.
+
+---
+
+## Command-line interface (optional)
+
+The same engine is available as a CLI if you prefer scripting.
 
 ```bash
-git clone <this-repo>
-cd <this-repo>
+pip install -r requirements.txt        # Python 3.9+
 
-# Only needed if you want the Google Drive upload:
-pip install -r requirements.txt
-```
+# Try it with sample data — no export or credentials needed:
+python -m chatgpt_export.cli --demo -o my_chats
 
-Python 3.9+ is required.
-
-## Step 3 — Render locally (no credentials needed)
-
-```bash
+# Render your real export locally:
 python -m chatgpt_export.cli /path/to/chatgpt-export.zip -o my_chats
 ```
 
@@ -63,18 +110,10 @@ my_chats/
 You can pass the `.zip`, an already-extracted folder, or `conversations.json`
 directly.
 
-## Step 4 — Upload to Google Drive
+### Upload to Google Drive from the CLI
 
-### One-time Google setup
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/),
-   create (or pick) a project.
-2. **Enable the Google Drive API** for that project.
-3. **APIs & Services → Credentials → Create Credentials → OAuth client ID →
-   Desktop app.** Download the JSON (e.g. `client_secrets.json`).
-4. On the OAuth consent screen, add your own Google account as a **Test user**.
-
-### Run the upload
+After completing [Google Drive setup](#google-drive-setup) with a **Desktop app**
+client:
 
 ```bash
 python -m chatgpt_export.cli /path/to/chatgpt-export.zip \
