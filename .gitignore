@@ -14,3 +14,9 @@ upload-*.json
 # ChatGPT export archives (may contain private data)
 *.zip
 conversations.json
+
+# Accounting — local books (may contain private financial data)
+*.db
+*.db-wal
+*.db-shm
+books.db

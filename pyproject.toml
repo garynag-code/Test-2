@@ -14,11 +14,14 @@ dependencies = []
 [project.optional-dependencies]
 # The web portal (the CLI needs no third-party packages at all).
 web = ["Flask>=2.3.0"]
-dev = ["pytest>=7.0", "Flask>=2.3.0"]
+# PDF bank-statement import for the accounting module (CSV needs no extras).
+pdf = ["pdfplumber>=0.10"]
+dev = ["pytest>=7.0", "Flask>=2.3.0", "pdfplumber>=0.10"]
 
 [project.scripts]
 chatgpt-export = "chatgpt_export.cli:main"
 chatgpt-export-portal = "chatgpt_export.web:main"
+sa-accounting = "accounting.cli:main"
 
 [tool.setuptools]
-packages = ["chatgpt_export"]
+packages = ["chatgpt_export", "accounting", "accounting.importers", "accounting.reports"]
