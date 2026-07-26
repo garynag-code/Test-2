@@ -17,7 +17,44 @@ cd worship_roster
 python3 -m http.server 8000     # then open http://localhost:8000
 ```
 
-Add it to your phone's home screen for an app-like, full-screen experience.
+## 📱 Install on an Android device
+
+The app is a **PWA** (progressive web app): it has a web manifest, a service
+worker and icons, so Android Chrome will install it to the home screen and run
+it **full-screen and offline**, like a native app. Pick whichever route suits
+you — the first is easiest.
+
+### Option A — GitHub Pages, then "Add to Home screen" (recommended, free)
+
+A PWA installs only from **HTTPS** (or `localhost`), which GitHub Pages provides.
+
+1. On GitHub: **repo → Settings → Pages → Build and deployment → Deploy from a
+   branch**, choose this branch and the **root** folder, and Save.
+2. Wait ~1 min, then on your **Android phone open Chrome** and go to:
+   `https://<your-user>.github.io/<repo>/worship_roster/`
+   (for this repo: `https://garynag-code.github.io/test-2/worship_roster/`).
+3. Tap the **⋮ menu → Install app** (or **Add to Home screen**). It lands on
+   your home screen with the music-note icon and opens full-screen. It keeps
+   working with no signal after the first load.
+
+### Option B — Same Wi-Fi, straight from your computer (quick test)
+
+1. On a computer on the **same Wi-Fi**, run `python3 -m http.server 8000` inside
+   `worship_roster/`.
+2. Find that computer's LAN IP (`ipconfig` / `ip addr`), then on the phone open
+   `http://<computer-ip>:8000/`.
+   *Note:* plain-`http` over Wi-Fi runs the app but **won't install as a PWA**
+   (Chrome requires HTTPS for that) — use Option A for the installable version.
+
+### Option C — Build a real APK / Play Store bundle
+
+Point **[PWABuilder](https://www.pwabuilder.com/)** at your GitHub Pages URL
+from Option A and it generates a signed Android **APK/AAB** you can sideload or
+publish. (The CLI equivalent is Google's **Bubblewrap** / Trusted Web Activity.)
+
+> **Tip:** the app stores its data in the browser per device, so each team
+> member installs their own copy. See *Notes & next steps* for sharing one live
+> roster across the team.
 
 ## Features
 
