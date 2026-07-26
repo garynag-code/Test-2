@@ -550,7 +550,7 @@ function songs() {
           <div class="song-item__key">Key: ${esc(song.key || '—')}</div>
         </div>`));
       const actions = el(`<div class="song-actions"></div>`);
-      const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener" href="${chordsUrl(song)}">🎼 Chords</a>`);
+      const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener noreferrer" href="${chordsUrl(song)}">🎼 Chords</a>`);
       const remind = el(`<button class="btn btn--sm">🔔 Remind</button>`);
       remind.addEventListener('click', () => remindSongPractice(mKey, song));
       actions.appendChild(chords);
@@ -810,3 +810,12 @@ document.getElementById('current-user').addEventListener('change', (e) => {
 
 render();
 fireDueNotifications();
+
+// Register the service worker so the app installs and runs offline on Android.
+// Kept here (not inline in HTML) so the page can enforce a strict
+// `script-src 'self'` Content-Security-Policy with no inline-script allowance.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* offline install optional */ });
+  });
+}
