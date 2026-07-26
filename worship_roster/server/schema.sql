@@ -1,0 +1,87 @@
+-- Worship Team Roster — D1 (SQLite) schema.
+-- Apply with:  wrangler d1 execute worship-roster --file=./schema.sql
+--
+-- Security notes:
+--  * Secrets (invite codes, device tokens) are NEVER stored in the clear —
+--    only their SHA-256 hex hash is persisted, so a database leak does not
+--    reveal usable credentials.
+--  * Every row is scoped by team_id; the Worker filters every query by the
+--    caller's team, enforced server-side.
+
+CREATE TABLE IF NOT EXISTS teams (
+  id                TEXT PRIMARY KEY,
+  name              TEXT NOT NULL,
+  invite_code_hash  TEXT NOT NULL,
+  season_start      TEXT NOT NULL DEFAULT '2026-07-02',
+  season_end        TEXT NOT NULL DEFAULT '2026-12-31',
+  created_at        TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS members (
+  id          TEXT PRIMARY KEY,
+  team_id     TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  is_leader   INTEGER NOT NULL DEFAULT 0,
+  positions   TEXT NOT NULL DEFAULT '[]',   -- JSON array of position ids
+  token_hash  TEXT NOT NULL,                -- SHA-256 of the device bearer token
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_members_token ON members(token_hash);
+
+CREATE TABLE IF NOT EXISTS assignments (
+  team_id     TEXT NOT NULL,
+  date        TEXT NOT NULL,               -- YYYY-MM-DD (a Sunday)
+  position_id TEXT NOT NULL,
+  member_id   TEXT,                        -- NULL = unassigned
+  PRIMARY KEY (team_id, date, position_id)
+);
+
+-- One row per member per (month, practice type): enforces one vote per block.
+CREATE TABLE IF NOT EXISTS votes (
+  team_id   TEXT NOT NULL,
+  month     TEXT NOT NULL,                 -- YYYY-MM
+  type_id   TEXT NOT NULL,                 -- 'weekday' | 'afterchurch'
+  member_id TEXT NOT NULL,
+  date      TEXT NOT NULL,                 -- candidate date voted for
+  PRIMARY KEY (team_id, month, type_id, member_id)
+);
+
+CREATE TABLE IF NOT EXISTS practice_locks (
+  team_id     TEXT NOT NULL,
+  month       TEXT NOT NULL,
+  type_id     TEXT NOT NULL,
+  locked_date TEXT NOT NULL,
+  locked_by   TEXT,
+  locked_at   TEXT,
+  PRIMARY KEY (team_id, month, type_id)
+);
+
+CREATE TABLE IF NOT EXISTS songs (
+  id         TEXT PRIMARY KEY,
+  team_id    TEXT NOT NULL,
+  month      TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  key_sig    TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_songs_team ON songs(team_id);
+
+-- Web Push subscriptions (one per installed device/browser).
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint   TEXT PRIMARY KEY,
+  member_id  TEXT NOT NULL,
+  team_id    TEXT NOT NULL,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_push_team ON push_subscriptions(team_id);
+
+-- Idempotency ledger so a cron re-run never double-sends the same reminder.
+CREATE TABLE IF NOT EXISTS reminder_log (
+  team_id  TEXT NOT NULL,
+  tag      TEXT NOT NULL,                  -- e.g. songlist:2026-07-05
+  sent_at  TEXT NOT NULL,
+  PRIMARY KEY (team_id, tag)
+);

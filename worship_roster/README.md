@@ -108,11 +108,34 @@ worship_roster/
   README.md
 ```
 
-## Notes & next steps
+## Two ways to run
 
-Reminders and votes live in the browser's `localStorage`, which is ideal for a
-self-contained demo the whole team can each run. To make reminders **push to
-phones when the app is closed** and to **share one live roster across the team**,
-the same UI can be pointed at a small shared backend (the reminder/vote/roster
-functions are already isolated for that) with a scheduled job that emails or
-push-notifies leaders each Wednesday.
+- **Local mode (default, no server).** Leave `js/config.js` `apiBase` empty.
+  Each phone keeps its own roster in the browser — perfect for a quick start or
+  a single organiser. This is what runs out of the box.
+- **Shared mode (optional backend).** Deploy the Cloudflare Worker in
+  [`server/`](server/README.md) and set `apiBase` + `vapidPublicKey` in
+  `js/config.js`. Now every phone shares **one live roster**, majority-vote
+  locking is enforced on the server, and **Web Push reminders** are delivered by
+  a daily cron (the Wednesday song-list nudge for leaders; practice reminders for
+  musicians). On first open each device sees a **Connect** screen to create or
+  join a team with an invite code.
+
+The UI is identical in both modes; every mutation goes through one `store`
+abstraction that talks to `localStorage` (local) or the API (shared).
+
+## Security
+
+Installing the app cannot expose a phone to external attacks — it runs in the
+browser sandbox with no native permissions and no third-party code. See
+[`SECURITY.md`](SECURITY.md) for the full posture (CSP, XSS defenses, and the
+backend's team-scoped auth, hashed credentials, and CORS controls).
+
+## Tests
+
+The backend ships a test suite that needs no cloud account (runs the real Worker
+over in-memory SQLite and drives the real front-end API client):
+
+```bash
+cd server && npm test
+```

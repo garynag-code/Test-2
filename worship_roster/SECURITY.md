@@ -43,6 +43,13 @@ own storage improperly.
 | **HTTPS + upgrade-insecure-requests** | Served over TLS via GitHub Pages; any stray `http:` sub-request is auto-upgraded. |
 | **Least privilege** | No login, no secrets, no permissions requested beyond optional notifications. |
 
+> **Note on `connect-src`.** In shared mode the page calls your Cloudflare
+> Worker on another origin, so `connect-src` is `'self' https:` — it permits
+> HTTPS API calls but still blocks cleartext and non-HTTP(S) schemes. Because
+> `script-src` stays `'self'` with no inline allowance, an attacker can't inject
+> script to abuse it, so this is a safe relaxation. For maximum strictness, pin
+> it to your exact Worker origin (e.g. `connect-src 'self' https://worship-roster-api.you.workers.dev`).
+
 ## Recommended host headers (defense in depth)
 
 A few controls can only be set as **HTTP response headers**, which GitHub Pages
@@ -62,32 +69,41 @@ Cross-Origin-Resource-Policy: same-origin
 `frame-ancestors 'none'` (clickjacking protection) is header-only; it's noted
 here because a `<meta>` tag can't deliver it.
 
-## When we add the shared backend
+## The shared backend (Cloudflare Worker + D1) — implemented
 
-Syncing one roster across phones and sending push reminders introduces a
-**server**, which is where "commercial-grade security" work actually
-concentrates. Note this still does **not** make phones more vulnerable — the
-phone only ever makes HTTPS API calls; the new risk is server-side. The plan:
+Shared mode adds a **server**, which is where "commercial-grade security" work
+concentrates. It still does **not** make phones more vulnerable — the phone only
+ever makes HTTPS API calls; the new surface is server-side, and it's addressed:
 
-- **Transport:** HTTPS/TLS only, HSTS, no mixed content.
-- **AuthN/Z:** per-team invite codes or magic-link/OAuth sign-in; every request
-  authorised against the caller's team and role (leaders vs members) server-side
-  — never trust the client.
-- **Input validation & injection:** parameterised queries (no string-built SQL),
-  strict schema validation on every endpoint, output encoding preserved.
-- **Abuse controls:** rate limiting, request size caps, and CORS restricted to
-  the app's own origin to blunt DoS and cross-site abuse.
-- **Web Push:** VAPID keys and push subscriptions treated as secrets, stored in
-  a managed secret store, never shipped to the client or committed to git.
-- **Data at rest:** encrypted managed database; least-privilege DB credentials;
-  automated backups.
-- **Operations:** dependency scanning (Dependabot), pinned/locked dependencies,
-  audit logging, and a documented patch cadence.
+- **Transport:** HTTPS/TLS only (Cloudflare-managed), `upgrade-insecure-requests`,
+  no mixed content.
+- **AuthN/Z:** high-entropy per-team invite codes and 256-bit device tokens.
+  Every request is authenticated and **scoped to the caller's team**; leader-only
+  actions (lock, new-vote, songs) are enforced **server-side** — the client is
+  never trusted. Verified by the test suite (a member's lock attempt returns 403;
+  voting a locked block returns 409).
+- **Credential storage:** invite codes and device tokens are stored **only as
+  SHA-256 hashes**, so a database leak yields no usable credentials.
+- **Injection:** all D1 access uses **parameterised prepared statements** — no
+  string-built SQL. Every endpoint validates types, enums (positions, practice
+  types), and date/month formats; names are sanitised and length-bounded.
+- **Abuse controls:** strict **CORS allow-list** (never `*`; requests from
+  other origins get 403), a request-size cap, and `no-store` responses.
+  Cloudflare's platform provides TLS termination and DDoS protection; for
+  per-endpoint rate limiting, add a Cloudflare Rate Limiting rule on the Worker
+  route.
+- **Web Push:** the VAPID **private key is a Worker secret** (`wrangler secret`),
+  never shipped to clients or committed. Reminders are sent **payload-less** —
+  no message content is transmitted or needs decrypting; the device simply
+  prompts the user to open the app. The VAPID signing is unit-tested with a full
+  sign-and-verify round-trip.
+- **Least privilege / no third-party runtime code:** the Worker has no npm
+  runtime dependencies; `wrangler` is a build-time dev tool only.
 
-Preferring a **serverless / managed platform** (e.g. Cloudflare Workers +
-managed KV/D1, or a managed Postgres backend) keeps the attack surface and
-patching burden low, which is the pragmatic path to commercial-grade security
-for a team of this size.
+This serverless/managed design (Workers + D1) keeps the attack surface and
+patching burden low — the pragmatic path to commercial-grade security for a team
+of this size. Recommended next hardening: add a Cloudflare Rate Limiting rule and
+enable Dependabot on the repo.
 
 ## Reporting
 

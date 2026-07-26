@@ -1,0 +1,175 @@
+/* End-to-end integration test of the Worker's request handlers, security
+ * enforcement and the majority-lock rule, run against a real in-memory SQLite
+ * wrapped as a minimal D1 adapter.
+ *
+ * Run with:  node --experimental-sqlite server/test/integration.mjs
+ */
+
+import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import worker from '../src/index.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+// ---- Minimal D1 adapter over node:sqlite -----------------------------------
+function makeDB() {
+  const db = new DatabaseSync(':memory:');
+  db.exec(readFileSync(join(here, '..', 'schema.sql'), 'utf8'));
+  const wrap = (sql) => ({
+    _sql: sql, _args: [],
+    bind(...a) { this._args = a; return this; },
+    first() { return db.prepare(this._sql).get(...this._args) ?? null; },
+    all() { return { results: db.prepare(this._sql).all(...this._args) }; },
+    run() { const r = db.prepare(this._sql).run(...this._args); return { success: true, meta: r }; },
+  });
+  return {
+    prepare: (sql) => wrap(sql),
+    batch: async (stmts) => stmts.map((s) => s.run()),
+  };
+}
+
+const ORIGIN = 'https://app.example';
+const env = {
+  DB: makeDB(),
+  ALLOWED_ORIGINS: ORIGIN,
+  VAPID_PUBLIC_KEY: 'BPabc', VAPID_SUBJECT: 'mailto:x@y.z',
+};
+
+async function call(method, path, { token, body, origin = ORIGIN } = {}) {
+  const headers = { 'Origin': origin };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  let init = { method, headers };
+  if (body !== undefined) {
+    const s = JSON.stringify(body);
+    headers['Content-Type'] = 'application/json';
+    headers['Content-Length'] = String(new TextEncoder().encode(s).length);
+    init.body = s;
+  }
+  const res = await worker.fetch(new Request('https://api.example' + path, init), env);
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  return { status: res.status, data, cors: res.headers.get('Access-Control-Allow-Origin') };
+}
+
+let passed = 0;
+async function test(name, fn) { await fn(); passed++; console.log('  ✓', name); }
+
+console.log('Handler + security integration');
+
+// ---- Team creation & auth ---------------------------------------------------
+let leaderToken, memberTokens = [], teamInvite;
+
+await test('create team returns invite + leader token', async () => {
+  const r = await call('POST', '/api/teams', { body: { teamName: 'Grace Worship', leaderName: 'Naomi' } });
+  assert.equal(r.status, 201);
+  assert.ok(r.data.deviceToken && r.data.inviteCode);
+  assert.equal(r.data.role, 'leader');
+  leaderToken = r.data.deviceToken;
+  teamInvite = r.data.inviteCode;
+});
+
+await test('unauthenticated requests are rejected', async () => {
+  const r = await call('GET', '/api/state', {});
+  assert.equal(r.status, 401);
+});
+
+await test('bad bearer token is rejected', async () => {
+  const r = await call('GET', '/api/state', { token: 'not-a-real-token' });
+  assert.equal(r.status, 401);
+});
+
+await test('members join with the invite code', async () => {
+  for (const name of ['David', 'Peter', 'Grace', 'Sam', 'Ruth', 'Esther', 'Joy']) {
+    const r = await call('POST', '/api/teams/join', { body: { inviteCode: teamInvite, name } });
+    assert.equal(r.status, 201);
+    memberTokens.push(r.data.deviceToken);
+  }
+  // 1 leader + 7 members = 8
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(state.data.members.length, 8);
+});
+
+await test('wrong invite code cannot join', async () => {
+  const r = await call('POST', '/api/teams/join', { body: { inviteCode: 'ZZZZZ-ZZZZ', name: 'Mallory' } });
+  assert.equal(r.status, 404);
+});
+
+// ---- CORS -------------------------------------------------------------------
+await test('requests from a non-allow-listed origin are blocked', async () => {
+  const r = await call('GET', '/api/health', { origin: 'https://evil.example' });
+  assert.equal(r.status, 403);
+});
+
+// ---- Voting + majority lock -------------------------------------------------
+await test('a member gets one vote per block (re-vote replaces)', async () => {
+  await call('POST', '/api/votes', { token: memberTokens[0], body: { month: '2026-07', typeId: 'weekday', date: '2026-07-02' } });
+  await call('POST', '/api/votes', { token: memberTokens[0], body: { month: '2026-07', typeId: 'weekday', date: '2026-07-09' } });
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const mine = state.data.votes.filter((v) => v.type_id === 'weekday' && v.month === '2026-07');
+  assert.equal(mine.length, 1, 'only the latest vote is kept');
+  assert.equal(mine[0].date, '2026-07-09');
+});
+
+await test('lock is refused without a majority', async () => {
+  // Only 1 vote so far (from the re-vote test) for 07-09; need 5 of 8.
+  const r = await call('POST', '/api/practices/lock', { token: leaderToken, body: { month: '2026-07', typeId: 'weekday' } });
+  assert.equal(r.status, 409, 'no majority -> 409');
+});
+
+await test('non-leaders cannot lock a date', async () => {
+  const r = await call('POST', '/api/practices/lock', { token: memberTokens[1], body: { month: '2026-07', typeId: 'weekday' } });
+  assert.equal(r.status, 403);
+});
+
+await test('a majority locks the date', async () => {
+  // Five members vote 2026-07-16 -> majority of 8.
+  for (let i = 0; i < 5; i++) {
+    await call('POST', '/api/votes', { token: memberTokens[i], body: { month: '2026-07', typeId: 'weekday', date: '2026-07-16' } });
+  }
+  const r = await call('POST', '/api/practices/lock', { token: leaderToken, body: { month: '2026-07', typeId: 'weekday' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.lockedDate, '2026-07-16');
+});
+
+await test('a locked date cannot be voted on (needs a new vote)', async () => {
+  const r = await call('POST', '/api/votes', { token: memberTokens[6], body: { month: '2026-07', typeId: 'weekday', date: '2026-07-23' } });
+  assert.equal(r.status, 409, 'voting on a locked block is refused');
+});
+
+await test('only a leader can call a new vote, which clears the lock', async () => {
+  const bad = await call('POST', '/api/practices/new-vote', { token: memberTokens[0], body: { month: '2026-07', typeId: 'weekday' } });
+  assert.equal(bad.status, 403);
+  const ok = await call('POST', '/api/practices/new-vote', { token: leaderToken, body: { month: '2026-07', typeId: 'weekday' } });
+  assert.equal(ok.status, 200);
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(state.data.locks.length, 0, 'lock cleared');
+  assert.equal(state.data.votes.filter((v) => v.month === '2026-07' && v.type_id === 'weekday').length, 0, 'votes reset');
+});
+
+// ---- Songs (leader-only) ----------------------------------------------------
+await test('members cannot post songs; leaders can', async () => {
+  const bad = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
+  assert.equal(bad.status, 403);
+  const ok = await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
+  assert.equal(ok.status, 201);
+});
+
+// ---- Input validation -------------------------------------------------------
+await test('invalid inputs are rejected', async () => {
+  assert.equal((await call('POST', '/api/votes', { token: leaderToken, body: { month: 'July', typeId: 'weekday', date: '2026-07-02' } })).status, 400);
+  assert.equal((await call('POST', '/api/votes', { token: leaderToken, body: { month: '2026-07', typeId: 'whenever', date: '2026-07-02' } })).status, 400);
+  assert.equal((await call('PUT', '/api/assignments', { token: leaderToken, body: { date: 'bad', positionId: 'lead' } })).status, 400);
+  assert.equal((await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'trombone' } })).status, 400);
+});
+
+await test('assignment only accepts a member of the same team', async () => {
+  const ok = await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'bass', memberId: null } });
+  assert.equal(ok.status, 200);
+  const bad = await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'bass', memberId: 'm_intruder' } });
+  assert.equal(bad.status, 400, 'unknown member rejected');
+});
+
+console.log(`\n${passed} tests passed.`);

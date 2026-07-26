@@ -54,8 +54,18 @@ const WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
  * 2. State + persistence
  * -------------------------------------------------------------------------- */
 
-let state = load();
+// Cloud mode is on when config supplies an API base AND the API client loaded.
+const CFG = window.ROSTER_CONFIG || {};
+const CLOUD = !!(CFG.apiBase && window.RosterAPI && window.RosterAPI.configured());
+
+let state = CLOUD ? emptyState() : load();
 let activeTab = 'roster';
+
+function emptyState() {
+  // Placeholder until the first cloud sync populates real data.
+  return { version: 1, currentUserId: null, members: [], sundays: buildSundays(),
+    practices: buildPractices(), reminders: [], songs: {}, notifyEnabled: false, cloud: true };
+}
 
 function load() {
   try {
@@ -66,6 +76,7 @@ function load() {
 }
 
 function save() {
+  if (CLOUD) return;  // in cloud mode the server is the source of truth
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (_) {
@@ -362,6 +373,107 @@ function songsFor(mKey) {
 }
 
 /* -------------------------------------------------------------------------- *
+ * 4b. Store abstraction (local vs cloud) + cloud sync
+ *
+ * Every UI mutation goes through `store` so local mode and cloud mode share one
+ * path. In local mode it edits localStorage-backed state; in cloud mode it
+ * calls the Worker API and re-syncs authoritative state from the server.
+ * -------------------------------------------------------------------------- */
+
+const localStore = {
+  async assign(date, pos, mid) {
+    const s = state.sundays.find((x) => x.date === date);
+    if (mid) s.assignments[pos] = mid; else delete s.assignments[pos];
+    save();
+  },
+  async vote(mKey, typeId, date) { castVote(state.practices[mKey][typeId], date); },
+  async lock(mKey, typeId) { return lockMajority(mKey, typeId); },
+  async newVote(mKey, typeId) { callNewVote(mKey, typeId); },
+  async addSong(mKey, title, key) {
+    if (!state.songs[mKey]) state.songs[mKey] = [];
+    state.songs[mKey].push({ id: uid('s'), title, key }); save();
+  },
+  async deleteSong(mKey, id) { state.songs[mKey] = (state.songs[mKey] || []).filter((x) => x.id !== id); save(); },
+};
+
+const cloudStore = {
+  async assign(date, pos, mid) { await guard(() => RosterAPI.setAssignment(date, pos, mid || null)); },
+  async vote(mKey, typeId, date) { await guard(() => RosterAPI.vote(mKey, typeId, date)); },
+  async lock(mKey, typeId) { const ok = await guard(() => RosterAPI.lock(mKey, typeId)); return ok; },
+  async newVote(mKey, typeId) { await guard(() => RosterAPI.newVote(mKey, typeId)); },
+  async addSong(mKey, title, key) { await guard(() => RosterAPI.addSong(mKey, title, key)); },
+  async deleteSong(mKey, id) { await guard(() => RosterAPI.deleteSong(id)); },
+};
+
+/** Run a cloud call, surface errors as a toast, then re-sync server truth. */
+async function guard(fn) {
+  let ok = true;
+  try { await fn(); } catch (e) { ok = false; toast(e.message || 'Something went wrong.'); }
+  try { await syncFromCloud(); } catch (_) { /* keep last-known state */ }
+  return ok;
+}
+
+const store = CLOUD ? cloudStore : localStore;
+
+/** Pull authoritative state from the server and map it to the local shape. */
+async function syncFromCloud() {
+  const s = await RosterAPI.getState();
+  state = cloudMap(s);
+}
+
+/** Map the server state payload onto the shape the render functions expect. */
+function cloudMap(s) {
+  const st = {
+    version: 1,
+    currentUserId: s.me && s.me.id,
+    members: (s.members || []).map((m) => ({ id: m.id, name: m.name, isLeader: m.isLeader, positions: m.positions || [] })),
+    sundays: buildSundays(),
+    practices: buildPractices(),
+    reminders: [],
+    songs: {},
+    notifyEnabled: localStorage.getItem('worship-roster-notify') === '1',
+    team: s.team,
+    cloud: true,
+  };
+  const byDate = {};
+  st.sundays.forEach((x) => { byDate[x.date] = x; });
+  for (const a of (s.assignments || [])) {
+    if (a.member_id && byDate[a.date]) byDate[a.date].assignments[a.position_id] = a.member_id;
+  }
+  for (const v of (s.votes || [])) {
+    const blk = st.practices[v.month] && st.practices[v.month][v.type_id];
+    if (!blk) continue;
+    const c = blk.candidates.find((x) => x.date === v.date);
+    if (c) c.votes.push(v.member_id);
+  }
+  for (const l of (s.locks || [])) {
+    const blk = st.practices[l.month] && st.practices[l.month][l.type_id];
+    if (blk) blk.lockedDate = l.locked_date;
+  }
+  for (const so of (s.songs || [])) {
+    (st.songs[so.month] = st.songs[so.month] || []).push({ id: so.id, title: so.title, key: so.key || '' });
+  }
+  // Derive the reminder list for display (push delivery is handled server-side).
+  st.reminders = buildSeasonReminders(st);
+  for (const mKey of Object.keys(st.practices)) {
+    for (const typeId of Object.keys(st.practices[mKey])) {
+      const blk = st.practices[mKey][typeId];
+      if (!blk.lockedDate) continue;
+      const type = PRACTICE_TYPES.find((t) => t.id === typeId);
+      const remindOn = parseISO(blk.lockedDate);
+      remindOn.setDate(remindOn.getDate() - 2);
+      st.reminders.push({
+        id: uid('r'), type: 'practice', tag: `practice:${mKey}:${typeId}`,
+        title: `Musicians: rehearse for ${type.name.toLowerCase()}`,
+        detail: `Practice on ${fmtLong(blk.lockedDate)}.`, date: toISO(remindOn),
+        audience: 'musicians', done: false,
+      });
+    }
+  }
+  return st;
+}
+
+/* -------------------------------------------------------------------------- *
  * 5. Rendering
  * -------------------------------------------------------------------------- */
 
@@ -405,6 +517,13 @@ function render() {
 
 function syncUserSelect() {
   const sel = document.getElementById('current-user');
+  if (CLOUD) {
+    // Each device is signed in as one member; no switching.
+    const me = currentUser();
+    sel.innerHTML = me ? `<option>${esc(me.name)}</option>` : '';
+    sel.disabled = true;
+    return;
+  }
   sel.innerHTML = state.members
     .map((m) => `<option value="${m.id}">${esc(m.name)}</option>`)
     .join('');
@@ -437,10 +556,8 @@ function roster() {
       const pool = eligible.length ? eligible : state.members;
       sel.innerHTML = `<option value="">— unassigned —</option>` +
         pool.map((m) => `<option value="${m.id}" ${sunday.assignments[pos.id] === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
-      sel.addEventListener('change', () => {
-        if (sel.value) sunday.assignments[pos.id] = sel.value;
-        else delete sunday.assignments[pos.id];
-        save();
+      sel.addEventListener('change', async () => {
+        await store.assign(sunday.date, pos.id, sel.value || null);
         render();
       });
       row.appendChild(sel);
@@ -491,7 +608,7 @@ function voting() {
           </div>`);
         if (!block.lockedDate) {
           const btn = el(`<button class="btn btn--sm ${iVoted ? 'btn--primary' : ''}">${iVoted ? '✓ Voted' : 'Vote'}</button>`);
-          btn.addEventListener('click', () => { castVote(block, c.date); render(); });
+          btn.addEventListener('click', async () => { await store.vote(mKey, type.id, c.date); render(); });
           opt.querySelector('.vote-option__right').appendChild(btn);
         }
         card.appendChild(opt);
@@ -504,15 +621,15 @@ function voting() {
         if (isLeader()) {
           const nv = el(`<button class="btn btn--sm btn--danger">Call new vote</button>`);
           nv.addEventListener('click', () => {
-            confirmModal('Call a new vote?', 'This clears the locked date and all current votes for this practice.', () => {
-              callNewVote(mKey, type.id); render();
+            confirmModal('Call a new vote?', 'This clears the locked date and all current votes for this practice.', async () => {
+              await store.newVote(mKey, type.id); render();
             });
           });
           controls.appendChild(nv);
         }
       } else if (isLeader()) {
         const lock = el(`<button class="btn btn--sm btn--primary" ${hasMajority ? '' : 'disabled'}>Lock majority${leader && leader.votes.length ? ` (${fmtShort(leader.date)})` : ''}</button>`);
-        lock.addEventListener('click', () => { if (lockMajority(mKey, type.id)) render(); });
+        lock.addEventListener('click', async () => { if (await store.lock(mKey, type.id)) render(); });
         controls.appendChild(lock);
       } else {
         controls.appendChild(el(`<span class="card__meta">A leader locks the date once the majority is in.</span>`));
@@ -557,9 +674,8 @@ function songs() {
       actions.appendChild(remind);
       if (isLeader()) {
         const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
-        del.addEventListener('click', () => {
-          state.songs[mKey] = list.filter((x) => x.id !== song.id);
-          save(); render();
+        del.addEventListener('click', async () => {
+          await store.deleteSong(mKey, song.id); render();
         });
         actions.appendChild(del);
       }
@@ -588,11 +704,8 @@ function addSongModal(mKey) {
     const title = body.querySelector('#song-title').value.trim();
     const key = body.querySelector('#song-key').value.trim();
     if (!title) { toast('Enter a song title.'); return false; }
-    if (!state.songs[mKey]) state.songs[mKey] = [];
-    state.songs[mKey].push({ id: uid('s'), title, key });
-    save(); render();
-    toast('Song added.');
-    return true;
+    store.addSong(mKey, title, key).then(() => { render(); toast('Song added.'); });
+    return true;  // close the modal immediately; the store call resolves async
   });
 }
 
@@ -657,6 +770,25 @@ function team() {
   view.appendChild(el(`<h2 class="section-title">👥 Team</h2>`));
   view.appendChild(el(`<p class="section-sub">${state.members.length} members. Leaders manage songs, lock practice dates and get the Wednesday song-list nudge.</p>`));
 
+  // In cloud mode, members join with the team's invite code — show it so a
+  // leader can share it, rather than adding members manually.
+  if (CLOUD) {
+    const t = RosterAPI.team();
+    if (t && t.inviteCode) {
+      const inv = el(`<div class="card"></div>`);
+      inv.appendChild(el(`<div class="card__head"><span class="card__title">Invite code</span><span class="badge">${esc(t.role || 'member')}</span></div>`));
+      inv.appendChild(el(`<div class="card__meta">Share this so teammates can join "${esc(t.teamName || 'the team')}" on their own phones.</div>`));
+      inv.appendChild(el(`<div style="font-size:1.4rem;font-weight:700;letter-spacing:2px;text-align:center;margin:10px 0">${esc(t.inviteCode)}</div>`));
+      const copy = el(`<button class="btn btn--sm btn--block">Copy invite code</button>`);
+      copy.addEventListener('click', () => {
+        navigator.clipboard && navigator.clipboard.writeText(t.inviteCode);
+        toast('Invite code copied.');
+      });
+      inv.appendChild(copy);
+      view.appendChild(inv);
+    }
+  }
+
   const card = el(`<div class="card"></div>`);
   for (const m of state.members) {
     const row = el(`<div class="member"></div>`);
@@ -666,18 +798,30 @@ function team() {
         <div class="member__name">${esc(m.name)} ${m.isLeader ? '<span class="badge">Leader</span>' : ''}</div>
         <div class="member__pos">${esc(posNames || 'No position set')}</div>
       </div>`));
-    const actions = el(`<div class="btn-row"></div>`);
-    const edit = el(`<button class="btn btn--sm">Edit</button>`);
-    edit.addEventListener('click', () => memberModal(m));
-    actions.appendChild(edit);
-    row.appendChild(actions);
+    if (!CLOUD) {
+      const actions = el(`<div class="btn-row"></div>`);
+      const edit = el(`<button class="btn btn--sm">Edit</button>`);
+      edit.addEventListener('click', () => memberModal(m));
+      actions.appendChild(edit);
+      row.appendChild(actions);
+    }
     card.appendChild(row);
   }
   view.appendChild(card);
 
-  const add = el(`<button class="btn btn--primary btn--block">＋ Add team member</button>`);
-  add.addEventListener('click', () => memberModal(null));
-  view.appendChild(add);
+  if (!CLOUD) {
+    const add = el(`<button class="btn btn--primary btn--block">＋ Add team member</button>`);
+    add.addEventListener('click', () => memberModal(null));
+    view.appendChild(add);
+  } else {
+    const out = el(`<button class="btn btn--danger btn--block">Sign out of this team</button>`);
+    out.addEventListener('click', () => {
+      confirmModal('Sign out?', 'This device will disconnect from the shared team. You can rejoin with the invite code.', () => {
+        RosterAPI.clearSession(); location.reload();
+      });
+    });
+    view.appendChild(out);
+  }
 }
 
 function memberModal(existing) {
@@ -774,15 +918,43 @@ function toast(msg) {
 
 function requestNotify() {
   if (!('Notification' in window)) { toast('Notifications not supported here.'); return; }
-  Notification.requestPermission().then((perm) => {
+  Notification.requestPermission().then(async (perm) => {
     if (perm === 'granted') {
-      state.notifyEnabled = true; save(); render();
+      state.notifyEnabled = true;
+      localStorage.setItem('worship-roster-notify', '1');
+      save();
+      if (CLOUD) await subscribeCloudPush();
+      render();
       fireDueNotifications();
       toast('Notifications enabled.');
     } else {
       toast('Permission denied.');
     }
   });
+}
+
+/** Register a Web Push subscription with the server (cloud mode only). */
+async function subscribeCloudPush() {
+  try {
+    if (!CFG.vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(CFG.vapidPublicKey),
+    });
+    await RosterAPI.subscribePush(sub.toJSON());
+  } catch (e) {
+    toast('Push setup failed: ' + (e.message || e));
+  }
+}
+
+function urlBase64ToUint8Array(base64) {
+  const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+  const b = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
 }
 
 function fireDueNotifications() {
@@ -804,12 +976,98 @@ document.querySelectorAll('.tabbar__btn').forEach((btn) => {
 });
 
 document.getElementById('current-user').addEventListener('change', (e) => {
+  if (CLOUD) return;                       // no member switching in cloud mode
   state.currentUserId = e.target.value;
   save(); render();
 });
 
-render();
-fireDueNotifications();
+function setChromeVisible(visible) {
+  const tabbar = document.querySelector('.tabbar');
+  const userSel = document.getElementById('current-user');
+  if (tabbar) tabbar.style.display = visible ? '' : 'none';
+  if (userSel) userSel.style.visibility = visible ? '' : 'hidden';
+}
+
+/** Cloud connect screen: create a new team or join one with an invite code. */
+function renderConnect() {
+  document.getElementById('season-label').textContent = `Season: ${SEASON.label}`;
+  setChromeVisible(false);
+  view.innerHTML = '';
+  view.appendChild(el(`<h2 class="section-title">🎵 Connect your team</h2>`));
+  view.appendChild(el(`<p class="section-sub">Create a shared roster, or join your team with the invite code they gave you. Your phone stays signed in.</p>`));
+
+  // Join
+  const joinCard = el(`<div class="card"></div>`);
+  joinCard.appendChild(el(`<div class="card__title">Join a team</div>`));
+  const joinBody = el(`
+    <div>
+      <label class="field" for="join-code">Invite code</label>
+      <input id="join-code" type="text" autocapitalize="characters" placeholder="ABCDE-FGHJ" />
+      <label class="field" for="join-name">Your name</label>
+      <input id="join-name" type="text" placeholder="e.g. David" />
+    </div>`);
+  joinCard.appendChild(joinBody);
+  const joinBtn = el(`<button class="btn btn--primary btn--block" style="margin-top:12px">Join team</button>`);
+  joinBtn.addEventListener('click', async () => {
+    const code = joinBody.querySelector('#join-code').value.trim();
+    const name = joinBody.querySelector('#join-name').value.trim();
+    if (!code || !name) { toast('Enter the invite code and your name.'); return; }
+    joinBtn.disabled = true;
+    try { await RosterAPI.joinTeam(code, name); await afterConnect(); }
+    catch (e) { toast(e.message); joinBtn.disabled = false; }
+  });
+  joinCard.appendChild(joinBtn);
+  view.appendChild(joinCard);
+
+  // Create
+  const createCard = el(`<div class="card"></div>`);
+  createCard.appendChild(el(`<div class="card__title">Start a new team</div>`));
+  const createBody = el(`
+    <div>
+      <label class="field" for="team-name">Team name</label>
+      <input id="team-name" type="text" placeholder="e.g. Grace Worship" />
+      <label class="field" for="leader-name">Your name (team leader)</label>
+      <input id="leader-name" type="text" placeholder="e.g. Naomi" />
+    </div>`);
+  createCard.appendChild(createBody);
+  const createBtn = el(`<button class="btn btn--block" style="margin-top:12px">Create team</button>`);
+  createBtn.addEventListener('click', async () => {
+    const teamName = createBody.querySelector('#team-name').value.trim();
+    const leaderName = createBody.querySelector('#leader-name').value.trim();
+    if (!teamName || !leaderName) { toast('Enter a team name and your name.'); return; }
+    createBtn.disabled = true;
+    try {
+      const d = await RosterAPI.createTeam(teamName, leaderName);
+      await afterConnect();
+      toast(`Team created — invite code ${d.inviteCode}`);
+    } catch (e) { toast(e.message); createBtn.disabled = false; }
+  });
+  createCard.appendChild(createBtn);
+  view.appendChild(createCard);
+}
+
+async function afterConnect() {
+  await syncFromCloud();
+  setChromeVisible(true);
+  activeTab = 'roster';
+  render();
+}
+
+async function boot() {
+  if (CLOUD) {
+    if (!RosterAPI.hasSession()) { renderConnect(); return; }
+    try { await syncFromCloud(); }
+    catch (e) { toast(e.message || 'Could not reach the server.'); renderConnect(); return; }
+    setChromeVisible(true);
+    render();
+    fireDueNotifications();
+  } else {
+    render();
+    fireDueNotifications();
+  }
+}
+
+boot();
 
 // Register the service worker so the app installs and runs offline on Android.
 // Kept here (not inline in HTML) so the page can enforce a strict

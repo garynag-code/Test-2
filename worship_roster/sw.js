@@ -48,3 +48,28 @@ self.addEventListener('fetch', (event) => {
   // Cross-origin (e.g. chord lookups): network-first, fall back to cache.
   event.respondWith(fetch(req).catch(() => caches.match(req)));
 });
+
+/* ---- Web Push (cloud mode) --------------------------------------------------
+ * The server sends a payload-less "tickle" (so no message content is ever
+ * transmitted or needs decrypting). We show a prompt to open the app, where the
+ * Reminders tab lists exactly what's due. */
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    self.registration.showNotification('Worship Team Roster', {
+      body: 'You have reminders due today — tap to open your roster.',
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      tag: 'worship-reminders',
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow('./index.html');
+    })
+  );
+});
