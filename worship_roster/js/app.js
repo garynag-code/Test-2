@@ -1039,10 +1039,9 @@ function renderConnect() {
   const invited = !!invitedCode;
 
   view.appendChild(el(`
-    <div style="text-align:center;margin:8px 0 16px">
-      <div style="font-size:1.35rem;font-weight:800;color:var(--brand-dark);letter-spacing:.3px">${esc(BRAND)}</div>
-      <div style="font-size:.8rem;color:var(--muted);font-style:italic;margin-top:2px">${esc(TAGLINE)}</div>
-      <div style="font-size:.9rem;font-weight:600;color:var(--brand);margin-top:8px">🎵 Worship Team Roster</div>
+    <div style="text-align:center;margin:8px 0 18px">
+      <img src="img/logo.svg" alt="${esc(BRAND)} — ${esc(TAGLINE)}" style="width:82%;max-width:300px;height:auto" />
+      <div style="font-size:.95rem;font-weight:600;color:var(--brand);margin-top:12px">🎵 Worship Team Roster</div>
     </div>`));
   view.appendChild(el(invited
     ? `<p class="section-sub">You've been invited to join the ${esc(BRAND)} worship team. Enter your name below to join.</p>`
