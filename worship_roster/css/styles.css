@@ -52,7 +52,9 @@ html, body {
 .app-header__inner {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
-.app-header__title { font-size: 1.15rem; margin: 0; font-weight: 700; }
+.app-header__brand { display: flex; flex-direction: column; gap: 1px; }
+.app-header__title { font-size: 1.15rem; margin: 0; font-weight: 800; letter-spacing: .2px; }
+.app-header__subtitle { margin: 0; font-size: .72rem; font-weight: 500; opacity: .9; letter-spacing: .3px; text-transform: uppercase; }
 .app-header__season { margin: 4px 0 0; font-size: .78rem; opacity: .9; }
 .user-select {
   background: rgba(255,255,255,.16);

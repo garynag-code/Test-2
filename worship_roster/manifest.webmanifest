@@ -1,7 +1,7 @@
 {
-  "name": "Worship Team Roster",
-  "short_name": "Roster",
-  "description": "Manage a worship team roster, schedule practices by majority vote, post song lists with chords, and send reminders.",
+  "name": "Ecclesia Glocal — Worship Team Roster",
+  "short_name": "Ecclesia Glocal",
+  "description": "Ecclesia Glocal worship team roster: schedule practices by majority vote, post song lists with chords, and send reminders.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

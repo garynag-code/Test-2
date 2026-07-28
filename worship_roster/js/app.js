@@ -46,6 +46,9 @@ const PRACTICE_TYPES = [
   { id: 'afterchurch', name: 'After-church practice', hint: 'Rehearsal straight after a Sunday service', sundayOnly: true },
 ];
 
+// Organisation branding (single source of truth; change here to re-brand).
+const BRAND = 'Ecclesia Glocal';
+
 const STORAGE_KEY = 'worship-roster-v1';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -777,9 +780,43 @@ function team() {
     if (t && t.inviteCode) {
       const inv = el(`<div class="card"></div>`);
       inv.appendChild(el(`<div class="card__head"><span class="card__title">Invite code</span><span class="badge">${esc(t.role || 'member')}</span></div>`));
-      inv.appendChild(el(`<div class="card__meta">Share this so teammates can join "${esc(t.teamName || 'the team')}" on their own phones.</div>`));
+      inv.appendChild(el(`<div class="card__meta">Send teammates the invite link below — it opens the app ready to join "${esc(t.teamName || 'the team')}", with "start a new team" disabled so nobody creates a duplicate.</div>`));
       inv.appendChild(el(`<div style="font-size:1.4rem;font-weight:700;letter-spacing:2px;text-align:center;margin:10px 0">${esc(t.inviteCode)}</div>`));
-      const copy = el(`<button class="btn btn--sm btn--block">Copy invite code</button>`);
+
+      // Full join link: current page URL + ?join=CODE (no query/hash carried over).
+      const teamName = t.teamName || 'our worship team';
+      const inviteLink = location.origin + location.pathname + '?join=' + encodeURIComponent(t.inviteCode);
+      // A clean, professional message to share alongside the link.
+      const inviteMsg =
+        `🎵 ${BRAND} — Worship Team\n\n` +
+        `You're invited to join ${teamName}. Tap the link below on your phone to join — you'll just enter your name:\n${inviteLink}\n\n` +
+        `Once you're in you'll see the schedule, song lists and practice reminders.`;
+
+      inv.appendChild(el(`<div class="card__meta" style="word-break:break-all;background:#f3f4f6;border-radius:8px;padding:8px;margin-bottom:8px">${esc(inviteLink)}</div>`));
+
+      const shareBtn = el(`<button class="btn btn--sm btn--primary btn--block" style="margin-bottom:8px">Share invite</button>`);
+      shareBtn.addEventListener('click', async () => {
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: `Join ${teamName}`, text: inviteMsg });
+          } else {
+            await navigator.clipboard.writeText(inviteMsg); toast('Invite message copied — paste it into WhatsApp, SMS or email.');
+          }
+        } catch (_) {
+          try { await navigator.clipboard.writeText(inviteMsg); toast('Invite message copied.'); }
+          catch (e2) { toast('Copy failed — long-press the link above to copy.'); }
+        }
+      });
+      inv.appendChild(shareBtn);
+
+      const copyMsg = el(`<button class="btn btn--sm btn--block" style="margin-bottom:8px">Copy invite message</button>`);
+      copyMsg.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(inviteMsg); toast('Invite message copied.'); }
+        catch (_) { toast('Copy failed — long-press the link above to copy.'); }
+      });
+      inv.appendChild(copyMsg);
+
+      const copy = el(`<button class="btn btn--sm btn--block">Copy code only</button>`);
       copy.addEventListener('click', () => {
         navigator.clipboard && navigator.clipboard.writeText(t.inviteCode);
         toast('Invite code copied.');
@@ -993,16 +1030,25 @@ function renderConnect() {
   document.getElementById('season-label').textContent = `Season: ${SEASON.label}`;
   setChromeVisible(false);
   view.innerHTML = '';
-  view.appendChild(el(`<h2 class="section-title">🎵 Connect your team</h2>`));
-  view.appendChild(el(`<p class="section-sub">Create a shared roster, or join your team with the invite code they gave you. Your phone stays signed in.</p>`));
 
-  // Join
+  // An invite link carries the team code as ?join=CODE. When present, we only
+  // let the person JOIN (creating a new team is greyed out) so invitees can't
+  // accidentally start a competing team.
+  const invitedCode = (new URLSearchParams(location.search).get('join') || '').trim().toUpperCase();
+  const invited = !!invitedCode;
+
+  view.appendChild(el(`<h2 class="section-title">🎵 ${esc(BRAND)} Worship</h2>`));
+  view.appendChild(el(invited
+    ? `<p class="section-sub">You've been invited to join the ${esc(BRAND)} worship team. Enter your name below to join.</p>`
+    : `<p class="section-sub">Create a shared roster, or join your team with the invite code they gave you. Your phone stays signed in.</p>`));
+
+  // ---- Join ----
   const joinCard = el(`<div class="card"></div>`);
   joinCard.appendChild(el(`<div class="card__title">Join a team</div>`));
   const joinBody = el(`
     <div>
       <label class="field" for="join-code">Invite code</label>
-      <input id="join-code" type="text" autocapitalize="characters" placeholder="ABCDE-FGHJ" />
+      <input id="join-code" type="text" autocapitalize="characters" placeholder="ABCDE-FGHJ" value="${esc(invitedCode)}" ${invited ? 'readonly' : ''} />
       <label class="field" for="join-name">Your name</label>
       <input id="join-name" type="text" placeholder="e.g. David" />
     </div>`);
@@ -1018,19 +1064,23 @@ function renderConnect() {
   });
   joinCard.appendChild(joinBtn);
   view.appendChild(joinCard);
+  if (invited) setTimeout(() => { const n = joinBody.querySelector('#join-name'); n && n.focus(); }, 0);
 
-  // Create
+  // ---- Create (greyed out when arriving via an invite link) ----
   const createCard = el(`<div class="card"></div>`);
+  if (invited) createCard.style.cssText = 'opacity:.5;pointer-events:none';
+  createCard.setAttribute('aria-disabled', invited ? 'true' : 'false');
   createCard.appendChild(el(`<div class="card__title">Start a new team</div>`));
+  if (invited) createCard.appendChild(el(`<div class="card__meta">Disabled — you're joining an existing team via your invite link.</div>`));
   const createBody = el(`
     <div>
       <label class="field" for="team-name">Team name</label>
-      <input id="team-name" type="text" placeholder="e.g. Grace Worship" />
+      <input id="team-name" type="text" placeholder="e.g. Grace Worship" ${invited ? 'disabled' : ''} />
       <label class="field" for="leader-name">Your name (team leader)</label>
-      <input id="leader-name" type="text" placeholder="e.g. Naomi" />
+      <input id="leader-name" type="text" placeholder="e.g. Naomi" ${invited ? 'disabled' : ''} />
     </div>`);
   createCard.appendChild(createBody);
-  const createBtn = el(`<button class="btn btn--block" style="margin-top:12px">Create team</button>`);
+  const createBtn = el(`<button class="btn btn--block" style="margin-top:12px" ${invited ? 'disabled' : ''}>Create team</button>`);
   createBtn.addEventListener('click', async () => {
     const teamName = createBody.querySelector('#team-name').value.trim();
     const leaderName = createBody.querySelector('#leader-name').value.trim();
