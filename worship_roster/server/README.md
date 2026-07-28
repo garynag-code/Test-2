@@ -24,7 +24,31 @@ without it (local mode); turn this on only when you want sync + push.
   D1 queries, security headers. The VAPID private key is a **Worker secret**,
   never shipped to clients or committed.
 
-## Deploy
+## Deploy — Option A: from GitHub (no local tools) ⭐ easiest
+
+A GitHub Actions workflow (`.github/workflows/deploy-worker.yml`) does the whole
+deploy for you. You only touch web UIs.
+
+1. **Create a free Cloudflare account** at dash.cloudflare.com. On first visit to
+   **Workers & Pages**, register a **workers.dev subdomain** when prompted (any
+   name) — the Worker is served from it.
+2. **Get your Account ID:** Cloudflare dashboard → Workers & Pages → the
+   **Account ID** is shown on the right.
+3. **Create an API token:** dashboard → **My Profile → API Tokens → Create
+   Token → "Edit Cloudflare Workers"** template → Create. Copy the token.
+4. **Add three secrets in GitHub:** repo → **Settings → Secrets and variables →
+   Actions → New repository secret**, add:
+   - `CLOUDFLARE_API_TOKEN` — the token from step 3
+   - `CLOUDFLARE_ACCOUNT_ID` — the id from step 2
+   - `VAPID_PRIVATE_KEY` — the Web Push private key (ask the maintainer / see the
+     value you were given; it is intentionally **not** stored in the repo)
+5. **Run it:** repo → **Actions → "Deploy Worship Roster API" → Run workflow**.
+6. When it finishes, the run **summary prints the Worker URL**
+   (`https://worship-roster-api.<you>.workers.dev`). Put that URL into
+   `worship_roster/js/config.js` as `apiBase`, commit, and the GitHub Pages site
+   switches to shared mode on its next build.
+
+## Deploy — Option B: from your computer (Wrangler CLI)
 
 Prerequisites: a (free) Cloudflare account and Node 18+.
 

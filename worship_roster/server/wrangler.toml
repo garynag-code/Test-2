@@ -17,7 +17,7 @@ compatibility_date = "2024-11-01"
 # separate multiple origins. Never use "*": that would let any site call the API.
 [vars]
 ALLOWED_ORIGINS = "https://garynag-code.github.io"
-VAPID_PUBLIC_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY"
+VAPID_PUBLIC_KEY = "BOt8KohaLoHaf8hZzFMPsl2k8rTR-4kMEr1qbehp6KHv2ryMJvUxGDG5kxStW9bJJQae0FpYtHFbNX667Hocf_0"
 VAPID_SUBJECT = "mailto:leader@example.com"
 
 # Managed SQLite database.
