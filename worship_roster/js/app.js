@@ -789,9 +789,15 @@ function team() {
       const inviteLink = location.origin + location.pathname + '?join=' + encodeURIComponent(t.inviteCode);
       // A clean, professional message to share alongside the link.
       const inviteMsg =
-        `🎵 ${BRAND} — Worship Team\n\n` +
-        `You're invited to join ${teamName}. Tap the link below on your phone to join — you'll just enter your name:\n${inviteLink}\n\n` +
-        `Once you're in you'll see the schedule, song lists and practice reminders.`;
+        `🎵 ${BRAND} — Worship Team Roster\n\n` +
+        `Hi team! Please join our worship roster — schedule, song lists (with chords) and practice reminders, all in one place.\n\n` +
+        `👉 Tap to join: ${inviteLink}\n\n` +
+        `How to join (2 minutes):\n` +
+        `1. Tap the link above.\n` +
+        `2. Type your name, then tap “Join team”.\n` +
+        `3. Chrome menu (⋮) → “Add to Home screen” for quick access.\n` +
+        `4. Open the Reminders tab → “Enable notifications”.\n\n` +
+        `Please join on the phone you’ll actually use — it becomes your personal sign-in (no password needed).`;
 
       inv.appendChild(el(`<div class="card__meta" style="word-break:break-all;background:#f3f4f6;border-radius:8px;padding:8px;margin-bottom:8px">${esc(inviteLink)}</div>`));
 
