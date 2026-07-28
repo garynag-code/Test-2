@@ -3,9 +3,10 @@
    ============================================================ */
 
 :root {
-  --brand: #4f46e5;
-  --brand-dark: #4338ca;
-  --brand-soft: #eef2ff;
+  /* Ecclesia Glocal Church brand palette (royal navy blue) */
+  --brand: #232a8f;
+  --brand-dark: #161b5e;
+  --brand-soft: #e9ebf8;
   --accent: #0ea5e9;
   --ok: #16a34a;
   --ok-soft: #dcfce7;

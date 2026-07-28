@@ -47,7 +47,8 @@ const PRACTICE_TYPES = [
 ];
 
 // Organisation branding (single source of truth; change here to re-brand).
-const BRAND = 'Ecclesia Glocal';
+const BRAND = 'Ecclesia Glocal Church';
+const TAGLINE = 'Forming Christ, Driving Change';
 
 const STORAGE_KEY = 'worship-roster-v1';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1037,7 +1038,12 @@ function renderConnect() {
   const invitedCode = (new URLSearchParams(location.search).get('join') || '').trim().toUpperCase();
   const invited = !!invitedCode;
 
-  view.appendChild(el(`<h2 class="section-title">🎵 ${esc(BRAND)} Worship</h2>`));
+  view.appendChild(el(`
+    <div style="text-align:center;margin:8px 0 16px">
+      <div style="font-size:1.35rem;font-weight:800;color:var(--brand-dark);letter-spacing:.3px">${esc(BRAND)}</div>
+      <div style="font-size:.8rem;color:var(--muted);font-style:italic;margin-top:2px">${esc(TAGLINE)}</div>
+      <div style="font-size:.9rem;font-weight:600;color:var(--brand);margin-top:8px">🎵 Worship Team Roster</div>
+    </div>`));
   view.appendChild(el(invited
     ? `<p class="section-sub">You've been invited to join the ${esc(BRAND)} worship team. Enter your name below to join.</p>`
     : `<p class="section-sub">Create a shared roster, or join your team with the invite code they gave you. Your phone stays signed in.</p>`));
