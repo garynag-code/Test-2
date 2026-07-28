@@ -2,12 +2,15 @@
  * Cache-first for the app shell so it launches with no network; bump CACHE
  * when any shell file changes to roll the cache over. */
 
-const CACHE = 'worship-roster-v1';
+const CACHE = 'worship-roster-v3';
 const SHELL = [
   './',
   './index.html',
   './css/styles.css',
+  './js/config.js',
+  './js/api.js',
   './js/app.js',
+  './img/logo.svg',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -33,14 +36,15 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Same-origin shell/assets: cache-first, then fill the cache on miss.
+  // Same-origin app files: NETWORK-FIRST so the app always self-updates when
+  // online (fresh HTML/JS/CSS every load), falling back to cache only offline.
   if (url.origin === location.origin) {
     event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      fetch(req).then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() => caches.match('./index.html')))
+      }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
     );
     return;
   }
