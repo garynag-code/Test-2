@@ -15,6 +15,12 @@ name: Deploy Worship Roster API (Cloudflare)
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - claude/worship-team-roster-scheduler-55po8j
+    paths:
+      - '.github/workflows/deploy-worker.yml'
+      - 'worship_roster/server/**'
 
 jobs:
   deploy:
