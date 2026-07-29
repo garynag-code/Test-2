@@ -69,8 +69,13 @@
     vote(month, typeId, date) { return req('POST', '/api/votes', { month, typeId, date }); },
     lock(month, typeId) { return req('POST', '/api/practices/lock', { month, typeId }); },
     newVote(month, typeId) { return req('POST', '/api/practices/new-vote', { month, typeId }); },
-    addSong(month, title, key) { return req('POST', '/api/songs', { month, title, key }); },
+    addSong(month, title, key, link) { return req('POST', '/api/songs', { month, title, key, link }); },
+    editSong(id, fields) { return req('PUT', '/api/songs/' + encodeURIComponent(id), fields); },
     deleteSong(id) { return req('DELETE', '/api/songs/' + encodeURIComponent(id)); },
+
+    addLibrarySong(fields) { return req('POST', '/api/library', fields); },
+    updateLibrarySong(id, fields) { return req('PUT', '/api/library/' + encodeURIComponent(id), fields); },
+    deleteLibrarySong(id) { return req('DELETE', '/api/library/' + encodeURIComponent(id)); },
 
     // Upload a chord PDF (raw bytes) and fetch it back as a blob URL for viewing.
     async uploadSongPdf(id, file) {

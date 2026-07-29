@@ -79,7 +79,7 @@ let activeTab = 'roster';
 function emptyState() {
   // Placeholder until the first cloud sync populates real data.
   return { version: 1, currentUserId: null, members: [], sundays: buildSundays(),
-    practices: buildPractices(), reminders: [], songs: {}, notifyEnabled: false, cloud: true };
+    practices: buildPractices(), reminders: [], songs: {}, library: [], notifyEnabled: false, cloud: true };
 }
 
 function load() {
@@ -126,7 +126,8 @@ function seed() {
     sundays: buildSundays(),   // roster rows for each Sunday in season
     practices: buildPractices(),
     reminders: [],
-    songs: {},                 // keyed by "YYYY-MM" -> [ {id,title,key} ]
+    songs: {},                 // keyed by "YYYY-MM" -> [ {id,title,key,link} ]
+    library: [],               // future songs to learn
     notifyEnabled: false,
   };
   s.reminders = buildSeasonReminders(s);
@@ -404,11 +405,21 @@ const localStore = {
   async vote(mKey, typeId, date) { castVote(state.practices[mKey][typeId], date); },
   async lock(mKey, typeId) { return lockMajority(mKey, typeId); },
   async newVote(mKey, typeId) { callNewVote(mKey, typeId); },
-  async addSong(mKey, title, key) {
+  async addSong(mKey, title, key, link) {
     if (!state.songs[mKey]) state.songs[mKey] = [];
-    state.songs[mKey].push({ id: uid('s'), title, key }); save();
+    state.songs[mKey].push({ id: uid('s'), title, key, link: link || '' }); save();
+  },
+  async editSong(id, fields) {
+    for (const mk of Object.keys(state.songs)) {
+      const s = (state.songs[mk] || []).find((x) => x.id === id);
+      if (s) Object.assign(s, fields);
+    }
+    save();
   },
   async deleteSong(mKey, id) { state.songs[mKey] = (state.songs[mKey] || []).filter((x) => x.id !== id); save(); },
+  async addLib(fields) { (state.library = state.library || []).unshift(Object.assign({ id: uid('l') }, fields)); save(); },
+  async updateLib(id, fields) { const l = (state.library || []).find((x) => x.id === id); if (l) Object.assign(l, fields); save(); },
+  async deleteLib(id) { state.library = (state.library || []).filter((x) => x.id !== id); save(); },
 };
 
 const cloudStore = {
@@ -416,8 +427,12 @@ const cloudStore = {
   async vote(mKey, typeId, date) { await guard(() => RosterAPI.vote(mKey, typeId, date)); },
   async lock(mKey, typeId) { const ok = await guard(() => RosterAPI.lock(mKey, typeId)); return ok; },
   async newVote(mKey, typeId) { await guard(() => RosterAPI.newVote(mKey, typeId)); },
-  async addSong(mKey, title, key) { await guard(() => RosterAPI.addSong(mKey, title, key)); },
+  async addSong(mKey, title, key, link) { await guard(() => RosterAPI.addSong(mKey, title, key, link)); },
+  async editSong(id, fields) { await guard(() => RosterAPI.editSong(id, fields)); },
   async deleteSong(mKey, id) { await guard(() => RosterAPI.deleteSong(id)); },
+  async addLib(fields) { await guard(() => RosterAPI.addLibrarySong(fields)); },
+  async updateLib(id, fields) { await guard(() => RosterAPI.updateLibrarySong(id, fields)); },
+  async deleteLib(id) { await guard(() => RosterAPI.deleteLibrarySong(id)); },
 };
 
 /** Run a cloud call, surface errors as a toast, then re-sync server truth. */
@@ -446,6 +461,7 @@ function cloudMap(s) {
     practices: buildPractices(),
     reminders: [],
     songs: {},
+    library: (s.library || []).map((l) => ({ id: l.id, title: l.title, artist: l.artist || '', lyrics: l.lyrics || '', chords: l.chords || '', link: l.link || '' })),
     notifyEnabled: localStorage.getItem('worship-roster-notify') === '1',
     team: s.team,
     cloud: true,
@@ -467,7 +483,8 @@ function cloudMap(s) {
   }
   for (const so of (s.songs || [])) {
     (st.songs[so.month] = st.songs[so.month] || []).push({
-      id: so.id, title: so.title, key: so.key || '', hasPdf: !!so.hasPdf, pdfName: so.pdfName || null,
+      id: so.id, title: so.title, key: so.key || '', link: so.link || '',
+      hasPdf: !!so.hasPdf, pdfName: so.pdfName || null,
     });
   }
   // Derive the reminder list for display (push delivery is handled server-side).
@@ -525,7 +542,7 @@ function render() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { roster, voting, songs, reminders, team };
+  const map = { roster, voting, songs, library, reminders, team };
   view.innerHTML = '';
   (map[activeTab] || roster)();
   view.scrollTop = 0;
@@ -705,6 +722,12 @@ function songs() {
       const actions = el(`<div class="song-actions"></div>`);
       const hasPdf = CLOUD ? song.hasPdf : !!song.pdfData;
 
+      // Listening link (YouTube, etc.) — shown if present.
+      if (song.link) {
+        const listen = el(`<button class="btn btn--sm">▶️ Listen</button>`);
+        listen.addEventListener('click', () => openExternal(song.link));
+        actions.appendChild(listen);
+      }
       // Attached chord PDF (reliable, always works) — shown if present.
       if (hasPdf) {
         const pdf = el(`<button class="btn btn--sm btn--primary">📄 Chord PDF</button>`);
@@ -723,6 +746,10 @@ function songs() {
       const remind = el(`<button class="btn btn--sm">🔔 Remind</button>`);
       remind.addEventListener('click', () => remindSongPractice(mKey, song));
       actions.appendChild(remind);
+
+      const edit = el(`<button class="btn btn--sm">✏️ Edit</button>`);
+      edit.addEventListener('click', () => editSongModal(song));
+      actions.appendChild(edit);
 
       const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
       del.addEventListener('click', async () => {
@@ -748,13 +775,50 @@ function addSongModal(mKey) {
       <input id="song-title" type="text" placeholder="e.g. Great Are You Lord" />
       <label class="field" for="song-key">Key (optional)</label>
       <input id="song-key" type="text" placeholder="e.g. G" />
+      <label class="field" for="song-link">Listening link (YouTube etc., optional)</label>
+      <input id="song-link" type="url" inputmode="url" placeholder="https://youtu.be/…" />
     </div>`);
   openModal('Add a song', body, () => {
     const title = body.querySelector('#song-title').value.trim();
     const key = body.querySelector('#song-key').value.trim();
+    const link = normalizeLink(body.querySelector('#song-link').value);
     if (!title) { toast('Enter a song title.'); return false; }
-    store.addSong(mKey, title, key).then(() => { render(); toast('Song added.'); });
+    store.addSong(mKey, title, key, link).then(() => { render(); toast('Song added.'); });
     return true;  // close the modal immediately; the store call resolves async
+  });
+}
+
+/** Trim a URL and only keep it if it's an http(s) link. */
+function normalizeLink(v) {
+  const t = (v || '').trim();
+  return /^https?:\/\/\S+$/i.test(t) ? t : '';
+}
+
+/** Open an external (http/https) URL safely in a new tab. */
+function openExternal(url) {
+  if (!/^https?:\/\//i.test(url)) { toast('Invalid link.'); return; }
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/** Edit an existing song's title/key/listening link. */
+function editSongModal(song) {
+  const body = el(`
+    <div>
+      <label class="field" for="es-title">Song title</label>
+      <input id="es-title" type="text" value="${esc(song.title)}" />
+      <label class="field" for="es-key">Key (optional)</label>
+      <input id="es-key" type="text" value="${esc(song.key || '')}" />
+      <label class="field" for="es-link">Listening link (YouTube etc., optional)</label>
+      <input id="es-link" type="url" inputmode="url" value="${esc(song.link || '')}" placeholder="https://youtu.be/…" />
+    </div>`);
+  openModal('Edit song', body, () => {
+    const title = body.querySelector('#es-title').value.trim();
+    if (!title) { toast('Enter a song title.'); return false; }
+    const fields = { title, key: body.querySelector('#es-key').value.trim(), link: normalizeLink(body.querySelector('#es-link').value) };
+    store.editSong(song.id, fields).then(() => { render(); toast('Song updated.'); });
+    return true;
   });
 }
 
@@ -804,6 +868,98 @@ async function openSongPdf(song) {
   } catch (e) {
     toast(e.message || 'Could not open the PDF.');
   }
+}
+
+// -- Tab: Library (future songs to learn) ---------------------------------
+
+function library() {
+  const lib = state.library || [];
+  view.appendChild(el(`<h2 class="section-title">📚 Song Library</h2>`));
+  view.appendChild(el(`<p class="section-sub">Future songs to learn — lyrics, chords and a listening link, all in one place. Anyone can add or edit. ${lib.length} song${lib.length === 1 ? '' : 's'}.</p>`));
+
+  const add = el(`<button class="btn btn--primary btn--block" style="margin-bottom:12px">＋ Add song to library</button>`);
+  add.addEventListener('click', () => libraryModal(null));
+  view.appendChild(add);
+
+  if (!lib.length) {
+    view.appendChild(el(`<div class="empty"><div class="empty__icon">🎼</div><p>No songs yet — add one to start building your list.</p></div>`));
+    return;
+  }
+  for (const song of lib) {
+    const card = el(`<div class="card"></div>`);
+    card.appendChild(el(`<div class="card__title">${esc(song.title)}</div>`));
+    if (song.artist) card.appendChild(el(`<div class="card__meta">${esc(song.artist)}</div>`));
+    const actions = el(`<div class="btn-row" style="margin-top:10px"></div>`);
+    if (song.link) {
+      const l = el(`<button class="btn btn--sm">▶️ Listen</button>`);
+      l.addEventListener('click', () => openExternal(song.link));
+      actions.appendChild(l);
+    }
+    if (song.lyrics || song.chords) {
+      const v = el(`<button class="btn btn--sm btn--primary">📖 Lyrics & chords</button>`);
+      v.addEventListener('click', () => libraryViewModal(song));
+      actions.appendChild(v);
+    }
+    const e = el(`<button class="btn btn--sm">✏️ Edit</button>`);
+    e.addEventListener('click', () => libraryModal(song));
+    actions.appendChild(e);
+    const d = el(`<button class="btn btn--sm btn--danger">✕</button>`);
+    d.addEventListener('click', () => confirmModal('Remove from library?', `Delete “${song.title}” from the library?`, async () => { await store.deleteLib(song.id); render(); }));
+    actions.appendChild(d);
+    card.appendChild(actions);
+    view.appendChild(card);
+  }
+}
+
+/** Read-only view of a library song's chords and lyrics. */
+function libraryViewModal(song) {
+  const body = el(`<div></div>`);
+  if (song.link) {
+    const l = el(`<button class="btn btn--sm btn--block" style="margin-bottom:10px">▶️ Listen to this song</button>`);
+    l.addEventListener('click', () => openExternal(song.link));
+    body.appendChild(l);
+  }
+  if (song.chords) {
+    body.appendChild(el(`<label class="field">Chords</label>`));
+    body.appendChild(el(`<pre style="white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;background:#f3f4f6;border-radius:8px;padding:10px;overflow-x:auto;margin:0 0 10px">${esc(song.chords)}</pre>`));
+  }
+  if (song.lyrics) {
+    body.appendChild(el(`<label class="field">Lyrics</label>`));
+    body.appendChild(el(`<div style="white-space:pre-wrap;line-height:1.55">${esc(song.lyrics)}</div>`));
+  }
+  openModal(song.title, body, () => true, null, 'Close');
+}
+
+/** Add or edit a library song (title, artist, listening link, chords, lyrics). */
+function libraryModal(existing) {
+  const s = existing || { title: '', artist: '', lyrics: '', chords: '', link: '' };
+  const body = el(`
+    <div>
+      <label class="field" for="lib-title">Song title</label>
+      <input id="lib-title" type="text" value="${esc(s.title)}" placeholder="e.g. Goodness of God" />
+      <label class="field" for="lib-artist">Artist (optional)</label>
+      <input id="lib-artist" type="text" value="${esc(s.artist || '')}" placeholder="e.g. Bethel Music" />
+      <label class="field" for="lib-link">Listening link (YouTube etc., optional)</label>
+      <input id="lib-link" type="url" inputmode="url" value="${esc(s.link || '')}" placeholder="https://youtu.be/…" />
+      <label class="field" for="lib-chords">Chords (optional)</label>
+      <textarea id="lib-chords" rows="5" placeholder="Paste chords here…">${esc(s.chords || '')}</textarea>
+      <label class="field" for="lib-lyrics">Lyrics (optional)</label>
+      <textarea id="lib-lyrics" rows="6" placeholder="Paste lyrics here…">${esc(s.lyrics || '')}</textarea>
+    </div>`);
+  openModal(existing ? 'Edit library song' : 'Add to library', body, () => {
+    const title = body.querySelector('#lib-title').value.trim();
+    if (!title) { toast('Enter a song title.'); return false; }
+    const fields = {
+      title,
+      artist: body.querySelector('#lib-artist').value.trim(),
+      link: normalizeLink(body.querySelector('#lib-link').value),
+      chords: body.querySelector('#lib-chords').value,
+      lyrics: body.querySelector('#lib-lyrics').value,
+    };
+    (existing ? store.updateLib(existing.id, fields) : store.addLib(fields))
+      .then(() => { render(); toast(existing ? 'Library song updated.' : 'Added to library.'); });
+    return true;
+  });
 }
 
 // -- Tab: Reminders -------------------------------------------------------

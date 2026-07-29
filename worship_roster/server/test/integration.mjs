@@ -259,4 +259,50 @@ await test('non-PDF and oversized uploads are rejected', async () => {
   assert.equal((await worker.fetch(rawPdfReq(id, leaderToken, big), env)).status, 413);
 });
 
+// ---- Song listening link + edit --------------------------------------------
+await test('a song carries a listening link and can be edited; unsafe links stripped', async () => {
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-11', title: 'Link Song', key: 'C', link: 'https://youtu.be/abc' } });
+  assert.equal(add.status, 201);
+  const id = add.data.id;
+  let st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.songs.find((s) => s.id === id).link, 'https://youtu.be/abc');
+
+  const ed = await call('PUT', '/api/songs/' + id, { token: memberTokens[1], body: { link: 'https://youtu.be/xyz' } });
+  assert.equal(ed.status, 200);
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.songs.find((s) => s.id === id).link, 'https://youtu.be/xyz');
+
+  await call('PUT', '/api/songs/' + id, { token: leaderToken, body: { link: 'javascript:alert(1)' } });
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.songs.find((s) => s.id === id).link, '', 'non-http(s) link is stripped');
+});
+
+// ---- Song library -----------------------------------------------------------
+await test('library: any member can add, view, update and delete', async () => {
+  const add = await call('POST', '/api/library', { token: memberTokens[0], body: { title: 'Goodness of God', artist: 'Bethel', lyrics: 'I love You Lord', chords: 'G  C  D', link: 'https://youtu.be/n0Y' } });
+  assert.equal(add.status, 201);
+  const id = add.data.id;
+
+  let st = await call('GET', '/api/state', { token: memberTokens[2] });
+  const item = st.data.library.find((l) => l.id === id);
+  assert.ok(item, 'appears in state for any member');
+  assert.equal(item.artist, 'Bethel');
+  assert.equal(item.chords, 'G  C  D');
+  assert.equal(item.link, 'https://youtu.be/n0Y');
+
+  const up = await call('PUT', '/api/library/' + id, { token: memberTokens[1], body: { lyrics: 'Updated lyrics' } });
+  assert.equal(up.status, 200);
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.library.find((l) => l.id === id).lyrics, 'Updated lyrics');
+
+  const del = await call('DELETE', '/api/library/' + id, { token: memberTokens[0] });
+  assert.equal(del.status, 200);
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.library.find((l) => l.id === id), undefined);
+});
+
+await test('library requires a title', async () => {
+  assert.equal((await call('POST', '/api/library', { token: leaderToken, body: { lyrics: 'no title' } })).status, 400);
+});
+
 console.log(`\n${passed} tests passed.`);

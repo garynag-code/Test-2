@@ -73,6 +73,8 @@ jobs:
         run: |
           $WRANGLER d1 execute worship-roster --remote \
             --command "ALTER TABLE members ADD COLUMN title TEXT NOT NULL DEFAULT ''" || true
+          $WRANGLER d1 execute worship-roster --remote \
+            --command "ALTER TABLE songs ADD COLUMN link TEXT NOT NULL DEFAULT ''" || true
 
       - name: Store the VAPID private key as a Worker secret
         run: printf '%s' "${{ secrets.VAPID_PRIVATE_KEY }}" | $WRANGLER secret put VAPID_PRIVATE_KEY

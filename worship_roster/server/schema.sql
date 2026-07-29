@@ -64,9 +64,23 @@ CREATE TABLE IF NOT EXISTS songs (
   month      TEXT NOT NULL,
   title      TEXT NOT NULL,
   key_sig    TEXT,
+  link       TEXT NOT NULL DEFAULT '',   -- optional listening link (YouTube, etc.)
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_songs_team ON songs(team_id);
+
+-- Song library: future songs to learn (lyrics, chords, listening link).
+CREATE TABLE IF NOT EXISTS library_songs (
+  id         TEXT PRIMARY KEY,
+  team_id    TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  artist     TEXT NOT NULL DEFAULT '',
+  lyrics     TEXT NOT NULL DEFAULT '',
+  chords     TEXT NOT NULL DEFAULT '',
+  link       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_library_team ON library_songs(team_id);
 
 -- Optional attached chord-sheet PDF for a song (base64, kept small).
 CREATE TABLE IF NOT EXISTS song_pdfs (
