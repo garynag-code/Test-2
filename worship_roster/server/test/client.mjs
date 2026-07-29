@@ -106,7 +106,7 @@ await test('new vote clears the lock, re-enabling voting', async () => {
 });
 
 await test('addSong then deleteSong via the client', async () => {
-  const added = await API.addSong('2026-07', 'Great Are You Lord', 'A');
+  const added = await API.addSong('2026-07-05', 'Great Are You Lord', 'A');
   let s = await API.getState();
   assert.equal(s.songs.length, 1);
   assert.equal(s.songs[0].title, 'Great Are You Lord');

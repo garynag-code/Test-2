@@ -705,75 +705,67 @@ function voting() {
 
 function songs() {
   view.appendChild(el(`<h2 class="section-title">🎸 Song List & Chords</h2>`));
-  view.appendChild(el(`<p class="section-sub">Leaders post the weekly list; anyone can pull chords or send musicians a practice reminder.</p>`));
+  view.appendChild(el(`<p class="section-sub">The song list for each Sunday service — add chords (search or attach a PDF) and a listening link. Anyone can add.</p>`));
 
-  for (const mKey of seasonMonths()) {
-    const [y, m] = mKey.split('-').map(Number);
-    const list = songsFor(mKey);
+  const upcoming = seasonSundays().filter((d) => d >= todayISO());
+  const list = upcoming.length ? upcoming : seasonSundays();
+  for (const sunday of list) {
+    const songsList = songsFor(sunday);
     const card = el(`<div class="card"></div>`);
     card.appendChild(el(`
       <div class="card__head">
-        <span class="card__title">${MONTHS[m - 1]} ${y}</span>
-        <span class="badge badge--muted">${list.length} song${list.length === 1 ? '' : 's'}</span>
+        <span class="card__title">${fmtLong(sunday)}</span>
+        <span class="badge badge--muted">${songsList.length} song${songsList.length === 1 ? '' : 's'}</span>
       </div>`));
 
-    if (!list.length) {
-      card.appendChild(el(`<div class="card__meta">No songs posted yet.</div>`));
-    }
-    for (const song of list) {
-      const item = el(`<div class="song-item"></div>`);
-      item.appendChild(el(`
-        <div>
-          <div class="song-item__title">${esc(song.title)}</div>
-          <div class="song-item__key">Key: ${esc(song.key || '—')}</div>
-        </div>`));
-      const actions = el(`<div class="song-actions"></div>`);
-      const hasPdf = CLOUD ? song.hasPdf : !!song.pdfData;
+    if (!songsList.length) card.appendChild(el(`<div class="card__meta">No songs posted yet.</div>`));
+    for (const song of songsList) card.appendChild(songItemEl(sunday, song));
 
-      // Listening link (YouTube, etc.) — shown if present.
-      if (song.link) {
-        const listen = el(`<button class="btn btn--sm">▶️ Listen</button>`);
-        listen.addEventListener('click', () => openExternal(song.link));
-        actions.appendChild(listen);
-      }
-      // Attached chord PDF (reliable, always works) — shown if present.
-      if (hasPdf) {
-        const pdf = el(`<button class="btn btn--sm btn--primary">📄 Chord PDF</button>`);
-        pdf.addEventListener('click', () => openSongPdf(song));
-        actions.appendChild(pdf);
-      }
-      // Online chord search (may not always find the song).
-      const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener noreferrer" href="${chordsUrl(song)}">🔎 Find chords</a>`);
-      actions.appendChild(chords);
-
-      // Attach / replace a PDF (any member).
-      const attach = el(`<button class="btn btn--sm">${hasPdf ? '🔁 Replace PDF' : '📎 Attach PDF'}</button>`);
-      attach.addEventListener('click', () => pickSongPdf(mKey, song));
-      actions.appendChild(attach);
-
-      const remind = el(`<button class="btn btn--sm">🔔 Remind</button>`);
-      remind.addEventListener('click', () => remindSongPractice(mKey, song));
-      actions.appendChild(remind);
-
-      const edit = el(`<button class="btn btn--sm">✏️ Edit</button>`);
-      edit.addEventListener('click', () => editSongModal(song));
-      actions.appendChild(edit);
-
-      const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
-      del.addEventListener('click', async () => {
-        await store.deleteSong(mKey, song.id); render();
-      });
-      actions.appendChild(del);
-      item.appendChild(actions);
-      card.appendChild(item);
-    }
-
-    // Any team member can add a song.
+    // Any team member can add a song to this service.
     const add = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:8px">＋ Add song</button>`);
-    add.addEventListener('click', () => addSongModal(mKey));
+    add.addEventListener('click', () => addSongModal(sunday));
     card.appendChild(add);
     view.appendChild(card);
   }
+}
+
+/** Build one song row (title/key + Listen/PDF/chords/attach/remind/edit/delete). */
+function songItemEl(weekKey, song) {
+  const item = el(`<div class="song-item"></div>`);
+  item.appendChild(el(`
+    <div>
+      <div class="song-item__title">${esc(song.title)}</div>
+      <div class="song-item__key">Key: ${esc(song.key || '—')}</div>
+    </div>`));
+  const actions = el(`<div class="song-actions"></div>`);
+  const hasPdf = CLOUD ? song.hasPdf : !!song.pdfData;
+
+  if (song.link) {
+    const listen = el(`<button class="btn btn--sm">▶️ Listen</button>`);
+    listen.addEventListener('click', () => openExternal(song.link));
+    actions.appendChild(listen);
+  }
+  if (hasPdf) {
+    const pdf = el(`<button class="btn btn--sm btn--primary">📄 Chord PDF</button>`);
+    pdf.addEventListener('click', () => openSongPdf(song));
+    actions.appendChild(pdf);
+  }
+  const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener noreferrer" href="${chordsUrl(song)}">🔎 Find chords</a>`);
+  actions.appendChild(chords);
+  const attach = el(`<button class="btn btn--sm">${hasPdf ? '🔁 Replace PDF' : '📎 Attach PDF'}</button>`);
+  attach.addEventListener('click', () => pickSongPdf(weekKey, song));
+  actions.appendChild(attach);
+  const remind = el(`<button class="btn btn--sm">🔔 Remind</button>`);
+  remind.addEventListener('click', () => remindSongPractice(weekKey, song));
+  actions.appendChild(remind);
+  const edit = el(`<button class="btn btn--sm">✏️ Edit</button>`);
+  edit.addEventListener('click', () => editSongModal(song));
+  actions.appendChild(edit);
+  const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
+  del.addEventListener('click', async () => { await store.deleteSong(weekKey, song.id); render(); });
+  actions.appendChild(del);
+  item.appendChild(actions);
+  return item;
 }
 
 function addSongModal(mKey) {

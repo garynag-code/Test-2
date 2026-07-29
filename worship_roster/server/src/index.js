@@ -350,10 +350,11 @@ async function newVote(request, env, me) {
 }
 
 async function addSong(request, env, me) {
-  // Any team member can post songs.
+  // Any team member can post songs. `month` holds the service date (a Sunday);
+  // song lists are per-week.
   const body = await readJson(request);
   const title = sanitizeName(body && body.title);
-  if (!isMonth(body && body.month) || !title) return err(400, 'Invalid song');
+  if (!isDate(body && body.month) || !title) return err(400, 'Invalid song');
   const key = typeof (body && body.key) === 'string' ? body.key.slice(0, 12).trim() : '';
   const link = sanitizeUrl(body && body.link);
   const id = uid('s');

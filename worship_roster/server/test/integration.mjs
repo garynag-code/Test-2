@@ -151,12 +151,12 @@ await test('only a leader can call a new vote, which clears the lock', async () 
 
 // ---- Songs (any member) -----------------------------------------------------
 await test('any member can post and remove songs', async () => {
-  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-07-05', title: 'Reckless Love', key: 'C' } });
   assert.equal(add.status, 201, 'a non-admin member can add a song');
   const del = await call('DELETE', `/api/songs/${add.data.id}`, { token: memberTokens[1] });
   assert.equal(del.status, 200, 'a different member can remove it');
   // Re-add for later assertions that expect a July song to exist.
-  await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
+  await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-07-05', title: 'Reckless Love', key: 'C' } });
 });
 
 // ---- Input validation -------------------------------------------------------
@@ -206,7 +206,7 @@ await test('admin can grant admin to another member, who can then lock', async (
   const r = await call('PUT', `/api/members/${grace.id}`, { token: leaderToken, body: { isLeader: true } });
   assert.equal(r.status, 200);
   // Grace (memberTokens[2]) can now post a song (an admin-only action).
-  const song = await call('POST', '/api/songs', { token: memberTokens[2], body: { month: '2026-09', title: 'Test', key: 'D' } });
+  const song = await call('POST', '/api/songs', { token: memberTokens[2], body: { month: '2026-09-06', title: 'Test', key: 'D' } });
   assert.equal(song.status, 201);
 });
 
@@ -227,7 +227,7 @@ function rawPdfReq(id, token, body, name) {
 }
 
 await test('a member can attach a chord PDF and anyone can fetch it', async () => {
-  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-10', title: 'PDF Song', key: 'G' } });
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-10-04', title: 'PDF Song', key: 'G' } });
   const id = add.data.id;
   const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF');
   const up = await worker.fetch(rawPdfReq(id, memberTokens[0], pdf, 'chart.pdf'), env);
@@ -251,7 +251,7 @@ await test('a member can attach a chord PDF and anyone can fetch it', async () =
 });
 
 await test('non-PDF and oversized uploads are rejected', async () => {
-  const add = await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-10', title: 'X', key: '' } });
+  const add = await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-10-04', title: 'X', key: '' } });
   const id = add.data.id;
   const notPdf = new TextEncoder().encode('hello, definitely not a pdf');
   assert.equal((await worker.fetch(rawPdfReq(id, leaderToken, notPdf), env)).status, 400);
@@ -261,7 +261,7 @@ await test('non-PDF and oversized uploads are rejected', async () => {
 
 // ---- Song listening link + edit --------------------------------------------
 await test('a song carries a listening link and can be edited; unsafe links stripped', async () => {
-  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-11', title: 'Link Song', key: 'C', link: 'https://youtu.be/abc' } });
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-11-01', title: 'Link Song', key: 'C', link: 'https://youtu.be/abc' } });
   assert.equal(add.status, 201);
   const id = add.data.id;
   let st = await call('GET', '/api/state', { token: leaderToken });
