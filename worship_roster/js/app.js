@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v4 · 2026-07-29';
+const APP_VERSION = 'v5 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -78,7 +78,7 @@ const IS_STANDALONE = (window.navigator.standalone === true) ||
   (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 
 let state = CLOUD ? emptyState() : load();
-let activeTab = 'roster';
+let activeTab = 'home';
 
 function emptyState() {
   // Placeholder until the first cloud sync populates real data.
@@ -186,6 +186,54 @@ const MINISTRY_MARKERS = [
   { id: 'practice', label: 'Attended practice' },
   { id: 'contributes', label: 'Contributed to the team' },
 ];
+
+// Personal Sunday-preparation checklist shown on the Home landing page. Ticks
+// are private to each device and reset every ministry week (keyed by Sunday).
+const PREP_CHECKLIST = [
+  { title: 'During the Week', items: [
+    { id: 'w1', label: 'Spend personal time in prayer and Scripture' },
+    { id: 'w2', label: 'Keep your heart free from offence and unresolved conflict' },
+    { id: 'w3', label: 'Pray for the congregation and the Sunday service' },
+    { id: 'w4', label: 'Listen to and learn all assigned songs' },
+    { id: 'w5', label: 'Practise your chords, lyrics, harmonies and parts' },
+    { id: 'w6', label: 'Understand the biblical message of each song' },
+    { id: 'w7', label: 'Confirm keys, arrangements, transitions and responsibilities' },
+    { id: 'w8', label: 'Communicate any challenges to the worship leader early' },
+  ] },
+  { title: 'Before Sunday', items: [
+    { id: 'b1', label: 'Prepare your clothing and equipment' },
+    { id: 'b2', label: 'Charge devices and check instruments' },
+    { id: 'b3', label: 'Rest properly and avoid unnecessary distractions' },
+    { id: 'b4', label: 'Arrive spiritually prepared, not only musically prepared' },
+  ] },
+  { title: 'On Sunday', items: [
+    { id: 's1', label: 'Arrive early and on time' },
+    { id: 's2', label: 'Set up and sound-check quickly' },
+    { id: 's3', label: 'Participate fully in team prayer' },
+    { id: 's4', label: 'Honour the worship leader and follow direction' },
+    { id: 's5', label: 'Stay sensitive to the Holy Spirit' },
+    { id: 's6', label: 'Focus on Jesus, not performance' },
+    { id: 's7', label: 'Help the congregation worship rather than drawing attention to yourself' },
+  ] },
+];
+const PREP_QUOTE = 'Worship begins long before the first song is played.';
+const PREP_TOTAL = PREP_CHECKLIST.reduce((n, s) => n + s.items.length, 0);
+
+/** localStorage key for this week's personal prep ticks (per signed-in member). */
+function prepKey() {
+  const who = CLOUD ? ((currentUser() && currentUser().id) || 'me') : (state.currentUserId || 'me');
+  return `worship-roster-prep:${who}:${currentServiceSunday()}`;
+}
+function getPrepChecks() {
+  try { return new Set(JSON.parse(localStorage.getItem(prepKey()) || '[]')); }
+  catch (_) { return new Set(); }
+}
+function togglePrep(id) {
+  const set = getPrepChecks();
+  set.has(id) ? set.delete(id) : set.add(id);
+  try { localStorage.setItem(prepKey(), JSON.stringify([...set])); }
+  catch (_) { toast('Could not save — storage may be full.'); }
+}
 
 function ratingFor(score) {
   if (score >= 85) return { label: 'On fire 🔥', color: 'var(--ok)', bg: 'var(--ok-soft)' };
@@ -621,9 +669,9 @@ function render() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { roster, voting, songs, library, devotions, journey, reminders, team };
+  const map = { home, roster, voting, songs, library, devotions, journey, reminders, team };
   view.innerHTML = '';
-  (map[activeTab] || roster)();
+  (map[activeTab] || home)();
   view.scrollTop = 0;
   window.scrollTo(0, 0);
 }
@@ -641,6 +689,91 @@ function syncUserSelect() {
     .map((m) => `<option value="${m.id}">${esc(m.name)}</option>`)
     .join('');
   sel.value = state.currentUserId;
+}
+
+// -- Tab: Home (landing) --------------------------------------------------
+
+function home() {
+  const sunday = currentServiceSunday();
+  view.appendChild(el(`<h2 class="section-title">🏠 This Week</h2>`));
+  view.appendChild(el(`<p class="section-sub">${esc(BRAND)} — the worship set and your preparation for the upcoming service.</p>`));
+
+  // ---- Current week's music set ----
+  const setCard = el(`<div class="card"></div>`);
+  setCard.appendChild(el(`
+    <div class="card__head">
+      <span class="card__title">🎵 ${fmtLong(sunday)}</span>
+      <span class="badge">This Sunday</span>
+    </div>`));
+
+  const lineup = homeLineup(sunday);
+  if (lineup) setCard.appendChild(lineup);
+
+  const list = songsFor(sunday);
+  setCard.appendChild(el(`<div class="card__meta" style="margin:12px 0 4px;font-weight:600">🎸 Song list (${list.length})</div>`));
+  if (!list.length) {
+    setCard.appendChild(el(`<div class="card__meta">No songs posted yet for this service.</div>`));
+  } else {
+    for (const song of list) setCard.appendChild(songItemEl(sunday, song));
+  }
+  const goSongs = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:10px">Open full song list →</button>`);
+  goSongs.addEventListener('click', () => { activeTab = 'songs'; render(); });
+  setCard.appendChild(goSongs);
+  view.appendChild(setCard);
+
+  // ---- Sunday preparation checklist (personal, resets weekly) ----
+  const checks = getPrepChecks();
+  const doneCount = () => PREP_CHECKLIST.reduce((n, s) => n + s.items.filter((i) => getPrepChecks().has(i.id)).length, 0);
+  const prep = el(`<div class="card"></div>`);
+  const head = el(`<div class="card__head"><span class="card__title">✅ Sunday Preparation Checklist</span></div>`);
+  const badge = el(`<span class="badge ${checks.size >= PREP_TOTAL ? 'badge--ok' : 'badge--muted'}">${doneCount()}/${PREP_TOTAL}</span>`);
+  head.appendChild(badge);
+  prep.appendChild(head);
+  prep.appendChild(el(`<p class="card__meta" style="margin:-4px 0 6px">Your personal checklist — ticks stay on this device and reset each week.</p>`));
+
+  const refreshBadge = () => {
+    const d = doneCount();
+    badge.textContent = `${d}/${PREP_TOTAL}`;
+    badge.classList.toggle('badge--ok', d === PREP_TOTAL);
+    badge.classList.toggle('badge--muted', d !== PREP_TOTAL);
+  };
+
+  for (const section of PREP_CHECKLIST) {
+    prep.appendChild(el(`<div class="section-title" style="font-size:.92rem;margin:14px 2px 4px">${esc(section.title)}</div>`));
+    for (const item of section.items) {
+      const on = checks.has(item.id);
+      const row = el(`<div class="check-row ${on ? 'is-on' : ''}"><span class="check-row__box">${on ? '✓' : ''}</span><span class="check-row__label">${esc(item.label)}</span></div>`);
+      row.addEventListener('click', () => {
+        togglePrep(item.id);
+        const nowOn = getPrepChecks().has(item.id);
+        row.classList.toggle('is-on', nowOn);
+        row.querySelector('.check-row__box').textContent = nowOn ? '✓' : '';
+        refreshBadge();
+      });
+      prep.appendChild(row);
+    }
+  }
+  prep.appendChild(el(`<blockquote style="margin:16px 2px 2px;padding:10px 14px;border-left:3px solid var(--brand);background:var(--brand-soft);border-radius:8px;font-style:italic;color:var(--brand-dark)">“${esc(PREP_QUOTE)}”</blockquote>`));
+  view.appendChild(prep);
+}
+
+/** Compact "who's playing this Sunday" summary for the Home page. */
+function homeLineup(sunday) {
+  const s = (state.sundays || []).find((x) => x.date === sunday);
+  const a = (s && s.assignments) || {};
+  const rows = [];
+  const leaders = ['lead', ...CO_LEAD_SLOTS].map((id) => a[id]).filter(Boolean).map(memberName);
+  if (leaders.length) rows.push(['🎤 Worship lead', leaders.join(', ')]);
+  for (const pos of POSITIONS) {
+    if (pos.id === 'lead') continue;
+    if (a[pos.id]) rows.push([`${pos.icon} ${pos.name}`, memberName(a[pos.id])]);
+  }
+  if (!rows.length) return null;
+  const wrap = el(`<div style="margin:6px 0 2px"></div>`);
+  for (const [k, v] of rows) {
+    wrap.appendChild(el(`<div class="member" style="padding:6px 0"><span class="member__pos">${esc(k)}</span><span class="member__name">${esc(v)}</span></div>`));
+  }
+  return wrap;
 }
 
 // -- Tab: Roster ----------------------------------------------------------
@@ -1731,7 +1864,7 @@ function renderConnect() {
 async function afterConnect() {
   await syncFromCloud();
   setChromeVisible(true);
-  activeTab = 'roster';
+  activeTab = 'home';
   render();
 }
 
