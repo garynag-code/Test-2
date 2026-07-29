@@ -706,22 +706,19 @@ function songs() {
       remind.addEventListener('click', () => remindSongPractice(mKey, song));
       actions.appendChild(chords);
       actions.appendChild(remind);
-      if (isLeader()) {
-        const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
-        del.addEventListener('click', async () => {
-          await store.deleteSong(mKey, song.id); render();
-        });
-        actions.appendChild(del);
-      }
+      const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
+      del.addEventListener('click', async () => {
+        await store.deleteSong(mKey, song.id); render();
+      });
+      actions.appendChild(del);
       item.appendChild(actions);
       card.appendChild(item);
     }
 
-    if (isLeader()) {
-      const add = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:8px">＋ Add song</button>`);
-      add.addEventListener('click', () => addSongModal(mKey));
-      card.appendChild(add);
-    }
+    // Any team member can add a song.
+    const add = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:8px">＋ Add song</button>`);
+    add.addEventListener('click', () => addSongModal(mKey));
+    card.appendChild(add);
     view.appendChild(card);
   }
 }

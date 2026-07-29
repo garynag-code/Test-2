@@ -149,12 +149,14 @@ await test('only a leader can call a new vote, which clears the lock', async () 
   assert.equal(state.data.votes.filter((v) => v.month === '2026-07' && v.type_id === 'weekday').length, 0, 'votes reset');
 });
 
-// ---- Songs (leader-only) ----------------------------------------------------
-await test('members cannot post songs; leaders can', async () => {
-  const bad = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
-  assert.equal(bad.status, 403);
-  const ok = await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
-  assert.equal(ok.status, 201);
+// ---- Songs (any member) -----------------------------------------------------
+await test('any member can post and remove songs', async () => {
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
+  assert.equal(add.status, 201, 'a non-admin member can add a song');
+  const del = await call('DELETE', `/api/songs/${add.data.id}`, { token: memberTokens[1] });
+  assert.equal(del.status, 200, 'a different member can remove it');
+  // Re-add for later assertions that expect a July song to exist.
+  await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-07', title: 'Reckless Love', key: 'C' } });
 });
 
 // ---- Input validation -------------------------------------------------------

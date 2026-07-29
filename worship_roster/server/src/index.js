@@ -322,7 +322,7 @@ async function newVote(request, env, me) {
 }
 
 async function addSong(request, env, me) {
-  if (!me.isLeader) return err(403, 'Only an admin can post songs');
+  // Any team member can post songs.
   const body = await readJson(request);
   const title = sanitizeName(body && body.title);
   if (!isMonth(body && body.month) || !title) return err(400, 'Invalid song');
@@ -334,7 +334,7 @@ async function addSong(request, env, me) {
 }
 
 async function deleteSong(env, me, songId) {
-  if (!me.isLeader) return err(403, 'Only an admin can remove songs');
+  // Any team member can remove a song (so mistakes can be fixed by anyone).
   await env.DB.prepare('DELETE FROM songs WHERE id = ? AND team_id = ?').bind(songId, me.teamId).run();
   return json({ ok: true });
 }
