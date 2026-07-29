@@ -172,4 +172,41 @@ await test('assignment only accepts a member of the same team', async () => {
   assert.equal(bad.status, 400, 'unknown member rejected');
 });
 
+// ---- Member titles + admin (leader-only) -----------------------------------
+await test('admin can set a member title (e.g. Pastor); it shows in state', async () => {
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const david = state.data.members.find((m) => m.name === 'David');
+  const r = await call('PUT', `/api/members/${david.id}`, { token: leaderToken, body: { title: 'Pastor' } });
+  assert.equal(r.status, 200);
+  const after = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(after.data.members.find((m) => m.id === david.id).title, 'Pastor');
+});
+
+await test('a non-admin cannot change member roles', async () => {
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const peter = state.data.members.find((m) => m.name === 'Peter');
+  const r = await call('PUT', `/api/members/${peter.id}`, { token: memberTokens[0], body: { title: 'Hacker' } });
+  assert.equal(r.status, 403);
+});
+
+await test('admin can grant admin to another member, who can then lock', async () => {
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const grace = state.data.members.find((m) => m.name === 'Grace');
+  const r = await call('PUT', `/api/members/${grace.id}`, { token: leaderToken, body: { isLeader: true } });
+  assert.equal(r.status, 200);
+  // Grace (memberTokens[2]) can now post a song (an admin-only action).
+  const song = await call('POST', '/api/songs', { token: memberTokens[2], body: { month: '2026-09', title: 'Test', key: 'D' } });
+  assert.equal(song.status, 201);
+});
+
+await test('the last admin cannot remove their own admin (no lockout)', async () => {
+  // Demote Grace again so only the original leader remains admin.
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const grace = state.data.members.find((m) => m.name === 'Grace');
+  await call('PUT', `/api/members/${grace.id}`, { token: leaderToken, body: { isLeader: false } });
+  const me = await call('GET', '/api/state', { token: leaderToken });
+  const r = await call('PUT', `/api/members/${me.data.me.id}`, { token: leaderToken, body: { isLeader: false } });
+  assert.equal(r.status, 409, 'must keep at least one admin');
+});
+
 console.log(`\n${passed} tests passed.`);

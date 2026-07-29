@@ -125,7 +125,7 @@ await test('joinTeam with the invite code switches the session', async () => {
 
 await test('a member cannot lock (server rejects, client throws)', async () => {
   await API.vote('2026-08', 'weekday', '2026-08-04');
-  await assert.rejects(() => API.lock('2026-08', 'weekday'), /leader/i);
+  await assert.rejects(() => API.lock('2026-08', 'weekday'), /admin/i);
 });
 
 console.log(`\n${passed} tests passed.`);

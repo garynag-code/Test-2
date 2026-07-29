@@ -69,6 +69,11 @@ jobs:
       - name: Apply the database schema (idempotent)
         run: $WRANGLER d1 execute worship-roster --remote --file=./schema.sql
 
+      - name: Apply migrations (add columns to existing databases; safe to fail)
+        run: |
+          $WRANGLER d1 execute worship-roster --remote \
+            --command "ALTER TABLE members ADD COLUMN title TEXT NOT NULL DEFAULT ''" || true
+
       - name: Store the VAPID private key as a Worker secret
         run: printf '%s' "${{ secrets.VAPID_PRIVATE_KEY }}" | $WRANGLER secret put VAPID_PRIVATE_KEY
 

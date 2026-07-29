@@ -65,6 +65,7 @@
 
     getState() { return req('GET', '/api/state'); },
     setAssignment(date, positionId, memberId) { return req('PUT', '/api/assignments', { date, positionId, memberId }); },
+    updateMember(id, fields) { return req('PUT', '/api/members/' + encodeURIComponent(id), fields); },
     vote(month, typeId, date) { return req('POST', '/api/votes', { month, typeId, date }); },
     lock(month, typeId) { return req('POST', '/api/practices/lock', { month, typeId }); },
     newVote(month, typeId) { return req('POST', '/api/practices/new-vote', { month, typeId }); },

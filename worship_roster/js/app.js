@@ -430,7 +430,7 @@ function cloudMap(s) {
   const st = {
     version: 1,
     currentUserId: s.me && s.me.id,
-    members: (s.members || []).map((m) => ({ id: m.id, name: m.name, isLeader: m.isLeader, positions: m.positions || [] })),
+    members: (s.members || []).map((m) => ({ id: m.id, name: m.name, isLeader: m.isLeader, title: m.title || '', positions: m.positions || [] })),
     sundays: buildSundays(),
     practices: buildPractices(),
     reminders: [],
@@ -556,8 +556,11 @@ function roster() {
       const row = el(`<div class="assign-row"></div>`);
       row.appendChild(el(`<div class="assign-row__pos"><span class="pos-icon">${pos.icon}</span>${pos.name}</div>`));
       const sel = el(`<select data-date="${sunday.date}" data-pos="${pos.id}"></select>`);
-      const eligible = state.members.filter((m) => m.positions.includes(pos.id));
-      const pool = eligible.length ? eligible : state.members;
+      // Anyone can fill any position (e.g. different people lead worship on
+      // different Sundays); those with the position as a preference sort first.
+      const preferred = state.members.filter((m) => m.positions.includes(pos.id));
+      const others = state.members.filter((m) => !m.positions.includes(pos.id));
+      const pool = [...preferred, ...others];
       sel.innerHTML = `<option value="">— unassigned —</option>` +
         pool.map((m) => `<option value="${m.id}" ${sunday.assignments[pos.id] === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
       sel.addEventListener('change', async () => {
@@ -636,7 +639,7 @@ function voting() {
         lock.addEventListener('click', async () => { if (await store.lock(mKey, type.id)) render(); });
         controls.appendChild(lock);
       } else {
-        controls.appendChild(el(`<span class="card__meta">A leader locks the date once the majority is in.</span>`));
+        controls.appendChild(el(`<span class="card__meta">An admin locks the date once the majority is in.</span>`));
       }
       card.appendChild(controls);
       view.appendChild(card);
@@ -780,7 +783,7 @@ function team() {
     const t = RosterAPI.team();
     if (t && t.inviteCode) {
       const inv = el(`<div class="card"></div>`);
-      inv.appendChild(el(`<div class="card__head"><span class="card__title">Invite code</span><span class="badge">${esc(t.role || 'member')}</span></div>`));
+      inv.appendChild(el(`<div class="card__head"><span class="card__title">Invite code</span><span class="badge">${t.role === 'leader' ? 'Admin' : 'Member'}</span></div>`));
       inv.appendChild(el(`<div class="card__meta">Send teammates the invite link below — it opens the app ready to join "${esc(t.teamName || 'the team')}", with "start a new team" disabled so nobody creates a duplicate.</div>`));
       inv.appendChild(el(`<div style="font-size:1.4rem;font-weight:700;letter-spacing:2px;text-align:center;margin:10px 0">${esc(t.inviteCode)}</div>`));
 
@@ -837,15 +840,25 @@ function team() {
   for (const m of state.members) {
     const row = el(`<div class="member"></div>`);
     const posNames = m.positions.map((p) => (POSITIONS.find((x) => x.id === p) || {}).name).filter(Boolean).join(', ');
+    const badges =
+      (m.isLeader ? '<span class="badge">Admin</span>' : '') +
+      (m.title ? ` <span class="badge badge--muted">${esc(m.title)}</span>` : '');
     row.appendChild(el(`
       <div>
-        <div class="member__name">${esc(m.name)} ${m.isLeader ? '<span class="badge">Leader</span>' : ''}</div>
+        <div class="member__name">${esc(m.name)} ${badges}</div>
         <div class="member__pos">${esc(posNames || 'No position set')}</div>
       </div>`));
     if (!CLOUD) {
       const actions = el(`<div class="btn-row"></div>`);
       const edit = el(`<button class="btn btn--sm">Edit</button>`);
       edit.addEventListener('click', () => memberModal(m));
+      actions.appendChild(edit);
+      row.appendChild(actions);
+    } else if (isLeader()) {
+      // Admins can set a member's title (e.g. Pastor) or grant/revoke admin.
+      const edit = el(`<button class="btn btn--sm">Edit</button>`);
+      edit.addEventListener('click', () => cloudMemberModal(m));
+      const actions = el(`<div class="btn-row"></div>`);
       actions.appendChild(edit);
       row.appendChild(actions);
     }
@@ -918,6 +931,34 @@ function memberModal(existing) {
     : null;
 
   openModal(existing ? 'Edit member' : 'Add member', body, onSave, extra);
+}
+
+/** Admin-only editor (cloud mode): set a member's title and admin privileges. */
+function cloudMemberModal(m) {
+  const me = currentUser();
+  const isSelf = me && me.id === m.id;
+  const suggestions = ['Pastor', 'Worship Leader', 'Elder', 'Musician', 'Vocalist'];
+  const body = el(`
+    <div>
+      <div class="card__meta" style="margin-bottom:8px">${esc(m.name)}</div>
+      <label class="field" for="mem-title">Title (optional)</label>
+      <input id="mem-title" type="text" list="title-options" value="${esc(m.title || '')}" placeholder="e.g. Pastor" maxlength="30" />
+      <datalist id="title-options">${suggestions.map((s) => `<option value="${s}"></option>`).join('')}</datalist>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:600">
+        <input id="mem-admin" type="checkbox" ${m.isLeader ? 'checked' : ''} ${isSelf ? 'disabled' : ''} style="width:auto" />
+        Admin privileges (manage songs, lock dates, edit members)
+      </label>
+      ${isSelf ? '<div class="card__meta" style="margin-top:4px">You can\'t remove your own admin here.</div>' : ''}
+    </div>`);
+
+  openModal('Edit member', body, () => {
+    const title = body.querySelector('#mem-title').value.trim();
+    const isAdmin = body.querySelector('#mem-admin').checked;
+    const fields = { title };
+    if (!isSelf) fields.isLeader = isAdmin;
+    guard(() => RosterAPI.updateMember(m.id, fields)).then(() => { render(); toast('Member updated.'); });
+    return true;
+  });
 }
 
 /* -------------------------------------------------------------------------- *

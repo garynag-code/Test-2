@@ -209,7 +209,7 @@ async function getState(env, me) {
   const t = me.teamId;
   const [team, members, assigns, voteRows, locks, songs] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
-    env.DB.prepare('SELECT id, name, is_leader, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
+    env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT month, type_id, member_id, date FROM votes WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT month, type_id, locked_date FROM practice_locks WHERE team_id = ?').bind(t).all(),
@@ -219,7 +219,7 @@ async function getState(env, me) {
     team: { name: team && team.name, seasonStart: team && team.season_start, seasonEnd: team && team.season_end },
     me: { id: me.id, isLeader: me.isLeader },
     members: (members.results || []).map((r) => ({
-      id: r.id, name: r.name, isLeader: !!r.is_leader, positions: JSON.parse(r.positions || '[]'),
+      id: r.id, name: r.name, isLeader: !!r.is_leader, title: r.title || '', positions: JSON.parse(r.positions || '[]'),
     })),
     assignments: assigns.results || [],
     votes: voteRows.results || [],
@@ -243,6 +243,35 @@ async function setAssignment(request, env, me) {
   return json({ ok: true });
 }
 
+/** Admin-only: set another member's display title and/or admin privileges. */
+async function updateMember(request, env, me, memberId) {
+  if (!me.isLeader) return err(403, 'Only an admin can change member roles');
+  const target = await env.DB.prepare('SELECT id, is_leader FROM members WHERE id = ? AND team_id = ?')
+    .bind(memberId, me.teamId).first();
+  if (!target) return err(404, 'Member not found');
+
+  const body = await readJson(request);
+  const sets = [], vals = [];
+  if (typeof body.title === 'string') {
+    const title = body.title.replace(/[\x00-\x1F\x7F]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    sets.push('title = ?'); vals.push(title);
+  }
+  if (typeof body.isLeader === 'boolean') {
+    // Never leave the team without an admin.
+    if (body.isLeader === false && target.is_leader) {
+      const admins = await env.DB.prepare('SELECT COUNT(*) AS n FROM members WHERE team_id = ? AND is_leader = 1')
+        .bind(me.teamId).first();
+      if (admins.n <= 1) return err(409, 'The team must keep at least one admin');
+    }
+    sets.push('is_leader = ?'); vals.push(body.isLeader ? 1 : 0);
+  }
+  if (!sets.length) return err(400, 'Nothing to update');
+
+  vals.push(memberId, me.teamId);
+  await env.DB.prepare(`UPDATE members SET ${sets.join(', ')} WHERE id = ? AND team_id = ?`).bind(...vals).run();
+  return json({ ok: true });
+}
+
 async function castVote(request, env, me) {
   const body = await readJson(request);
   if (!isMonth(body && body.month) || !isTypeId(body && body.typeId) || !isDate(body && body.date))
@@ -260,7 +289,7 @@ async function castVote(request, env, me) {
 }
 
 async function lockPractice(request, env, me) {
-  if (!me.isLeader) return err(403, 'Only a leader can lock a date');
+  if (!me.isLeader) return err(403, 'Only an admin can lock a date');
   const body = await readJson(request);
   if (!isMonth(body && body.month) || !isTypeId(body && body.typeId)) return err(400, 'Invalid request');
 
@@ -280,7 +309,7 @@ async function lockPractice(request, env, me) {
 }
 
 async function newVote(request, env, me) {
-  if (!me.isLeader) return err(403, 'Only a leader can call a new vote');
+  if (!me.isLeader) return err(403, 'Only an admin can call a new vote');
   const body = await readJson(request);
   if (!isMonth(body && body.month) || !isTypeId(body && body.typeId)) return err(400, 'Invalid request');
   await env.DB.batch([
@@ -293,7 +322,7 @@ async function newVote(request, env, me) {
 }
 
 async function addSong(request, env, me) {
-  if (!me.isLeader) return err(403, 'Only a leader can post songs');
+  if (!me.isLeader) return err(403, 'Only an admin can post songs');
   const body = await readJson(request);
   const title = sanitizeName(body && body.title);
   if (!isMonth(body && body.month) || !title) return err(400, 'Invalid song');
@@ -305,7 +334,7 @@ async function addSong(request, env, me) {
 }
 
 async function deleteSong(env, me, songId) {
-  if (!me.isLeader) return err(403, 'Only a leader can remove songs');
+  if (!me.isLeader) return err(403, 'Only an admin can remove songs');
   await env.DB.prepare('DELETE FROM songs WHERE id = ? AND team_id = ?').bind(songId, me.teamId).run();
   return json({ ok: true });
 }
@@ -448,6 +477,7 @@ async function handle(request, env) {
 
   if (method === 'GET' && path === '/api/state') return json(await getState(env, me));
   if (method === 'PUT' && path === '/api/assignments') return setAssignment(request, env, me);
+  if (method === 'PUT' && path.startsWith('/api/members/')) return updateMember(request, env, me, decodeURIComponent(path.slice('/api/members/'.length)));
   if (method === 'POST' && path === '/api/votes') return castVote(request, env, me);
   if (method === 'POST' && path === '/api/practices/lock') return lockPractice(request, env, me);
   if (method === 'POST' && path === '/api/practices/new-vote') return newVote(request, env, me);

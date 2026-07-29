@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS members (
   id          TEXT PRIMARY KEY,
   team_id     TEXT NOT NULL,
   name        TEXT NOT NULL,
-  is_leader   INTEGER NOT NULL DEFAULT 0,
+  is_leader   INTEGER NOT NULL DEFAULT 0,   -- admin privileges
+  title       TEXT NOT NULL DEFAULT '',     -- optional display title, e.g. "Pastor"
   positions   TEXT NOT NULL DEFAULT '[]',   -- JSON array of position ids
   token_hash  TEXT NOT NULL,                -- SHA-256 of the device bearer token
   created_at  TEXT NOT NULL
