@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v14 · 2026-07-29';
+const APP_VERSION = 'v15 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -862,7 +862,17 @@ function home() {
   if (!list.length) {
     setCard.appendChild(el(`<div class="card__meta">No songs posted yet for this service.</div>`));
   } else {
-    for (const song of list) setCard.appendChild(songItemEl(sunday, song));
+    // Landing page stays scannable: title + key only. Chords, listening links and
+    // PDFs live on the Songs tab (the button below jumps straight there).
+    for (const song of list) {
+      setCard.appendChild(el(`
+        <div class="song-item">
+          <div>
+            <div class="song-item__title">${esc(song.title)}</div>
+            <div class="song-item__key">Key: ${esc(song.key || '—')}</div>
+          </div>
+        </div>`));
+    }
   }
   const goSongs = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:10px">Open full song list →</button>`);
   goSongs.addEventListener('click', () => { activeTab = 'songs'; render(); });
