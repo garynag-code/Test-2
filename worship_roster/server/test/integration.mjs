@@ -305,4 +305,33 @@ await test('library requires a title', async () => {
   assert.equal((await call('POST', '/api/library', { token: leaderToken, body: { lyrics: 'no title' } })).status, 400);
 });
 
+// ---- Devotionals ------------------------------------------------------------
+await test('devotionals: any member can add (with author), view, edit, delete', async () => {
+  const add = await call('POST', '/api/devotionals', { token: memberTokens[0], body: { title: 'Walking in Faith', link: 'https://youtu.be/dev', scripture: 'Proverbs 3:5-6', application: 'Trust God this week', prayer: 'Lord, help me trust You.' } });
+  assert.equal(add.status, 201);
+  const id = add.data.id;
+
+  let st = await call('GET', '/api/state', { token: memberTokens[2] });
+  const item = st.data.devotionals.find((x) => x.id === id);
+  assert.ok(item, 'visible to all members');
+  assert.equal(item.scripture, 'Proverbs 3:5-6');
+  assert.equal(item.application, 'Trust God this week');
+  assert.equal(item.prayer, 'Lord, help me trust You.');
+  assert.equal(item.author, 'David', 'stamped with the author name');
+  assert.equal(item.link, 'https://youtu.be/dev');
+
+  const up = await call('PUT', '/api/devotionals/' + id, { token: memberTokens[1], body: { prayer: 'Updated prayer' } });
+  assert.equal(up.status, 200);
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.devotionals.find((x) => x.id === id).prayer, 'Updated prayer');
+
+  assert.equal((await call('DELETE', '/api/devotionals/' + id, { token: memberTokens[0] })).status, 200);
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.devotionals.find((x) => x.id === id), undefined);
+});
+
+await test('a devotional requires a title', async () => {
+  assert.equal((await call('POST', '/api/devotionals', { token: leaderToken, body: { prayer: 'no title' } })).status, 400);
+});
+
 console.log(`\n${passed} tests passed.`);

@@ -219,7 +219,7 @@ async function joinTeam(request, env) {
 /** Assemble the full shared state for the caller's team. */
 async function getState(env, me) {
   const t = me.teamId;
-  const [team, members, assigns, voteRows, locks, songs, pdfs, lib] = await Promise.all([
+  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
     env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
@@ -228,6 +228,7 @@ async function getState(env, me) {
     env.DB.prepare('SELECT id, month, title, key_sig, link FROM songs WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT song_id, filename FROM song_pdfs WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT id, title, artist, lyrics, chords, link FROM library_songs WHERE team_id = ? ORDER BY created_at DESC').bind(t).all(),
+    env.DB.prepare('SELECT id, title, author, link, scripture, application, prayer, created_at FROM devotionals WHERE team_id = ? ORDER BY created_at DESC').bind(t).all(),
   ]);
   const pdfMap = new Map((pdfs.results || []).map((r) => [r.song_id, r.filename || 'chords.pdf']));
   return {
@@ -246,6 +247,11 @@ async function getState(env, me) {
     library: (lib.results || []).map((r) => ({
       id: r.id, title: r.title, artist: r.artist || '', lyrics: r.lyrics || '',
       chords: r.chords || '', link: r.link || '',
+    })),
+    devotionals: (dev.results || []).map((r) => ({
+      id: r.id, title: r.title, author: r.author || '', link: r.link || '',
+      scripture: r.scripture || '', application: r.application || '', prayer: r.prayer || '',
+      date: (r.created_at || '').slice(0, 10),
     })),
   };
 }
@@ -410,6 +416,41 @@ async function updateLibrarySong(request, env, me, id) {
 
 async function deleteLibrarySong(env, me, id) {
   await env.DB.prepare('DELETE FROM library_songs WHERE id = ? AND team_id = ?').bind(id, me.teamId).run();
+  return json({ ok: true });
+}
+
+// ---- Devotionals -----------------------------------------------------------
+
+async function addDevotional(request, env, me) {
+  const body = await readJson(request, LIB_BODY_BYTES);
+  const title = sanitizeName(body && body.title);
+  if (!title) return err(400, 'Title is required');
+  const id = uid('d');
+  await env.DB.prepare('INSERT INTO devotionals (id, team_id, title, author, link, scripture, application, prayer, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    .bind(id, me.teamId, title, me.name || '', sanitizeUrl(body.link),
+      sanitizeText(body.scripture, 4000), sanitizeText(body.application, 20000), sanitizeText(body.prayer, 8000),
+      new Date().toISOString()).run();
+  return json({ ok: true, id }, 201);
+}
+
+async function updateDevotional(request, env, me, id) {
+  const row = await env.DB.prepare('SELECT id FROM devotionals WHERE id = ? AND team_id = ?').bind(id, me.teamId).first();
+  if (!row) return err(404, 'Devotional not found');
+  const body = await readJson(request, LIB_BODY_BYTES);
+  const sets = [], vals = [];
+  if (typeof body.title === 'string') { const t = sanitizeName(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
+  if ('link' in body) { sets.push('link = ?'); vals.push(sanitizeUrl(body.link)); }
+  if ('scripture' in body) { sets.push('scripture = ?'); vals.push(sanitizeText(body.scripture, 4000)); }
+  if ('application' in body) { sets.push('application = ?'); vals.push(sanitizeText(body.application, 20000)); }
+  if ('prayer' in body) { sets.push('prayer = ?'); vals.push(sanitizeText(body.prayer, 8000)); }
+  if (!sets.length) return err(400, 'Nothing to update');
+  vals.push(id, me.teamId);
+  await env.DB.prepare(`UPDATE devotionals SET ${sets.join(', ')} WHERE id = ? AND team_id = ?`).bind(...vals).run();
+  return json({ ok: true });
+}
+
+async function deleteDevotional(env, me, id) {
+  await env.DB.prepare('DELETE FROM devotionals WHERE id = ? AND team_id = ?').bind(id, me.teamId).run();
   return json({ ok: true });
 }
 
@@ -621,6 +662,13 @@ async function handle(request, env) {
     const lid = decodeURIComponent(path.slice('/api/library/'.length));
     if (method === 'PUT') return updateLibrarySong(request, env, me, lid);
     if (method === 'DELETE') return deleteLibrarySong(env, me, lid);
+  }
+
+  if (method === 'POST' && path === '/api/devotionals') return addDevotional(request, env, me);
+  if (path.startsWith('/api/devotionals/')) {
+    const did = decodeURIComponent(path.slice('/api/devotionals/'.length));
+    if (method === 'PUT') return updateDevotional(request, env, me, did);
+    if (method === 'DELETE') return deleteDevotional(env, me, did);
   }
   if (method === 'POST' && path === '/api/push/subscribe') return subscribePush(request, env, me);
 

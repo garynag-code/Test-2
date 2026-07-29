@@ -79,7 +79,7 @@ let activeTab = 'roster';
 function emptyState() {
   // Placeholder until the first cloud sync populates real data.
   return { version: 1, currentUserId: null, members: [], sundays: buildSundays(),
-    practices: buildPractices(), reminders: [], songs: {}, library: [], notifyEnabled: false, cloud: true };
+    practices: buildPractices(), reminders: [], songs: {}, library: [], devotionals: [], notifyEnabled: false, cloud: true };
 }
 
 function load() {
@@ -128,6 +128,7 @@ function seed() {
     reminders: [],
     songs: {},                 // keyed by "YYYY-MM" -> [ {id,title,key,link} ]
     library: [],               // future songs to learn
+    devotionals: [],           // shared devotionals
     notifyEnabled: false,
   };
   s.reminders = buildSeasonReminders(s);
@@ -420,6 +421,9 @@ const localStore = {
   async addLib(fields) { (state.library = state.library || []).unshift(Object.assign({ id: uid('l') }, fields)); save(); },
   async updateLib(id, fields) { const l = (state.library || []).find((x) => x.id === id); if (l) Object.assign(l, fields); save(); },
   async deleteLib(id) { state.library = (state.library || []).filter((x) => x.id !== id); save(); },
+  async addDev(fields) { (state.devotionals = state.devotionals || []).unshift(Object.assign({ id: uid('d'), author: (currentUser() || {}).name || '', date: todayISO() }, fields)); save(); },
+  async updateDev(id, fields) { const d = (state.devotionals || []).find((x) => x.id === id); if (d) Object.assign(d, fields); save(); },
+  async deleteDev(id) { state.devotionals = (state.devotionals || []).filter((x) => x.id !== id); save(); },
 };
 
 const cloudStore = {
@@ -433,6 +437,9 @@ const cloudStore = {
   async addLib(fields) { await guard(() => RosterAPI.addLibrarySong(fields)); },
   async updateLib(id, fields) { await guard(() => RosterAPI.updateLibrarySong(id, fields)); },
   async deleteLib(id) { await guard(() => RosterAPI.deleteLibrarySong(id)); },
+  async addDev(fields) { await guard(() => RosterAPI.addDevotional(fields)); },
+  async updateDev(id, fields) { await guard(() => RosterAPI.updateDevotional(id, fields)); },
+  async deleteDev(id) { await guard(() => RosterAPI.deleteDevotional(id)); },
 };
 
 /** Run a cloud call, surface errors as a toast, then re-sync server truth. */
@@ -462,6 +469,7 @@ function cloudMap(s) {
     reminders: [],
     songs: {},
     library: (s.library || []).map((l) => ({ id: l.id, title: l.title, artist: l.artist || '', lyrics: l.lyrics || '', chords: l.chords || '', link: l.link || '' })),
+    devotionals: (s.devotionals || []).map((d) => ({ id: d.id, title: d.title, author: d.author || '', link: d.link || '', scripture: d.scripture || '', application: d.application || '', prayer: d.prayer || '', date: d.date || '' })),
     notifyEnabled: localStorage.getItem('worship-roster-notify') === '1',
     team: s.team,
     cloud: true,
@@ -542,7 +550,7 @@ function render() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { roster, voting, songs, library, reminders, team };
+  const map = { roster, voting, songs, library, devotions, reminders, team };
   view.innerHTML = '';
   (map[activeTab] || roster)();
   view.scrollTop = 0;
@@ -958,6 +966,100 @@ function libraryModal(existing) {
     };
     (existing ? store.updateLib(existing.id, fields) : store.addLib(fields))
       .then(() => { render(); toast(existing ? 'Library song updated.' : 'Added to library.'); });
+    return true;
+  });
+}
+
+// -- Tab: Devotions -------------------------------------------------------
+
+function devotions() {
+  const list = state.devotionals || [];
+  view.appendChild(el(`<h2 class="section-title">🙏 Devotions</h2>`));
+  view.appendChild(el(`<p class="section-sub">Devotionals for the team — scripture, a practical life application and a prayer, with an optional video or blog link. Anyone can share one. ${list.length} devotional${list.length === 1 ? '' : 's'}.</p>`));
+
+  const add = el(`<button class="btn btn--primary btn--block" style="margin-bottom:12px">＋ Share a devotional</button>`);
+  add.addEventListener('click', () => devotionalModal(null));
+  view.appendChild(add);
+
+  if (!list.length) {
+    view.appendChild(el(`<div class="empty"><div class="empty__icon">📖</div><p>No devotionals yet — be the first to share one.</p></div>`));
+    return;
+  }
+  for (const d of list) {
+    const card = el(`<div class="card"></div>`);
+    card.appendChild(el(`<div class="card__title">${esc(d.title)}</div>`));
+    const meta = [d.author, d.date].filter(Boolean).join(' · ');
+    if (meta) card.appendChild(el(`<div class="card__meta">${esc(meta)}</div>`));
+    if (d.scripture) card.appendChild(el(`<div class="card__meta" style="margin-top:6px">📖 ${esc(d.scripture.split('\n')[0])}</div>`));
+    const actions = el(`<div class="btn-row" style="margin-top:10px"></div>`);
+    const read = el(`<button class="btn btn--sm btn--primary">📖 Read</button>`);
+    read.addEventListener('click', () => devotionalViewModal(d));
+    actions.appendChild(read);
+    if (d.link) {
+      const w = el(`<button class="btn btn--sm">▶️ Watch/Read</button>`);
+      w.addEventListener('click', () => openExternal(d.link));
+      actions.appendChild(w);
+    }
+    const e = el(`<button class="btn btn--sm">✏️ Edit</button>`);
+    e.addEventListener('click', () => devotionalModal(d));
+    actions.appendChild(e);
+    const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
+    del.addEventListener('click', () => confirmModal('Remove devotional?', `Delete “${d.title}”?`, async () => { await store.deleteDev(d.id); render(); }));
+    actions.appendChild(del);
+    card.appendChild(actions);
+    view.appendChild(card);
+  }
+}
+
+/** Read-only view of a full devotional. */
+function devotionalViewModal(d) {
+  const body = el(`<div></div>`);
+  const meta = [d.author, d.date].filter(Boolean).join(' · ');
+  if (meta) body.appendChild(el(`<div class="card__meta" style="margin-bottom:10px">${esc(meta)}</div>`));
+  if (d.link) {
+    const w = el(`<button class="btn btn--sm btn--block" style="margin-bottom:12px">▶️ Watch / read online</button>`);
+    w.addEventListener('click', () => openExternal(d.link));
+    body.appendChild(w);
+  }
+  const section = (label, text) => {
+    if (!text) return;
+    body.appendChild(el(`<label class="field">${label}</label>`));
+    body.appendChild(el(`<div style="white-space:pre-wrap;line-height:1.55;margin-bottom:8px">${esc(text)}</div>`));
+  };
+  section('Scripture', d.scripture);
+  section('Practical life application', d.application);
+  section('Prayer', d.prayer);
+  openModal(d.title, body, () => true, null, 'Close');
+}
+
+/** Add or edit a devotional. */
+function devotionalModal(existing) {
+  const d = existing || { title: '', link: '', scripture: '', application: '', prayer: '' };
+  const body = el(`
+    <div>
+      <label class="field" for="dv-title">Title</label>
+      <input id="dv-title" type="text" value="${esc(d.title)}" placeholder="e.g. Walking in Faith" />
+      <label class="field" for="dv-link">Video or blog link (optional)</label>
+      <input id="dv-link" type="url" inputmode="url" value="${esc(d.link || '')}" placeholder="https://…" />
+      <label class="field" for="dv-scripture">Scripture(s)</label>
+      <textarea id="dv-scripture" rows="3" placeholder="e.g. Proverbs 3:5–6 — Trust in the Lord…">${esc(d.scripture || '')}</textarea>
+      <label class="field" for="dv-application">Practical life application</label>
+      <textarea id="dv-application" rows="5" placeholder="How do we live this out this week?">${esc(d.application || '')}</textarea>
+      <label class="field" for="dv-prayer">Prayer</label>
+      <textarea id="dv-prayer" rows="4" placeholder="A short prayer…">${esc(d.prayer || '')}</textarea>
+    </div>`);
+  openModal(existing ? 'Edit devotional' : 'Share a devotional', body, () => {
+    const title = body.querySelector('#dv-title').value.trim();
+    if (!title) { toast('Enter a title.'); return false; }
+    const fields = {
+      title,
+      link: normalizeLink(body.querySelector('#dv-link').value),
+      scripture: body.querySelector('#dv-scripture').value,
+      application: body.querySelector('#dv-application').value,
+      prayer: body.querySelector('#dv-prayer').value,
+    };
+    (existing ? store.updateDev(existing.id, fields) : store.addDev(fields))
+      .then(() => { render(); toast(existing ? 'Devotional updated.' : 'Devotional shared.'); });
     return true;
   });
 }

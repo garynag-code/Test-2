@@ -77,6 +77,10 @@
     updateLibrarySong(id, fields) { return req('PUT', '/api/library/' + encodeURIComponent(id), fields); },
     deleteLibrarySong(id) { return req('DELETE', '/api/library/' + encodeURIComponent(id)); },
 
+    addDevotional(fields) { return req('POST', '/api/devotionals', fields); },
+    updateDevotional(id, fields) { return req('PUT', '/api/devotionals/' + encodeURIComponent(id), fields); },
+    deleteDevotional(id) { return req('DELETE', '/api/devotionals/' + encodeURIComponent(id)); },
+
     // Upload a chord PDF (raw bytes) and fetch it back as a blob URL for viewing.
     async uploadSongPdf(id, file) {
       const t = getToken();

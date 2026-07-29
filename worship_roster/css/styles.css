@@ -194,11 +194,12 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible {
   padding-bottom: var(--safe-bottom);
 }
 .tabbar__btn {
-  flex: 1; background: none; border: 0; padding: 8px 2px 6px; cursor: pointer;
+  flex: 1; min-width: 0; background: none; border: 0; padding: 8px 1px 6px; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  color: var(--muted); font-size: .68rem; font-weight: 600; min-height: 56px;
+  color: var(--muted); font-size: .6rem; font-weight: 600; min-height: 54px;
 }
-.tabbar__icon { font-size: 1.25rem; line-height: 1; }
+.tabbar__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabbar__icon { font-size: 1.18rem; line-height: 1; }
 .tabbar__btn[aria-current="true"] { color: var(--brand); }
 
 /* ---------- Toast ---------- */

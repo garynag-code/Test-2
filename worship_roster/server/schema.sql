@@ -82,6 +82,20 @@ CREATE TABLE IF NOT EXISTS library_songs (
 );
 CREATE INDEX IF NOT EXISTS idx_library_team ON library_songs(team_id);
 
+-- Devotionals: title, video/blog link, scripture, application, prayer.
+CREATE TABLE IF NOT EXISTS devotionals (
+  id          TEXT PRIMARY KEY,
+  team_id     TEXT NOT NULL,
+  title       TEXT NOT NULL,
+  author      TEXT NOT NULL DEFAULT '',
+  link        TEXT NOT NULL DEFAULT '',
+  scripture   TEXT NOT NULL DEFAULT '',
+  application TEXT NOT NULL DEFAULT '',
+  prayer      TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_devotionals_team ON devotionals(team_id);
+
 -- Optional attached chord-sheet PDF for a song (base64, kept small).
 CREATE TABLE IF NOT EXISTS song_pdfs (
   song_id    TEXT PRIMARY KEY,
