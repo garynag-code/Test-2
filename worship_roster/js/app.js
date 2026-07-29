@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v5 · 2026-07-29';
+const APP_VERSION = 'v6 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -177,6 +177,17 @@ function daysAgoISO(n) {
   d.setDate(d.getDate() - n);
   return toISO(d);
 }
+/** ISO date `n` days before the given ISO date. */
+function daysAgoFrom(iso, n) {
+  const d = parseISO(iso);
+  d.setDate(d.getDate() - n);
+  return toISO(d);
+}
+/** Full month + year label for an ISO date, e.g. "July 2026". */
+function monthName(iso) {
+  const d = parseISO(iso);
+  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 // Weekly targets used to score "Your Spiritual Journey".
 const KPI = { prayerWeekTarget: 60, wordWeekTarget: 90, devotionTarget: 3 };
@@ -219,20 +230,26 @@ const PREP_CHECKLIST = [
 const PREP_QUOTE = 'Worship begins long before the first song is played.';
 const PREP_TOTAL = PREP_CHECKLIST.reduce((n, s) => n + s.items.length, 0);
 
-/** localStorage key for this week's personal prep ticks (per signed-in member). */
-function prepKey() {
+const PREP_ITEM_IDS = new Set(PREP_CHECKLIST.flatMap((s) => s.items.map((i) => i.id)));
+
+/** localStorage key for a week's personal prep ticks (per signed-in member). */
+function prepKey(sunday) {
   const who = CLOUD ? ((currentUser() && currentUser().id) || 'me') : (state.currentUserId || 'me');
-  return `worship-roster-prep:${who}:${currentServiceSunday()}`;
+  return `worship-roster-prep:${who}:${sunday || currentServiceSunday()}`;
 }
-function getPrepChecks() {
-  try { return new Set(JSON.parse(localStorage.getItem(prepKey()) || '[]')); }
+function getPrepChecks(sunday) {
+  try { return new Set(JSON.parse(localStorage.getItem(prepKey(sunday)) || '[]')); }
   catch (_) { return new Set(); }
 }
-function togglePrep(id) {
-  const set = getPrepChecks();
+function togglePrep(id, sunday) {
+  const set = getPrepChecks(sunday);
   set.has(id) ? set.delete(id) : set.add(id);
-  try { localStorage.setItem(prepKey(), JSON.stringify([...set])); }
+  try { localStorage.setItem(prepKey(sunday), JSON.stringify([...set])); }
   catch (_) { toast('Could not save — storage may be full.'); }
+}
+/** How many valid prep items are ticked for a given service Sunday. */
+function prepDoneFor(sunday) {
+  return [...getPrepChecks(sunday)].filter((id) => PREP_ITEM_IDS.has(id)).length;
 }
 
 function ratingFor(score) {
@@ -247,10 +264,14 @@ function currentServiceSunday() {
   return seasonSundays().find((d) => d >= todayISO()) || (seasonSundays().slice(-1)[0] || todayISO());
 }
 
-/** Compute both KPI scores for the signed-in member. */
-function computeKpis() {
-  const since = daysAgoISO(6);
-  const log = (state.myLog || []).filter((e) => e.date >= since);
+/** Compute both KPI scores for the signed-in member.
+ * Defaults to the current ministry week; pass { sunday, since, until } to score
+ * a specific past week (used by the weekly/monthly review). */
+function computeKpis(opts) {
+  const sunday = (opts && opts.sunday) || currentServiceSunday();
+  const since = (opts && opts.since) || daysAgoISO(6);
+  const until = (opts && opts.until) || null;
+  const log = (state.myLog || []).filter((e) => e.date >= since && (!until || e.date <= until));
   const prayerMin = log.filter((e) => e.kind === 'prayer').reduce((a, e) => a + (e.minutes || 0), 0);
   const wordMin = log.filter((e) => e.kind === 'word').reduce((a, e) => a + (e.minutes || 0), 0);
 
@@ -264,12 +285,108 @@ function computeKpis() {
   const devPct = Math.min(1, readCount / devTarget);
   const spiritual = Math.round(((prayerPct + wordPct + devPct) / 3) * 100);
 
-  const sunday = currentServiceSunday();
   const ministryChecks = MINISTRY_MARKERS.map((m) => ({ ...m, on: flags.has(`ministry:${sunday}:${m.id}`) }));
   const checkedCount = ministryChecks.filter((c) => c.on).length;
   const ministry = Math.round(((checkedCount + spiritual / 100) / (MINISTRY_MARKERS.length + 1)) * 100);
 
-  return { prayerMin, wordMin, readCount, devTarget, prayerPct, wordPct, devPct, spiritual, ministryChecks, ministry, sunday };
+  return { prayerMin, wordMin, readCount, devTarget, prayerPct, wordPct, devPct, spiritual, ministryChecks, checkedCount, ministry, sunday };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Weekly (Monday) & month-end review + coaching
+ * -------------------------------------------------------------------------- */
+
+function isMonday() { return new Date().getDay() === 1; }
+function isLastDayOfMonth() {
+  const d = new Date();
+  const t = new Date(d); t.setDate(d.getDate() + 1);
+  return t.getMonth() !== d.getMonth();
+}
+/** The most recent service Sunday on or before today (the week just finished). */
+function mostRecentSunday() {
+  const past = seasonSundays().filter((d) => d <= todayISO());
+  return past.length ? past[past.length - 1] : (seasonSundays()[0] || todayISO());
+}
+/** All service Sundays that fall in the same calendar month as `iso`. */
+function sundaysInMonthOf(iso) {
+  const ym = iso.slice(0, 7);
+  return seasonSundays().filter((d) => d.slice(0, 7) === ym);
+}
+
+/** A full review for one service week: preparation + spiritual + ministry,
+ * an overall rating, per-dimension percentages, and targeted coaching notes. */
+function reviewFor(sunday) {
+  const k = computeKpis({ sunday, since: daysAgoFrom(sunday, 6), until: sunday });
+  const prepDone = prepDoneFor(sunday);
+  const prepPct = PREP_TOTAL ? prepDone / PREP_TOTAL : 0;
+  const ministryPct = MINISTRY_MARKERS.length ? k.checkedCount / MINISTRY_MARKERS.length : 0;
+  const overall = Math.round((prepPct * 100 + k.spiritual + k.ministry) / 3);
+  const empty = prepDone === 0 && k.prayerMin === 0 && k.wordMin === 0 && k.readCount === 0 && k.checkedCount === 0;
+  const pcts = { prepPct, prayerPct: k.prayerPct, wordPct: k.wordPct, devPct: k.devPct,
+    ministryPct, spiritual: k.spiritual, ministry: k.ministry };
+  return {
+    sunday, prepDone, prepTotal: PREP_TOTAL, prepPct,
+    spiritual: k.spiritual, ministry: k.ministry, overall, pcts,
+    prayerMin: k.prayerMin, wordMin: k.wordMin, readCount: k.readCount, devTarget: k.devTarget,
+    checkedCount: k.checkedCount, ministryTotal: MINISTRY_MARKERS.length,
+    rating: ratingFor(overall), empty, notes: coachingNotes(pcts),
+  };
+}
+
+/** Aggregate the weekly reviews across a month into one month-end summary. */
+function monthlyReview(anchorISO) {
+  const reviews = sundaysInMonthOf(anchorISO).map(reviewFor);
+  const mean = (sel) => reviews.length ? reviews.reduce((a, r) => a + sel(r), 0) / reviews.length : 0;
+  const prepAvg = Math.round(mean((r) => r.prepPct * 100));
+  const spiritualAvg = Math.round(mean((r) => r.spiritual));
+  const ministryAvg = Math.round(mean((r) => r.ministry));
+  const overall = Math.round((prepAvg + spiritualAvg + ministryAvg) / 3);
+  const activeWeeks = reviews.filter((r) => !r.empty).length;
+  const empty = activeWeeks === 0;
+  // Average each dimension's percentage so the coaching notes stay accurate.
+  const pcts = {
+    prepPct: mean((r) => r.pcts.prepPct),
+    prayerPct: mean((r) => r.pcts.prayerPct),
+    wordPct: mean((r) => r.pcts.wordPct),
+    devPct: mean((r) => r.pcts.devPct),
+    ministryPct: mean((r) => r.pcts.ministryPct),
+    spiritual: spiritualAvg, ministry: ministryAvg,
+  };
+  const notes = coachingNotes(pcts);
+  if (!empty) {
+    notes.unshift(activeWeeks === reviews.length
+      ? { icon: '🗓️', text: `Consistent all month — you engaged in all ${reviews.length} weeks. Consistency is the mark of a faithful worshipper.` }
+      : { icon: '🗓️', text: `You were active in ${activeWeeks} of ${reviews.length} weeks this month. Aim for every week — steady rhythm beats occasional effort.` });
+  }
+  return {
+    month: monthName(anchorISO), weeks: reviews.length, activeWeeks,
+    prepAvg, spiritualAvg, ministryAvg, overall, rating: ratingFor(overall), empty, notes,
+  };
+}
+
+/** Turn per-dimension percentages (0..1) into a short list of specific,
+ * encouraging coaching notes. Works for both a single week and a month. */
+function coachingNotes(p) {
+  const notes = [];
+  // Preparation
+  if (p.prepPct >= 0.85) notes.push({ icon: '✅', text: 'Outstanding preparation — you worked through almost the whole checklist. Keep this rhythm.' });
+  else if (p.prepPct >= 0.4) notes.push({ icon: '📝', text: 'Solid start on preparation. Complete the “During the Week” items early so Sunday feels effortless.' });
+  else if (p.prepPct > 0) notes.push({ icon: '📝', text: 'Preparation was light. Block midweek time to learn songs, keys and parts before Sunday.' });
+  else notes.push({ icon: '📝', text: 'No preparation recorded. Start early next week: prayer, learning the songs, and confirming your parts.' });
+  // Spiritual journey
+  if (p.prayerPct <= 0) notes.push({ icon: '🙏', text: 'No prayer logged. Even 10 minutes a day in the Spirit builds strength for ministry.' });
+  else if (p.prayerPct < 1) notes.push({ icon: '🙏', text: 'Grow your prayer in the Spirit — you’re close to the goal; a little more each day gets you there.' });
+  if (p.wordPct <= 0) notes.push({ icon: '📖', text: 'No time in the Word logged. Let Scripture shape your worship — start with 15 minutes.' });
+  else if (p.wordPct < 1) notes.push({ icon: '📖', text: 'Add a little more time in the Word to reach your goal.' });
+  if (p.devPct <= 0) notes.push({ icon: '🕮', text: 'Read the team devotions — they keep the whole team spiritually aligned.' });
+  // Ministry excellence
+  if (p.ministryPct <= 0) notes.push({ icon: '⭐', text: 'Mark your ministry commitments — arriving on time, joining team prayer and contributing all count.' });
+  else if (p.ministryPct >= 1) notes.push({ icon: '⭐', text: 'Excellent — punctual, prayerful and contributing. Keep modelling this for the team.' });
+  // Encouragement when everything is strong
+  if (p.prepPct >= 0.7 && p.spiritual >= 65 && p.ministry >= 65) {
+    notes.push({ icon: '🔥', text: 'You’re thriving across preparation, spirit and ministry — a real blessing to the team. Press on!' });
+  }
+  return notes.slice(0, 5);
 }
 
 /** Every Sunday between SEASON.start and SEASON.end (inclusive). */
@@ -669,7 +786,7 @@ function render() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { home, roster, voting, songs, library, devotions, journey, reminders, team };
+  const map = { home, roster, voting, songs, library, devotions, journey, growth, reminders, team };
   view.innerHTML = '';
   (map[activeTab] || home)();
   view.scrollTop = 0;
@@ -697,6 +814,11 @@ function home() {
   const sunday = currentServiceSunday();
   view.appendChild(el(`<h2 class="section-title">🏠 This Week</h2>`));
   view.appendChild(el(`<p class="section-sub">${esc(BRAND)} — the worship set and your preparation for the upcoming service.</p>`));
+
+  // Surface the review at the times the user asked for it: Mondays (weekly)
+  // and the last day of the month (month-end).
+  if (isMonday()) view.appendChild(homeReviewBanner('weekly'));
+  if (isLastDayOfMonth()) view.appendChild(homeReviewBanner('monthly'));
 
   // ---- Current week's music set ----
   const setCard = el(`<div class="card"></div>`);
@@ -1348,6 +1470,91 @@ function journey() {
   const spiritOn = k.spiritual >= 60;
   em.appendChild(el(`<div class="check-row ${spiritOn ? 'is-on' : ''}"><span class="check-row__box">${spiritOn ? '✓' : ''}</span><span class="check-row__label">Growing spiritually <span class="card__meta">(from your Spiritual Journey score)</span></span></div>`));
   view.appendChild(em);
+}
+
+// -- Tab: Growth (weekly & month-end review + coaching) -------------------
+
+function growth() {
+  const me = currentUser();
+  view.appendChild(el(`<h2 class="section-title">📊 Your Review</h2>`));
+  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — coaching on your meeting preparation, spiritual journey and ministry excellence. Private to you.</p>`));
+
+  // Weekly review — the week that just finished (surfaced every Monday).
+  const wSunday = mostRecentSunday();
+  const wr = reviewFor(wSunday);
+  view.appendChild(reviewCard({
+    icon: '🗓️', title: 'Weekly Review',
+    subtitle: `Week ending ${fmtLong(wSunday)}`,
+    highlight: isMonday(),
+    overall: wr.overall, rating: wr.rating, empty: wr.empty, notes: wr.notes,
+    prepPct: wr.prepPct, prepLabel: `${wr.prepDone} / ${wr.prepTotal} prep items`,
+    spiritual: wr.spiritual, ministry: wr.ministry,
+  }));
+
+  // Month-end review — month-to-date, emphasised on the last day of the month.
+  const mr = monthlyReview(todayISO());
+  view.appendChild(reviewCard({
+    icon: '📆', title: isLastDayOfMonth() ? 'Month-End Review' : 'This Month So Far',
+    subtitle: `${mr.month} · active in ${mr.activeWeeks}/${mr.weeks} weeks`,
+    highlight: isLastDayOfMonth(),
+    overall: mr.overall, rating: mr.rating, empty: mr.empty, notes: mr.notes,
+    prepPct: mr.prepAvg / 100, prepLabel: `${mr.prepAvg}% average`,
+    spiritual: mr.spiritualAvg, ministry: mr.ministryAvg,
+  }));
+
+  const go = el(`<button class="btn btn--sm btn--ghost btn--block">Log prayer / Word or tick ministry in My Journey →</button>`);
+  go.addEventListener('click', () => { activeTab = 'journey'; render(); });
+  view.appendChild(go);
+}
+
+/** Render one review (weekly or monthly) as a card with meters + coaching. */
+function reviewCard(o) {
+  const card = el(`<div class="card"></div>`);
+  if (o.highlight) card.style.borderColor = 'var(--brand)';
+  const head = el(`<div class="card__head"></div>`);
+  head.appendChild(el(`<span class="card__title">${o.icon} ${esc(o.title)}</span>`));
+  head.appendChild(el(`<span class="kpi__rating" style="color:${o.rating.color};background:${o.rating.bg}">${o.rating.label}</span>`));
+  card.appendChild(head);
+  card.appendChild(el(`<div class="card__meta" style="margin:-2px 0 8px">${esc(o.subtitle)}</div>`));
+
+  if (o.empty) {
+    card.appendChild(bigReminder());
+  } else {
+    card.appendChild(el(`<div class="kpi__score"><span class="kpi__num" style="color:${o.rating.color}">${o.overall}</span><span class="kpi__of">/ 100 overall</span></div>`));
+  }
+  card.appendChild(meter('📝 Meeting preparation', o.prepLabel, o.prepPct));
+  card.appendChild(meter('📈 Spiritual journey', `${o.spiritual} / 100`, o.spiritual / 100));
+  card.appendChild(meter('⭐ Ministry excellence', `${o.ministry} / 100`, o.ministry / 100));
+
+  card.appendChild(el(`<div class="card__meta" style="margin:12px 0 2px;font-weight:700">Coaching notes</div>`));
+  for (const n of o.notes) {
+    card.appendChild(el(`<div class="reminder"><span class="reminder__dot">${n.icon}</span><div class="reminder__body"><div class="reminder__title" style="font-weight:500">${esc(n.text)}</div></div></div>`));
+  }
+  return card;
+}
+
+/** The prominent "you haven't logged anything" reminder. */
+function bigReminder() {
+  return el(`<div style="border:2px solid var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:14px;margin:6px 0 10px;text-align:center">
+    <div style="font-size:1.7rem;line-height:1">⚠️</div>
+    <div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px">No inputs recorded</div>
+    <div style="font-size:.9rem;color:var(--ink)">Please improve next week — spend time in preparation, prayer and the Word, and mark your ministry. Small, consistent steps grow great worshippers.</div>
+  </div>`);
+}
+
+/** A tappable Home banner that surfaces the weekly / month-end review. */
+function homeReviewBanner(kind) {
+  const r = kind === 'weekly' ? reviewFor(mostRecentSunday()) : monthlyReview(todayISO());
+  const title = kind === 'weekly' ? '🗓️ Weekly Review is ready' : '📆 Month-End Review is ready';
+  const strong = r.empty;
+  const card = el(`<div class="card" style="cursor:pointer;border-color:${strong ? 'var(--warn)' : 'var(--brand)'};${strong ? 'background:var(--warn-soft);' : ''}"></div>`);
+  card.appendChild(el(`<div class="card__head"><span class="card__title">${title}</span><span class="kpi__rating" style="color:${r.rating.color};background:${r.rating.bg}">${r.rating.label}</span></div>`));
+  const msg = strong
+    ? 'You haven’t logged anything yet — tap to see how to improve this week.'
+    : `Overall ${r.overall}/100. Tap to read your coaching notes.`;
+  card.appendChild(el(`<div class="card__meta">${esc(msg)}</div>`));
+  card.addEventListener('click', () => { activeTab = 'growth'; render(); });
+  return card;
 }
 
 function logCustomModal() {
