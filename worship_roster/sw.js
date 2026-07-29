@@ -2,7 +2,7 @@
  * Cache-first for the app shell so it launches with no network; bump CACHE
  * when any shell file changes to roll the cache over. */
 
-const CACHE = 'worship-roster-v7';
+const CACHE = 'worship-roster-v8';
 const SHELL = [
   './',
   './index.html',

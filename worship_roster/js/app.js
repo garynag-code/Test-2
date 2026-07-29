@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v7 · 2026-07-29';
+const APP_VERSION = 'v8 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -355,8 +355,8 @@ function monthlyReview(anchorISO) {
   const notes = coachingNotes(pcts);
   if (!empty) {
     notes.unshift(activeWeeks === reviews.length
-      ? { icon: '🗓️', text: `Consistent all month — you engaged in all ${reviews.length} weeks. Stay the course: “Be steadfast, immovable, always abounding in the work of the Lord, knowing that in the Lord your labour is not in vain.” (1 Corinthians 15:58)` }
-      : { icon: '🗓️', text: `You were active in ${activeWeeks} of ${reviews.length} weeks this month. Press on toward every week: “Forgetting what lies behind… I press on toward the goal.” (Philippians 3:13-14)` });
+      ? { icon: '🗓️', text: `Consistent all month — you engaged in all ${reviews.length} weeks. Stay the course: “Be strong and immovable. Always work enthusiastically for the Lord, for you know that nothing you do for the Lord is ever useless.” (1 Corinthians 15:58, NLT)` }
+      : { icon: '🗓️', text: `You were active in ${activeWeeks} of ${reviews.length} weeks this month. Press on toward every week: “Forgetting the past and looking forward to what lies ahead, I press on to reach the end of the race.” (Philippians 3:13-14, NLT)` });
   }
   return {
     month: monthName(anchorISO), weeks: reviews.length, activeWeeks,
@@ -365,28 +365,29 @@ function monthlyReview(anchorISO) {
 }
 
 /** Turn per-dimension percentages (0..1) into a short list of Scripture-based
- * coaching notes that exhort and encourage. Works for a week or a month. */
+ * coaching notes (New Living Translation) that exhort and encourage. Works for
+ * a single week or a month. */
 function coachingNotes(p) {
   const notes = [];
   // Preparation
-  if (p.prepPct >= 0.85) notes.push({ icon: '✅', text: 'Outstanding preparation — you worked through almost the whole checklist. “Do your best to present yourself to God as one approved, a worker who has no need to be ashamed.” (2 Timothy 2:15) Keep it up!' });
-  else if (p.prepPct >= 0.4) notes.push({ icon: '📝', text: 'Good start on preparation — finish the “During the Week” items early. “The plans of the diligent lead surely to abundance.” (Proverbs 21:5)' });
-  else if (p.prepPct > 0) notes.push({ icon: '📝', text: 'Preparation was light this week. Block midweek time for your parts. “Let all things be done decently and in order.” (1 Corinthians 14:40)' });
-  else notes.push({ icon: '📝', text: 'No preparation recorded. Plan your week and count the cost of serving well. “Which of you, desiring to build a tower, does not first sit down and count the cost?” (Luke 14:28)' });
+  if (p.prepPct >= 0.85) notes.push({ icon: '✅', text: 'Outstanding preparation — you worked through almost the whole checklist. “Work hard so you can present yourself to God and receive his approval.” (2 Timothy 2:15, NLT) Keep it up!' });
+  else if (p.prepPct >= 0.4) notes.push({ icon: '📝', text: 'Good start on preparation — finish the “During the Week” items early. “Good planning and hard work lead to prosperity.” (Proverbs 21:5, NLT)' });
+  else if (p.prepPct > 0) notes.push({ icon: '📝', text: 'Preparation was light this week. Block midweek time for your parts. “Be sure that everything is done properly and in order.” (1 Corinthians 14:40, NLT)' });
+  else notes.push({ icon: '📝', text: 'No preparation recorded. Plan your week and count the cost of serving well. “Don’t begin until you count the cost.” (Luke 14:28, NLT)' });
   // Prayer (in the Spirit)
-  if (p.prayerPct <= 0) notes.push({ icon: '🙏', text: 'No prayer logged — begin with 10 minutes a day. “But you, beloved, building yourselves up in your most holy faith, praying in the Holy Spirit.” (Jude 1:20)' });
-  else if (p.prayerPct < 1) notes.push({ icon: '🙏', text: 'Grow your prayer in the Spirit — you’re close to the goal. “Praying at all times in the Spirit, with all prayer and supplication.” (Ephesians 6:18)' });
+  if (p.prayerPct <= 0) notes.push({ icon: '🙏', text: 'No prayer logged — begin with 10 minutes a day. “Build each other up in your most holy faith, and pray in the power of the Holy Spirit.” (Jude 1:20, NLT)' });
+  else if (p.prayerPct < 1) notes.push({ icon: '🙏', text: 'Grow your prayer in the Spirit — you’re close to the goal. “Pray in the Spirit at all times and on every occasion.” (Ephesians 6:18, NLT)' });
   // The Word
-  if (p.wordPct <= 0) notes.push({ icon: '📖', text: 'No time in the Word logged — let it fill your worship. “Let the word of Christ dwell in you richly… singing psalms and hymns and spiritual songs.” (Colossians 3:16)' });
-  else if (p.wordPct < 1) notes.push({ icon: '📖', text: 'Add a little more time in the Word to reach your goal. “I have stored up your word in my heart, that I might not sin against you.” (Psalm 119:11)' });
+  if (p.wordPct <= 0) notes.push({ icon: '📖', text: 'No time in the Word logged — let it fill your worship. “Let the message about Christ, in all its richness, fill your lives… Sing psalms and hymns and spiritual songs to God with thankful hearts.” (Colossians 3:16, NLT)' });
+  else if (p.wordPct < 1) notes.push({ icon: '📖', text: 'Add a little more time in the Word to reach your goal. “I have hidden your word in my heart, that I might not sin against you.” (Psalm 119:11, NLT)' });
   // Devotions
-  if (p.devPct <= 0) notes.push({ icon: '🕮', text: 'Read the team devotions to stay aligned as one body. “Let us consider how to stir up one another to love and good works, not neglecting to meet together.” (Hebrews 10:24-25)' });
+  if (p.devPct <= 0) notes.push({ icon: '🕮', text: 'Read the team devotions to stay aligned as one body. “Let us think of ways to motivate one another to acts of love and good works… encourage one another.” (Hebrews 10:24-25, NLT)' });
   // Ministry excellence
-  if (p.ministryPct <= 0) notes.push({ icon: '⭐', text: 'Mark your ministry commitments — arrive on time, join team prayer, contribute. “Whatever you do, work heartily, as for the Lord and not for men.” (Colossians 3:23)' });
-  else if (p.ministryPct >= 1) notes.push({ icon: '⭐', text: 'Excellent — punctual, prayerful and serving well. “As each has received a gift, use it to serve one another, as good stewards of God’s varied grace.” (1 Peter 4:10)' });
+  if (p.ministryPct <= 0) notes.push({ icon: '⭐', text: 'Mark your ministry commitments — arrive on time, join team prayer, contribute. “Work willingly at whatever you do, as though you were working for the Lord rather than for people.” (Colossians 3:23, NLT)' });
+  else if (p.ministryPct >= 1) notes.push({ icon: '⭐', text: 'Excellent — punctual, prayerful and serving well. “God has given each of you a gift… Use them well to serve one another.” (1 Peter 4:10, NLT)' });
   // Encouragement when everything is strong
   if (p.prepPct >= 0.7 && p.spiritual >= 65 && p.ministry >= 65) {
-    notes.push({ icon: '🔥', text: 'You’re thriving across preparation, spirit and ministry — a blessing to the team. “Let us not grow weary of doing good, for in due season we will reap, if we do not give up.” (Galatians 6:9)' });
+    notes.push({ icon: '🔥', text: 'You’re thriving across preparation, spirit and ministry — a blessing to the team. “Let’s not get tired of doing what is good. At just the right time we will reap a harvest of blessing if we don’t give up.” (Galatians 6:9, NLT)' });
   }
   return notes.slice(0, 5);
 }
@@ -1541,7 +1542,7 @@ function bigReminder() {
     <div style="font-size:1.7rem;line-height:1">⚠️</div>
     <div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px">No inputs recorded</div>
     <div style="font-size:.9rem;color:var(--ink)">Let’s grow next week — spend time in preparation, prayer and the Word, and mark your ministry. His mercy makes every week a fresh start.</div>
-    <div style="font-size:.85rem;font-style:italic;color:var(--brand-dark);margin-top:8px">“The steadfast love of the Lord never ceases; his mercies… are new every morning.” (Lamentations 3:22-23)</div>
+    <div style="font-size:.85rem;font-style:italic;color:var(--brand-dark);margin-top:8px">“The faithful love of the Lord never ends! His mercies never cease… they begin afresh each morning.” (Lamentations 3:22-23, NLT)</div>
   </div>`);
 }
 
