@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v13 · 2026-07-29';
+const APP_VERSION = 'v14 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -2202,7 +2202,25 @@ boot();
 // Kept here (not inline in HTML) so the page can enforce a strict
 // `script-src 'self'` Content-Security-Policy with no inline-script allowance.
 if ('serviceWorker' in navigator) {
+  // Auto-update: when a freshly deployed service worker takes control, reload
+  // once so everyone gets the newest version without reinstalling. We only
+  // reload if the page was already controlled (a genuine update) — never on the
+  // very first install, so we don't interrupt someone joining for the first time.
+  var hadController = !!navigator.serviceWorker.controller;
+  var swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!hadController || swRefreshing) return;
+    swRefreshing = true;
+    window.location.reload();
+  });
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function () { /* offline install optional */ });
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      // Check for a new version now, and each time the app is brought back to
+      // the foreground — this is what makes reopening the app pull the update.
+      reg.update().catch(function () {});
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') reg.update().catch(function () {});
+      });
+    }).catch(function () { /* offline install optional */ });
   });
 }
