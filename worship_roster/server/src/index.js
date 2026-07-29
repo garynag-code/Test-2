@@ -69,6 +69,12 @@ function randomInvite() {
 function uid(prefix) {
   return prefix + '_' + b64url(crypto.getRandomValues(new Uint8Array(8))).slice(0, 12);
 }
+/** ISO date (UTC) n days before today. */
+function daysAgoISO(n) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 // ---- Validation (pure) -----------------------------------------------------
 
@@ -219,7 +225,7 @@ async function joinTeam(request, env) {
 /** Assemble the full shared state for the caller's team. */
 async function getState(env, me) {
   const t = me.teamId;
-  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev] = await Promise.all([
+  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev, myLog, myFlags, readRows] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
     env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
@@ -229,7 +235,11 @@ async function getState(env, me) {
     env.DB.prepare('SELECT song_id, filename FROM song_pdfs WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT id, title, artist, lyrics, chords, link FROM library_songs WHERE team_id = ? ORDER BY created_at DESC').bind(t).all(),
     env.DB.prepare('SELECT id, title, author, link, scripture, application, prayer, created_at FROM devotionals WHERE team_id = ? ORDER BY created_at DESC').bind(t).all(),
+    env.DB.prepare('SELECT date, kind, minutes FROM activity_log WHERE team_id = ? AND member_id = ? AND date >= ? ORDER BY date').bind(t, me.id, daysAgoISO(27)).all(),
+    env.DB.prepare('SELECT key FROM member_flags WHERE team_id = ? AND member_id = ?').bind(t, me.id).all(),
+    env.DB.prepare("SELECT key, COUNT(*) AS n FROM member_flags WHERE team_id = ? AND key LIKE 'read:%' GROUP BY key").bind(t).all(),
   ]);
+  const readCounts = new Map((readRows.results || []).map((r) => [r.key, r.n]));
   const pdfMap = new Map((pdfs.results || []).map((r) => [r.song_id, r.filename || 'chords.pdf']));
   return {
     team: { name: team && team.name, seasonStart: team && team.season_start, seasonEnd: team && team.season_end },
@@ -251,8 +261,10 @@ async function getState(env, me) {
     devotionals: (dev.results || []).map((r) => ({
       id: r.id, title: r.title, author: r.author || '', link: r.link || '',
       scripture: r.scripture || '', application: r.application || '', prayer: r.prayer || '',
-      date: (r.created_at || '').slice(0, 10),
+      date: (r.created_at || '').slice(0, 10), reads: readCounts.get('read:' + r.id) || 0,
     })),
+    myLog: (myLog.results || []).map((r) => ({ date: r.date, kind: r.kind, minutes: r.minutes })),
+    myFlags: (myFlags.results || []).map((r) => r.key),
   };
 }
 
@@ -452,6 +464,35 @@ async function updateDevotional(request, env, me, id) {
 
 async function deleteDevotional(env, me, id) {
   await env.DB.prepare('DELETE FROM devotionals WHERE id = ? AND team_id = ?').bind(id, me.teamId).run();
+  return json({ ok: true });
+}
+
+// ---- Spiritual journey: self-logged activity + member flags ----------------
+
+// Allowed flag keys: a devotion read, or a weekly ministry check-in marker.
+const FLAG_KEY_RE = /^(read:[A-Za-z0-9_-]{1,40}|ministry:\d{4}-\d{2}-\d{2}:(songlist|prep|practice|contributes))$/;
+
+async function addLog(request, env, me) {
+  const body = await readJson(request);
+  const kind = body && body.kind;
+  const minutes = Math.round(Number(body && body.minutes));
+  if (kind !== 'prayer' && kind !== 'word') return err(400, 'Invalid kind');
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) return err(400, 'Minutes must be 1–600');
+  await env.DB.prepare('INSERT INTO activity_log (id, team_id, member_id, date, kind, minutes, created_at) VALUES (?,?,?,?,?,?,?)')
+    .bind(uid('a'), me.teamId, me.id, daysAgoISO(0), kind, minutes, new Date().toISOString()).run();
+  return json({ ok: true }, 201);
+}
+
+async function setFlag(request, env, me) {
+  const body = await readJson(request);
+  const key = body && body.key;
+  if (typeof key !== 'string' || !FLAG_KEY_RE.test(key)) return err(400, 'Invalid flag');
+  if (body.on === false) {
+    await env.DB.prepare('DELETE FROM member_flags WHERE team_id = ? AND member_id = ? AND key = ?').bind(me.teamId, me.id, key).run();
+  } else {
+    await env.DB.prepare('INSERT OR IGNORE INTO member_flags (team_id, member_id, key, created_at) VALUES (?,?,?,?)')
+      .bind(me.teamId, me.id, key, new Date().toISOString()).run();
+  }
   return json({ ok: true });
 }
 
@@ -671,6 +712,9 @@ async function handle(request, env) {
     if (method === 'PUT') return updateDevotional(request, env, me, did);
     if (method === 'DELETE') return deleteDevotional(env, me, did);
   }
+
+  if (method === 'POST' && path === '/api/log') return addLog(request, env, me);
+  if (method === 'POST' && path === '/api/flags') return setFlag(request, env, me);
   if (method === 'POST' && path === '/api/push/subscribe') return subscribePush(request, env, me);
 
   return err(404, 'Not found');

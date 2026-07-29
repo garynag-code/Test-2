@@ -81,6 +81,9 @@
     updateDevotional(id, fields) { return req('PUT', '/api/devotionals/' + encodeURIComponent(id), fields); },
     deleteDevotional(id) { return req('DELETE', '/api/devotionals/' + encodeURIComponent(id)); },
 
+    logActivity(kind, minutes) { return req('POST', '/api/log', { kind, minutes }); },
+    setFlag(key, on) { return req('POST', '/api/flags', { key, on }); },
+
     // Upload a chord PDF (raw bytes) and fetch it back as a blob URL for viewing.
     async uploadSongPdf(id, file) {
       const t = getToken();

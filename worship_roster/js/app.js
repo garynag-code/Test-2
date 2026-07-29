@@ -79,7 +79,8 @@ let activeTab = 'roster';
 function emptyState() {
   // Placeholder until the first cloud sync populates real data.
   return { version: 1, currentUserId: null, members: [], sundays: buildSundays(),
-    practices: buildPractices(), reminders: [], songs: {}, library: [], devotionals: [], notifyEnabled: false, cloud: true };
+    practices: buildPractices(), reminders: [], songs: {}, library: [], devotionals: [],
+    myLog: [], myFlags: [], notifyEnabled: false, cloud: true };
 }
 
 function load() {
@@ -126,9 +127,11 @@ function seed() {
     sundays: buildSundays(),   // roster rows for each Sunday in season
     practices: buildPractices(),
     reminders: [],
-    songs: {},                 // keyed by "YYYY-MM" -> [ {id,title,key,link} ]
+    songs: {},                 // keyed by service date -> [ {id,title,key,link} ]
     library: [],               // future songs to learn
     devotionals: [],           // shared devotionals
+    myLog: [],                 // personal prayer/word logs
+    myFlags: [],               // devotion reads + ministry check-ins
     notifyEnabled: false,
   };
   s.reminders = buildSeasonReminders(s);
@@ -164,6 +167,57 @@ function fmtShort(iso) {
 }
 function todayISO() {
   return toISO(new Date());
+}
+function daysAgoISO(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return toISO(d);
+}
+
+// Weekly targets used to score "Your Spiritual Journey".
+const KPI = { prayerWeekTarget: 60, wordWeekTarget: 90, devotionTarget: 3 };
+const MINISTRY_MARKERS = [
+  { id: 'songlist', label: 'Posted the song list on time' },
+  { id: 'prep', label: 'On time for worship prep on Sunday' },
+  { id: 'practice', label: 'Attended practice' },
+  { id: 'contributes', label: 'Contributed to the team' },
+];
+
+function ratingFor(score) {
+  if (score >= 85) return { label: 'On fire 🔥', color: 'var(--ok)', bg: 'var(--ok-soft)' };
+  if (score >= 65) return { label: 'Strong 💪', color: 'var(--brand-dark)', bg: 'var(--brand-soft)' };
+  if (score >= 40) return { label: 'Growing 🌱', color: 'var(--warn)', bg: 'var(--warn-soft)' };
+  return { label: 'Getting started', color: 'var(--muted)', bg: '#f3f4f6' };
+}
+
+/** The Sunday that anchors the current ministry week (upcoming, or today). */
+function currentServiceSunday() {
+  return seasonSundays().find((d) => d >= todayISO()) || (seasonSundays().slice(-1)[0] || todayISO());
+}
+
+/** Compute both KPI scores for the signed-in member. */
+function computeKpis() {
+  const since = daysAgoISO(6);
+  const log = (state.myLog || []).filter((e) => e.date >= since);
+  const prayerMin = log.filter((e) => e.kind === 'prayer').reduce((a, e) => a + (e.minutes || 0), 0);
+  const wordMin = log.filter((e) => e.kind === 'word').reduce((a, e) => a + (e.minutes || 0), 0);
+
+  const devs = state.devotionals || [];
+  const flags = new Set(state.myFlags || []);
+  const readCount = devs.filter((d) => flags.has('read:' + d.id)).length;
+  const devTarget = Math.max(1, Math.min(devs.length || KPI.devotionTarget, KPI.devotionTarget));
+
+  const prayerPct = Math.min(1, prayerMin / KPI.prayerWeekTarget);
+  const wordPct = Math.min(1, wordMin / KPI.wordWeekTarget);
+  const devPct = Math.min(1, readCount / devTarget);
+  const spiritual = Math.round(((prayerPct + wordPct + devPct) / 3) * 100);
+
+  const sunday = currentServiceSunday();
+  const ministryChecks = MINISTRY_MARKERS.map((m) => ({ ...m, on: flags.has(`ministry:${sunday}:${m.id}`) }));
+  const checkedCount = ministryChecks.filter((c) => c.on).length;
+  const ministry = Math.round(((checkedCount + spiritual / 100) / (MINISTRY_MARKERS.length + 1)) * 100);
+
+  return { prayerMin, wordMin, readCount, devTarget, prayerPct, wordPct, devPct, spiritual, ministryChecks, ministry, sunday };
 }
 
 /** Every Sunday between SEASON.start and SEASON.end (inclusive). */
@@ -421,9 +475,18 @@ const localStore = {
   async addLib(fields) { (state.library = state.library || []).unshift(Object.assign({ id: uid('l') }, fields)); save(); },
   async updateLib(id, fields) { const l = (state.library || []).find((x) => x.id === id); if (l) Object.assign(l, fields); save(); },
   async deleteLib(id) { state.library = (state.library || []).filter((x) => x.id !== id); save(); },
-  async addDev(fields) { (state.devotionals = state.devotionals || []).unshift(Object.assign({ id: uid('d'), author: (currentUser() || {}).name || '', date: todayISO() }, fields)); save(); },
+  async addDev(fields) { (state.devotionals = state.devotionals || []).unshift(Object.assign({ id: uid('d'), author: (currentUser() || {}).name || '', date: todayISO(), reads: 0 }, fields)); save(); },
   async updateDev(id, fields) { const d = (state.devotionals || []).find((x) => x.id === id); if (d) Object.assign(d, fields); save(); },
   async deleteDev(id) { state.devotionals = (state.devotionals || []).filter((x) => x.id !== id); save(); },
+  async log(kind, minutes) { (state.myLog = state.myLog || []).push({ date: todayISO(), kind, minutes }); save(); },
+  async flag(key, on) {
+    state.myFlags = state.myFlags || [];
+    if (on === false) state.myFlags = state.myFlags.filter((k) => k !== key);
+    else if (!state.myFlags.includes(key)) state.myFlags.push(key);
+    // Reflect a devotion read in the local read count.
+    if (key.startsWith('read:')) { const d = (state.devotionals || []).find((x) => 'read:' + x.id === key); if (d) d.reads = on === false ? Math.max(0, (d.reads || 1) - 1) : 1; }
+    save();
+  },
 };
 
 const cloudStore = {
@@ -440,6 +503,8 @@ const cloudStore = {
   async addDev(fields) { await guard(() => RosterAPI.addDevotional(fields)); },
   async updateDev(id, fields) { await guard(() => RosterAPI.updateDevotional(id, fields)); },
   async deleteDev(id) { await guard(() => RosterAPI.deleteDevotional(id)); },
+  async log(kind, minutes) { await guard(() => RosterAPI.logActivity(kind, minutes)); },
+  async flag(key, on) { await guard(() => RosterAPI.setFlag(key, on)); },
 };
 
 /** Run a cloud call, surface errors as a toast, then re-sync server truth. */
@@ -469,7 +534,9 @@ function cloudMap(s) {
     reminders: [],
     songs: {},
     library: (s.library || []).map((l) => ({ id: l.id, title: l.title, artist: l.artist || '', lyrics: l.lyrics || '', chords: l.chords || '', link: l.link || '' })),
-    devotionals: (s.devotionals || []).map((d) => ({ id: d.id, title: d.title, author: d.author || '', link: d.link || '', scripture: d.scripture || '', application: d.application || '', prayer: d.prayer || '', date: d.date || '' })),
+    devotionals: (s.devotionals || []).map((d) => ({ id: d.id, title: d.title, author: d.author || '', link: d.link || '', scripture: d.scripture || '', application: d.application || '', prayer: d.prayer || '', date: d.date || '', reads: d.reads || 0 })),
+    myLog: (s.myLog || []).map((x) => ({ date: x.date, kind: x.kind, minutes: x.minutes })),
+    myFlags: (s.myFlags || []).slice(),
     notifyEnabled: localStorage.getItem('worship-roster-notify') === '1',
     team: s.team,
     cloud: true,
@@ -550,7 +617,7 @@ function render() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { roster, voting, songs, library, devotions, reminders, team };
+  const map = { roster, voting, songs, library, devotions, journey, reminders, team };
   view.innerHTML = '';
   (map[activeTab] || roster)();
   view.scrollTop = 0;
@@ -983,6 +1050,8 @@ function devotions() {
     const meta = [d.author, d.date].filter(Boolean).join(' · ');
     if (meta) card.appendChild(el(`<div class="card__meta">${esc(meta)}</div>`));
     if (d.scripture) card.appendChild(el(`<div class="card__meta" style="margin-top:6px">📖 ${esc(d.scripture.split('\n')[0])}</div>`));
+    const readByMe = new Set(state.myFlags || []).has('read:' + d.id);
+    card.appendChild(el(`<div style="margin-top:6px">${readByMe ? '<span class="badge badge--ok">✓ You’ve read this</span> ' : ''}<span class="card__meta">${d.reads || 0} read</span></div>`));
     const actions = el(`<div class="btn-row" style="margin-top:10px"></div>`);
     const read = el(`<button class="btn btn--sm btn--primary">📖 Read</button>`);
     read.addEventListener('click', () => devotionalViewModal(d));
@@ -1003,11 +1072,24 @@ function devotions() {
   }
 }
 
-/** Read-only view of a full devotional. */
+/** Read-only view of a full devotional, with a "mark as read" confirmation. */
 function devotionalViewModal(d) {
   const body = el(`<div></div>`);
   const meta = [d.author, d.date].filter(Boolean).join(' · ');
   if (meta) body.appendChild(el(`<div class="card__meta" style="margin-bottom:10px">${esc(meta)}</div>`));
+
+  // Read confirmation ("Done" after reading).
+  const readKey = 'read:' + d.id;
+  const readWrap = el(`<div style="margin-bottom:12px"></div>`);
+  const drawRead = () => {
+    readWrap.innerHTML = '';
+    const isRead = new Set(state.myFlags || []).has(readKey);
+    const btn = el(`<button class="btn btn--sm btn--block ${isRead ? '' : 'btn--primary'}">${isRead ? '✓ You’ve read this — tap to undo' : '✓ Mark as read (Done)'}</button>`);
+    btn.addEventListener('click', async () => { await store.flag(readKey, !isRead); drawRead(); render(); });
+    readWrap.appendChild(btn);
+  };
+  drawRead();
+  body.appendChild(readWrap);
   if (d.link) {
     const w = el(`<button class="btn btn--sm btn--block" style="margin-bottom:12px">▶️ Watch / read online</button>`);
     w.addEventListener('click', () => openExternal(d.link));
@@ -1052,6 +1134,96 @@ function devotionalModal(existing) {
     };
     (existing ? store.updateDev(existing.id, fields) : store.addDev(fields))
       .then(() => { render(); toast(existing ? 'Devotional updated.' : 'Devotional shared.'); });
+    return true;
+  });
+}
+
+// -- Tab: My Journey (personal dashboard) ---------------------------------
+
+function meter(label, valText, pct) {
+  const p = Math.max(0, Math.min(100, Math.round(pct * 100)));
+  const color = p >= 85 ? 'var(--ok)' : p >= 50 ? 'var(--brand)' : 'var(--warn)';
+  return el(`
+    <div class="meter">
+      <div class="meter__top"><span>${label}</span><span class="meter__val">${esc(valText)}</span></div>
+      <div class="meter__bar"><span style="width:${p}%;background:${color}"></span></div>
+    </div>`);
+}
+
+function journey() {
+  const me = currentUser();
+  const k = computeKpis();
+  view.appendChild(el(`<h2 class="section-title">📈 My Journey</h2>`));
+  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — your personal growth this week. Only you see your own dashboard; logging is on your honour before God.</p>`));
+
+  // Your Spiritual Journey
+  const sj = el(`<div class="card"></div>`);
+  const r1 = ratingFor(k.spiritual);
+  sj.appendChild(el(`<div class="card__title">Your Spiritual Journey</div>`));
+  sj.appendChild(el(`<div class="card__meta">Last 7 days</div>`));
+  sj.appendChild(el(`<div class="kpi__score"><span class="kpi__num" style="color:${r1.color}">${k.spiritual}</span><span class="kpi__of">/ 100</span><span class="kpi__rating" style="color:${r1.color};background:${r1.bg}">${r1.label}</span></div>`));
+  sj.appendChild(meter('🙏 Prayer (in the Spirit)', `${k.prayerMin} / ${KPI.prayerWeekTarget} min`, k.prayerPct));
+  sj.appendChild(meter('📖 The Word', `${k.wordMin} / ${KPI.wordWeekTarget} min`, k.wordPct));
+  sj.appendChild(meter('🙏 Devotions read', `${k.readCount} / ${k.devTarget}`, k.devPct));
+  view.appendChild(sj);
+
+  // Quick log
+  const logCard = el(`<div class="card"></div>`);
+  logCard.appendChild(el(`<div class="card__title">Log today</div>`));
+  logCard.appendChild(el(`<div class="card__meta" style="margin:2px 0 8px">Prayer in the Spirit</div>`));
+  const prayerRow = el(`<div class="btn-row"></div>`);
+  [10, 20, 30].forEach((min) => {
+    const btn = el(`<button class="btn btn--sm">🙏 ${min} min</button>`);
+    btn.addEventListener('click', async () => { await store.log('prayer', min); render(); toast(`Logged ${min} min of prayer.`); });
+    prayerRow.appendChild(btn);
+  });
+  logCard.appendChild(prayerRow);
+  logCard.appendChild(el(`<div class="card__meta" style="margin:12px 0 8px">Listening to / reading the Word</div>`));
+  const wordRow = el(`<div class="btn-row"></div>`);
+  [15, 30, 45].forEach((min) => {
+    const btn = el(`<button class="btn btn--sm">📖 ${min} min</button>`);
+    btn.addEventListener('click', async () => { await store.log('word', min); render(); toast(`Logged ${min} min in the Word.`); });
+    wordRow.appendChild(btn);
+  });
+  logCard.appendChild(wordRow);
+  const custom = el(`<button class="btn btn--sm btn--ghost btn--block" style="margin-top:10px">＋ Log a custom amount</button>`);
+  custom.addEventListener('click', logCustomModal);
+  logCard.appendChild(custom);
+  view.appendChild(logCard);
+
+  // Excellence in Ministry
+  const em = el(`<div class="card"></div>`);
+  const r2 = ratingFor(k.ministry);
+  em.appendChild(el(`<div class="card__title">Excellence in Ministry</div>`));
+  em.appendChild(el(`<div class="card__meta">Week of ${fmtLong(k.sunday)} — tick what applies</div>`));
+  em.appendChild(el(`<div class="kpi__score"><span class="kpi__num" style="color:${r2.color}">${k.ministry}</span><span class="kpi__of">/ 100</span><span class="kpi__rating" style="color:${r2.color};background:${r2.bg}">${r2.label}</span></div>`));
+  for (const c of k.ministryChecks) {
+    const row = el(`<div class="check-row ${c.on ? 'is-on' : ''}"><span class="check-row__box">${c.on ? '✓' : ''}</span><span class="check-row__label">${esc(c.label)}</span></div>`);
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', async () => { await store.flag(`ministry:${k.sunday}:${c.id}`, !c.on); render(); });
+    em.appendChild(row);
+  }
+  const spiritOn = k.spiritual >= 60;
+  em.appendChild(el(`<div class="check-row ${spiritOn ? 'is-on' : ''}"><span class="check-row__box">${spiritOn ? '✓' : ''}</span><span class="check-row__label">Growing spiritually <span class="card__meta">(from your Spiritual Journey score)</span></span></div>`));
+  view.appendChild(em);
+}
+
+function logCustomModal() {
+  const body = el(`
+    <div>
+      <label class="field" for="lg-kind">What did you do?</label>
+      <select id="lg-kind">
+        <option value="prayer">🙏 Prayer (in the Spirit)</option>
+        <option value="word">📖 The Word</option>
+      </select>
+      <label class="field" for="lg-min">Minutes</label>
+      <input id="lg-min" type="number" inputmode="numeric" min="1" max="600" placeholder="e.g. 25" />
+    </div>`);
+  openModal('Log today', body, () => {
+    const kind = body.querySelector('#lg-kind').value;
+    const min = Math.round(Number(body.querySelector('#lg-min').value));
+    if (!(min >= 1 && min <= 600)) { toast('Enter minutes between 1 and 600.'); return false; }
+    store.log(kind, min).then(() => { render(); toast('Logged.'); });
     return true;
   });
 }

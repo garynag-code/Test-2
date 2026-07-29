@@ -183,6 +183,27 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible {
 .member__name { font-weight: 600; }
 .member__pos { font-size: .78rem; color: var(--muted); }
 
+/* ---------- KPI dashboard ---------- */
+.kpi__score { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 2px; }
+.kpi__num { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.kpi__of { color: var(--muted); font-size: .85rem; }
+.kpi__rating { font-size: .82rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+.meter { margin: 10px 0; }
+.meter__top { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: 4px; }
+.meter__val { color: var(--muted); }
+.meter__bar { height: 8px; border-radius: 999px; background: #eef; overflow: hidden; }
+.meter__bar > span { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+.check-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line);
+}
+.check-row:last-child { border-bottom: 0; }
+.check-row__box {
+  width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--line); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: .95rem; color: #fff; background: #fff;
+}
+.check-row.is-on .check-row__box { background: var(--ok); border-color: var(--ok); }
+.check-row__label { flex: 1; font-size: .9rem; }
+
 /* ---------- Empty state ---------- */
 .empty { text-align: center; color: var(--muted); padding: 26px 10px; }
 .empty__icon { font-size: 2rem; }
@@ -192,9 +213,11 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
   display: flex; background: #fff; border-top: 1px solid var(--line);
   padding-bottom: var(--safe-bottom);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
+.tabbar::-webkit-scrollbar { display: none; }
 .tabbar__btn {
-  flex: 1; min-width: 0; background: none; border: 0; padding: 8px 1px 6px; cursor: pointer;
+  flex: 1 0 auto; min-width: 58px; background: none; border: 0; padding: 8px 4px 6px; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   color: var(--muted); font-size: .6rem; font-weight: 600; min-height: 54px;
 }

@@ -96,6 +96,29 @@ CREATE TABLE IF NOT EXISTS devotionals (
 );
 CREATE INDEX IF NOT EXISTS idx_devotionals_team ON devotionals(team_id);
 
+-- Self-logged spiritual disciplines (prayer / word minutes), per member per day.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id         TEXT PRIMARY KEY,
+  team_id    TEXT NOT NULL,
+  member_id  TEXT NOT NULL,
+  date       TEXT NOT NULL,             -- YYYY-MM-DD
+  kind       TEXT NOT NULL,             -- 'prayer' | 'word'
+  minutes    INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_member ON activity_log(team_id, member_id);
+
+-- Per-member boolean flags: devotion reads ("read:<id>") and weekly ministry
+-- check-ins ("ministry:<sunday>:<marker>"). Presence = true.
+CREATE TABLE IF NOT EXISTS member_flags (
+  team_id    TEXT NOT NULL,
+  member_id  TEXT NOT NULL,
+  key        TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (team_id, member_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_flags_team_key ON member_flags(team_id, key);
+
 -- Optional attached chord-sheet PDF for a song (base64, kept small).
 CREATE TABLE IF NOT EXISTS song_pdfs (
   song_id    TEXT PRIMARY KEY,

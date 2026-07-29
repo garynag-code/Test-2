@@ -334,4 +334,42 @@ await test('a devotional requires a title', async () => {
   assert.equal((await call('POST', '/api/devotionals', { token: leaderToken, body: { prayer: 'no title' } })).status, 400);
 });
 
+// ---- Spiritual journey: logs, flags, read counts ---------------------------
+await test('members log prayer/word into their own private journey', async () => {
+  assert.equal((await call('POST', '/api/log', { token: memberTokens[0], body: { kind: 'prayer', minutes: 20 } })).status, 201);
+  assert.equal((await call('POST', '/api/log', { token: memberTokens[0], body: { kind: 'word', minutes: 15 } })).status, 201);
+  const st = await call('GET', '/api/state', { token: memberTokens[0] });
+  assert.ok(st.data.myLog.length >= 2);
+  assert.ok(st.data.myLog.reduce((a, e) => a + e.minutes, 0) >= 35);
+  // another member's journey is separate
+  const st2 = await call('GET', '/api/state', { token: memberTokens[1] });
+  assert.equal(st2.data.myLog.length, 0, 'logs are per-member');
+  // validation
+  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'nope', minutes: 10 } })).status, 400);
+  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'prayer', minutes: 0 } })).status, 400);
+});
+
+await test('devotion reads: personal flag + team count, toggle off', async () => {
+  const add = await call('POST', '/api/devotionals', { token: leaderToken, body: { title: 'Read Test' } });
+  const key = 'read:' + add.data.id;
+  assert.equal((await call('POST', '/api/flags', { token: memberTokens[0], body: { key, on: true } })).status, 200);
+  assert.equal((await call('POST', '/api/flags', { token: memberTokens[1], body: { key, on: true } })).status, 200);
+  let st = await call('GET', '/api/state', { token: memberTokens[0] });
+  const dv = st.data.devotionals.find((x) => x.id === add.data.id);
+  assert.equal(dv.reads, 2, 'two members read it');
+  assert.ok(st.data.myFlags.includes(key), 'my read flag is set');
+  await call('POST', '/api/flags', { token: memberTokens[0], body: { key, on: false } });
+  st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.devotionals.find((x) => x.id === add.data.id).reads, 1, 'count drops when undone');
+});
+
+await test('ministry check-in flags work; junk flags are rejected', async () => {
+  const key = 'ministry:2026-08-02:practice';
+  assert.equal((await call('POST', '/api/flags', { token: memberTokens[0], body: { key, on: true } })).status, 200);
+  const st = await call('GET', '/api/state', { token: memberTokens[0] });
+  assert.ok(st.data.myFlags.includes(key));
+  assert.equal((await call('POST', '/api/flags', { token: memberTokens[0], body: { key: 'evil:hack', on: true } })).status, 400);
+  assert.equal((await call('POST', '/api/flags', { token: memberTokens[0], body: { key: 'ministry:bad:practice', on: true } })).status, 400);
+});
+
 console.log(`\n${passed} tests passed.`);
