@@ -18,7 +18,7 @@
 
 // ---- Domain constants (mirror the front-end) -------------------------------
 
-const POSITION_IDS = ['lead', 'lead2', 'bass', 'drums', 'guitar', 'keys', 'bv1', 'bv2', 'bv3'];
+const POSITION_IDS = ['lead', 'lead2', 'lead3', 'lead4', 'lead5', 'bass', 'drums', 'guitar', 'keys', 'bv1', 'bv2', 'bv3'];
 const TYPE_IDS = ['weekday', 'afterchurch'];
 const MAX_BODY_BYTES = 16 * 1024;          // 16 KB request cap
 const TOKEN_BYTES = 32;                    // 256-bit device tokens

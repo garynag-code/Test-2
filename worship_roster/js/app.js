@@ -30,8 +30,7 @@ const SEASON = {
 
 // Fixed positions on the team. `single: true` means one person fills it.
 const POSITIONS = [
-  { id: 'lead',    name: 'Lead Worshipper',    icon: '🎤' },
-  { id: 'lead2',   name: 'Co-Lead Worshipper', icon: '🎤', optional: true },
+  { id: 'lead',    name: 'Lead Worshipper', icon: '🎤' },
   { id: 'bass',    name: 'Bass',            icon: '🎸' },
   { id: 'drums',   name: 'Drums',           icon: '🥁' },
   { id: 'guitar',  name: 'Guitar',          icon: '🎸' },
@@ -40,6 +39,10 @@ const POSITIONS = [
   { id: 'bv2',     name: 'Backup Singer 2', icon: '🎙️' },
   { id: 'bv3',     name: 'Backup Singer 3', icon: '🎙️' },
 ];
+
+// Extra worship-leader slots, added on demand (a service can have several
+// leaders). The primary is POSITIONS 'lead'; these are the co-leaders.
+const CO_LEAD_SLOTS = ['lead2', 'lead3', 'lead4', 'lead5'];
 
 // The two monthly practice types decided by vote.
 const PRACTICE_TYPES = [
@@ -562,25 +565,40 @@ function roster() {
       </div>`));
 
     for (const pos of POSITIONS) {
-      const row = el(`<div class="assign-row"></div>`);
-      row.appendChild(el(`<div class="assign-row__pos"><span class="pos-icon">${pos.icon}</span>${pos.name}${pos.optional ? ' <span class="card__meta">(optional)</span>' : ''}</div>`));
-      const sel = el(`<select data-date="${sunday.date}" data-pos="${pos.id}"></select>`);
-      // Anyone can fill any position (e.g. different people lead worship on
-      // different Sundays); those with the position as a preference sort first.
-      const preferred = state.members.filter((m) => m.positions.includes(pos.id));
-      const others = state.members.filter((m) => !m.positions.includes(pos.id));
-      const pool = [...preferred, ...others];
-      sel.innerHTML = `<option value="">— unassigned —</option>` +
-        pool.map((m) => `<option value="${m.id}" ${sunday.assignments[pos.id] === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
-      sel.addEventListener('change', async () => {
-        await store.assign(sunday.date, pos.id, sel.value || null);
-        render();
-      });
-      row.appendChild(sel);
-      card.appendChild(row);
+      card.appendChild(assignRow(sunday, pos.id, pos.icon, pos.name));
+      // Right after the primary Lead Worshipper, list any co-leaders plus an
+      // "add another" slot, so a service can have as many worship leaders as needed.
+      if (pos.id === 'lead') {
+        const usedCoLeads = CO_LEAD_SLOTS.filter((id) => sunday.assignments[id]);
+        for (const id of usedCoLeads) {
+          card.appendChild(assignRow(sunday, id, '🎤', 'Co-Lead Worshipper'));
+        }
+        const nextFree = CO_LEAD_SLOTS.find((id) => !sunday.assignments[id]);
+        if (nextFree) card.appendChild(assignRow(sunday, nextFree, '➕', 'Add co-leader', true));
+      }
     }
     view.appendChild(card);
   }
+}
+
+/** Build one roster assignment row (position label + member dropdown). */
+function assignRow(sunday, posId, icon, name, isAdd) {
+  const row = el(`<div class="assign-row"></div>`);
+  row.appendChild(el(`<div class="assign-row__pos"><span class="pos-icon">${icon}</span>${esc(name)}${isAdd ? '' : ''}</div>`));
+  const sel = el(`<select data-date="${sunday.date}" data-pos="${posId}"></select>`);
+  // Anyone can fill any position; members who list it as a preference sort first.
+  const preferred = state.members.filter((m) => m.positions.includes(posId));
+  const others = state.members.filter((m) => !m.positions.includes(posId));
+  const pool = [...preferred, ...others];
+  const placeholder = isAdd ? '＋ add a worship leader…' : '— unassigned —';
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
+    pool.map((m) => `<option value="${m.id}" ${sunday.assignments[posId] === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+  sel.addEventListener('change', async () => {
+    await store.assign(sunday.date, posId, sel.value || null);
+    render();
+  });
+  row.appendChild(sel);
+  return row;
 }
 
 // -- Tab: Voting / Practices ---------------------------------------------
