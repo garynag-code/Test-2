@@ -20,7 +20,8 @@
 
 const POSITION_IDS = ['lead', 'lead2', 'lead3', 'lead4', 'lead5', 'bass', 'drums', 'guitar', 'keys', 'bv1', 'bv2', 'bv3'];
 const TYPE_IDS = ['weekday', 'afterchurch'];
-const MAX_BODY_BYTES = 16 * 1024;          // 16 KB request cap
+const MAX_BODY_BYTES = 16 * 1024;          // 16 KB request cap (JSON endpoints)
+const MAX_PDF_BYTES = 800 * 1024;          // 800 KB cap for attached chord PDFs
 const TOKEN_BYTES = 32;                    // 256-bit device tokens
 const INVITE_BYTES = 9;                    // ~14-char base32 invite code
 
@@ -207,14 +208,16 @@ async function joinTeam(request, env) {
 /** Assemble the full shared state for the caller's team. */
 async function getState(env, me) {
   const t = me.teamId;
-  const [team, members, assigns, voteRows, locks, songs] = await Promise.all([
+  const [team, members, assigns, voteRows, locks, songs, pdfs] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
     env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT month, type_id, member_id, date FROM votes WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT month, type_id, locked_date FROM practice_locks WHERE team_id = ?').bind(t).all(),
     env.DB.prepare('SELECT id, month, title, key_sig FROM songs WHERE team_id = ? ORDER BY created_at').bind(t).all(),
+    env.DB.prepare('SELECT song_id, filename FROM song_pdfs WHERE team_id = ?').bind(t).all(),
   ]);
+  const pdfMap = new Map((pdfs.results || []).map((r) => [r.song_id, r.filename || 'chords.pdf']));
   return {
     team: { name: team && team.name, seasonStart: team && team.season_start, seasonEnd: team && team.season_end },
     me: { id: me.id, isLeader: me.isLeader },
@@ -224,7 +227,10 @@ async function getState(env, me) {
     assignments: assigns.results || [],
     votes: voteRows.results || [],
     locks: locks.results || [],
-    songs: (songs.results || []).map((r) => ({ id: r.id, month: r.month, title: r.title, key: r.key_sig })),
+    songs: (songs.results || []).map((r) => ({
+      id: r.id, month: r.month, title: r.title, key: r.key_sig,
+      hasPdf: pdfMap.has(r.id), pdfName: pdfMap.get(r.id) || null,
+    })),
   };
 }
 
@@ -335,8 +341,51 @@ async function addSong(request, env, me) {
 
 async function deleteSong(env, me, songId) {
   // Any team member can remove a song (so mistakes can be fixed by anyone).
-  await env.DB.prepare('DELETE FROM songs WHERE id = ? AND team_id = ?').bind(songId, me.teamId).run();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM songs WHERE id = ? AND team_id = ?').bind(songId, me.teamId),
+    env.DB.prepare('DELETE FROM song_pdfs WHERE song_id = ? AND team_id = ?').bind(songId, me.teamId),
+  ]);
   return json({ ok: true });
+}
+
+/** Attach a chord-sheet PDF to a song (any member). Raw PDF body, ?name=filename. */
+async function uploadSongPdf(request, env, me, songId, url) {
+  const song = await env.DB.prepare('SELECT id FROM songs WHERE id = ? AND team_id = ?')
+    .bind(songId, me.teamId).first();
+  if (!song) return err(404, 'Song not found');
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.byteLength === 0) return err(400, 'Empty file');
+  if (bytes.byteLength > MAX_PDF_BYTES) return err(413, 'PDF too large — please keep it under 800 KB (1–2 page chord charts are fine).');
+  // Basic PDF signature check ("%PDF").
+  if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+    return err(400, 'That file is not a PDF.');
+  }
+  let filename = (url.searchParams.get('name') || 'chords.pdf').replace(/[\x00-\x1F\x7F/\\]/g, '').slice(0, 80);
+  if (!/\.pdf$/i.test(filename)) filename += '.pdf';
+
+  await env.DB.prepare(
+    'INSERT INTO song_pdfs (song_id, team_id, filename, data, created_at) VALUES (?,?,?,?,?) ' +
+    'ON CONFLICT(song_id) DO UPDATE SET filename = excluded.filename, data = excluded.data, created_at = excluded.created_at'
+  ).bind(songId, me.teamId, filename, b64url(bytes), new Date().toISOString()).run();
+  return json({ ok: true }, 201);
+}
+
+/** Return the attached PDF bytes for a song (any member of the team). */
+async function getSongPdf(env, me, songId) {
+  const row = await env.DB.prepare('SELECT filename, data FROM song_pdfs WHERE song_id = ? AND team_id = ?')
+    .bind(songId, me.teamId).first();
+  if (!row) return err(404, 'No PDF attached');
+  const bytes = b64urlToBytes(row.data);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${row.filename.replace(/"/g, '')}"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 async function subscribePush(request, env, me) {
@@ -482,6 +531,12 @@ async function handle(request, env) {
   if (method === 'POST' && path === '/api/practices/lock') return lockPractice(request, env, me);
   if (method === 'POST' && path === '/api/practices/new-vote') return newVote(request, env, me);
   if (method === 'POST' && path === '/api/songs') return addSong(request, env, me);
+  const pdfMatch = path.match(/^\/api\/songs\/([^/]+)\/pdf$/);
+  if (pdfMatch) {
+    const sid = decodeURIComponent(pdfMatch[1]);
+    if (method === 'POST') return uploadSongPdf(request, env, me, sid, url);
+    if (method === 'GET') return getSongPdf(env, me, sid);
+  }
   if (method === 'DELETE' && path.startsWith('/api/songs/')) return deleteSong(env, me, decodeURIComponent(path.slice('/api/songs/'.length)));
   if (method === 'POST' && path === '/api/push/subscribe') return subscribePush(request, env, me);
 

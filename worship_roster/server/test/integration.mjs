@@ -220,4 +220,43 @@ await test('the last admin cannot remove their own admin (no lockout)', async ()
   assert.equal(r.status, 409, 'must keep at least one admin');
 });
 
+// ---- Song chord PDFs --------------------------------------------------------
+function rawPdfReq(id, token, body, name) {
+  const u = 'https://api.example/api/songs/' + id + '/pdf' + (name ? '?name=' + encodeURIComponent(name) : '');
+  return new Request(u, { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + token, 'Content-Type': 'application/pdf' }, body });
+}
+
+await test('a member can attach a chord PDF and anyone can fetch it', async () => {
+  const add = await call('POST', '/api/songs', { token: memberTokens[0], body: { month: '2026-10', title: 'PDF Song', key: 'G' } });
+  const id = add.data.id;
+  const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF');
+  const up = await worker.fetch(rawPdfReq(id, memberTokens[0], pdf, 'chart.pdf'), env);
+  assert.equal(up.status, 201);
+
+  const st = await call('GET', '/api/state', { token: leaderToken });
+  const song = st.data.songs.find((s) => s.id === id);
+  assert.equal(song.hasPdf, true);
+  assert.equal(song.pdfName, 'chart.pdf');
+
+  const get = await worker.fetch(new Request('https://api.example/api/songs/' + id + '/pdf', { headers: { Origin: ORIGIN, Authorization: 'Bearer ' + leaderToken } }), env);
+  assert.equal(get.status, 200);
+  assert.equal(get.headers.get('Content-Type'), 'application/pdf');
+  const back = new Uint8Array(await get.arrayBuffer());
+  assert.deepEqual([...back.slice(0, 4)], [0x25, 0x50, 0x44, 0x46], 'round-trips the %PDF bytes');
+
+  // Deleting the song removes its PDF too.
+  await call('DELETE', '/api/songs/' + id, { token: leaderToken });
+  const gone = await worker.fetch(new Request('https://api.example/api/songs/' + id + '/pdf', { headers: { Origin: ORIGIN, Authorization: 'Bearer ' + leaderToken } }), env);
+  assert.equal(gone.status, 404);
+});
+
+await test('non-PDF and oversized uploads are rejected', async () => {
+  const add = await call('POST', '/api/songs', { token: leaderToken, body: { month: '2026-10', title: 'X', key: '' } });
+  const id = add.data.id;
+  const notPdf = new TextEncoder().encode('hello, definitely not a pdf');
+  assert.equal((await worker.fetch(rawPdfReq(id, leaderToken, notPdf), env)).status, 400);
+  const big = new Uint8Array(801 * 1024); big.set([0x25, 0x50, 0x44, 0x46]);
+  assert.equal((await worker.fetch(rawPdfReq(id, leaderToken, big), env)).status, 413);
+});
+
 console.log(`\n${passed} tests passed.`);

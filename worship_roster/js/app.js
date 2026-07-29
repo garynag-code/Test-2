@@ -466,7 +466,9 @@ function cloudMap(s) {
     if (blk) blk.lockedDate = l.locked_date;
   }
   for (const so of (s.songs || [])) {
-    (st.songs[so.month] = st.songs[so.month] || []).push({ id: so.id, title: so.title, key: so.key || '' });
+    (st.songs[so.month] = st.songs[so.month] || []).push({
+      id: so.id, title: so.title, key: so.key || '', hasPdf: !!so.hasPdf, pdfName: so.pdfName || null,
+    });
   }
   // Derive the reminder list for display (push delivery is handled server-side).
   st.reminders = buildSeasonReminders(st);
@@ -701,11 +703,27 @@ function songs() {
           <div class="song-item__key">Key: ${esc(song.key || '—')}</div>
         </div>`));
       const actions = el(`<div class="song-actions"></div>`);
-      const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener noreferrer" href="${chordsUrl(song)}">🎼 Chords</a>`);
+      const hasPdf = CLOUD ? song.hasPdf : !!song.pdfData;
+
+      // Attached chord PDF (reliable, always works) — shown if present.
+      if (hasPdf) {
+        const pdf = el(`<button class="btn btn--sm btn--primary">📄 Chord PDF</button>`);
+        pdf.addEventListener('click', () => openSongPdf(song));
+        actions.appendChild(pdf);
+      }
+      // Online chord search (may not always find the song).
+      const chords = el(`<a class="btn btn--sm" target="_blank" rel="noopener noreferrer" href="${chordsUrl(song)}">🔎 Find chords</a>`);
+      actions.appendChild(chords);
+
+      // Attach / replace a PDF (any member).
+      const attach = el(`<button class="btn btn--sm">${hasPdf ? '🔁 Replace PDF' : '📎 Attach PDF'}</button>`);
+      attach.addEventListener('click', () => pickSongPdf(mKey, song));
+      actions.appendChild(attach);
+
       const remind = el(`<button class="btn btn--sm">🔔 Remind</button>`);
       remind.addEventListener('click', () => remindSongPractice(mKey, song));
-      actions.appendChild(chords);
       actions.appendChild(remind);
+
       const del = el(`<button class="btn btn--sm btn--danger">✕</button>`);
       del.addEventListener('click', async () => {
         await store.deleteSong(mKey, song.id); render();
@@ -738,6 +756,54 @@ function addSongModal(mKey) {
     store.addSong(mKey, title, key).then(() => { render(); toast('Song added.'); });
     return true;  // close the modal immediately; the store call resolves async
   });
+}
+
+const MAX_PDF_BYTES = 800 * 1024;
+
+/** Let the user pick a PDF and attach it to a song. */
+function pickSongPdf(mKey, song) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,.pdf';
+  input.style.display = 'none';
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast('Please choose a PDF file.'); return; }
+    if (file.size > MAX_PDF_BYTES) { toast('PDF is too big — keep it under 800 KB (1–2 page charts are fine).'); return; }
+    toast('Uploading PDF…');
+    if (CLOUD) {
+      const ok = await guard(() => RosterAPI.uploadSongPdf(song.id, file));
+      render();
+      if (ok) toast('Chord PDF attached.');
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const s = (state.songs[mKey] || []).find((x) => x.id === song.id);
+        if (s) { s.pdfData = reader.result; s.pdfName = file.name; save(); render(); toast('Chord PDF attached.'); }
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
+/** Open a song's attached PDF in a new tab. */
+async function openSongPdf(song) {
+  try {
+    let url;
+    if (CLOUD) url = await RosterAPI.songPdfBlobUrl(song.id);
+    else url = song.pdfData;
+    if (!url) { toast('No PDF attached.'); return; }
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    if (CLOUD) setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    toast(e.message || 'Could not open the PDF.');
+  }
 }
 
 // -- Tab: Reminders -------------------------------------------------------

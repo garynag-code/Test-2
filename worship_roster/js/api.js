@@ -71,6 +71,29 @@
     newVote(month, typeId) { return req('POST', '/api/practices/new-vote', { month, typeId }); },
     addSong(month, title, key) { return req('POST', '/api/songs', { month, title, key }); },
     deleteSong(id) { return req('DELETE', '/api/songs/' + encodeURIComponent(id)); },
+
+    // Upload a chord PDF (raw bytes) and fetch it back as a blob URL for viewing.
+    async uploadSongPdf(id, file) {
+      const t = getToken();
+      let res;
+      try {
+        res = await fetch(BASE + '/api/songs/' + encodeURIComponent(id) + '/pdf?name=' + encodeURIComponent(file.name), {
+          method: 'POST', mode: 'cors',
+          headers: { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/pdf' },
+          body: file,
+        });
+      } catch (_) { throw new Error('Network error — check your connection.'); }
+      if (!res.ok) { let d = null; try { d = await res.json(); } catch (_) {} throw new Error((d && d.error) || ('Upload failed (' + res.status + ')')); }
+      return true;
+    },
+    async songPdfBlobUrl(id) {
+      const t = getToken();
+      const res = await fetch(BASE + '/api/songs/' + encodeURIComponent(id) + '/pdf', {
+        mode: 'cors', headers: { 'Authorization': 'Bearer ' + t },
+      });
+      if (!res.ok) throw new Error('Could not open the PDF (' + res.status + ').');
+      return URL.createObjectURL(await res.blob());
+    },
     subscribePush(subscription) { return req('POST', '/api/push/subscribe', { subscription }); },
   };
 })();

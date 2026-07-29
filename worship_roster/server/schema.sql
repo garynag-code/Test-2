@@ -68,6 +68,16 @@ CREATE TABLE IF NOT EXISTS songs (
 );
 CREATE INDEX IF NOT EXISTS idx_songs_team ON songs(team_id);
 
+-- Optional attached chord-sheet PDF for a song (base64, kept small).
+CREATE TABLE IF NOT EXISTS song_pdfs (
+  song_id    TEXT PRIMARY KEY,
+  team_id    TEXT NOT NULL,
+  filename   TEXT NOT NULL DEFAULT 'chords.pdf',
+  data       TEXT NOT NULL,               -- base64url-encoded PDF bytes
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_song_pdfs_team ON song_pdfs(team_id);
+
 -- Web Push subscriptions (one per installed device/browser).
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint   TEXT PRIMARY KEY,
