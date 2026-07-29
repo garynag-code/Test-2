@@ -21,6 +21,10 @@
  * 1. Constants & season configuration
  * -------------------------------------------------------------------------- */
 
+// Build stamp — shown in the header so you can confirm the phone loaded the
+// latest version (rather than an old cached one). Bump on notable changes.
+const APP_VERSION = 'v4 · 2026-07-29';
+
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
   start: '2026-07-02',
@@ -612,7 +616,7 @@ function isLeader() {
 }
 
 function render() {
-  document.getElementById('season-label').textContent = `Season: ${SEASON.label}`;
+  document.getElementById('season-label').textContent = `Season: ${SEASON.label}  ·  ${APP_VERSION}`;
   syncUserSelect();
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
@@ -1651,7 +1655,7 @@ function setChromeVisible(visible) {
 
 /** Cloud connect screen: create a new team or join one with an invite code. */
 function renderConnect() {
-  document.getElementById('season-label').textContent = `Season: ${SEASON.label}`;
+  document.getElementById('season-label').textContent = `Season: ${SEASON.label}  ·  ${APP_VERSION}`;
   setChromeVisible(false);
   view.innerHTML = '';
 
