@@ -293,7 +293,7 @@ async function setAssignment(request, env, me) {
   return json({ ok: true });
 }
 
-/** Admin-only: set another member's display title and/or admin privileges. */
+/** Admin-only: set another member's positions, display title and/or admin. */
 async function updateMember(request, env, me, memberId) {
   if (!me.isLeader) return err(403, 'Only an admin can change member roles');
   const target = await env.DB.prepare('SELECT id, is_leader FROM members WHERE id = ? AND team_id = ?')
@@ -305,6 +305,9 @@ async function updateMember(request, env, me, memberId) {
   if (typeof body.title === 'string') {
     const title = body.title.replace(/[\x00-\x1F\x7F]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
     sets.push('title = ?'); vals.push(title);
+  }
+  if (Array.isArray(body.positions)) {
+    sets.push('positions = ?'); vals.push(JSON.stringify(sanitizePositions(body.positions)));
   }
   if (typeof body.isLeader === 'boolean') {
     // Never leave the team without an admin.

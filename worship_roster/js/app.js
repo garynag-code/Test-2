@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v11 · 2026-07-29';
+const APP_VERSION = 'v12 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -1813,13 +1813,14 @@ function team() {
   for (const m of state.members) {
     const row = el(`<div class="member"></div>`);
     const posNames = m.positions.map((p) => (POSITIONS.find((x) => x.id === p) || {}).name).filter(Boolean).join(', ');
+    const roleLabel = posNames || (m.isLeader ? 'Administrator' : 'No position set');
     const badges =
       (m.isLeader ? '<span class="badge">Admin</span>' : '') +
       (m.title ? ` <span class="badge badge--muted">${esc(m.title)}</span>` : '');
     row.appendChild(el(`
       <div>
         <div class="member__name">${esc(m.name)} ${badges}</div>
-        <div class="member__pos">${esc(posNames || 'No position set')}</div>
+        <div class="member__pos">${esc(roleLabel)}</div>
       </div>`));
     if (!CLOUD) {
       const actions = el(`<div class="btn-row"></div>`);
@@ -1910,13 +1911,22 @@ function memberModal(existing) {
 function cloudMemberModal(m) {
   const me = currentUser();
   const isSelf = me && me.id === m.id;
-  const suggestions = ['Pastor', 'Worship Leader', 'Elder', 'Musician', 'Vocalist'];
+  const suggestions = ['Administrator', 'Pastor', 'Worship Leader', 'Elder', 'Musician', 'Vocalist'];
+  const mp = m.positions || [];
+  const posChecks = POSITIONS.map((p) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-weight:500">
+      <input type="checkbox" class="mem-pos" value="${p.id}" ${mp.includes(p.id) ? 'checked' : ''} style="width:auto" />
+      <span>${p.icon} ${p.name}</span>
+    </label>`).join('');
   const body = el(`
     <div>
       <div class="card__meta" style="margin-bottom:8px">${esc(m.name)}</div>
       <label class="field" for="mem-title">Title (optional)</label>
-      <input id="mem-title" type="text" list="title-options" value="${esc(m.title || '')}" placeholder="e.g. Pastor" maxlength="30" />
+      <input id="mem-title" type="text" list="title-options" value="${esc(m.title || '')}" placeholder="e.g. Administrator" maxlength="30" />
       <datalist id="title-options">${suggestions.map((s) => `<option value="${s}"></option>`).join('')}</datalist>
+      <label class="field" style="margin-top:12px">Positions</label>
+      <div class="card__meta" style="margin:-2px 0 4px">Untick all to show them as “Administrator”.</div>
+      ${posChecks}
       <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:600">
         <input id="mem-admin" type="checkbox" ${m.isLeader ? 'checked' : ''} ${isSelf ? 'disabled' : ''} style="width:auto" />
         Admin privileges (manage songs, lock dates, edit members)
@@ -1927,7 +1937,8 @@ function cloudMemberModal(m) {
   openModal('Edit member', body, () => {
     const title = body.querySelector('#mem-title').value.trim();
     const isAdmin = body.querySelector('#mem-admin').checked;
-    const fields = { title };
+    const positions = [...body.querySelectorAll('.mem-pos:checked')].map((c) => c.value);
+    const fields = { title, positions };
     if (!isSelf) fields.isLeader = isAdmin;
     guard(() => RosterAPI.updateMember(m.id, fields)).then(() => { render(); toast('Member updated.'); });
     return true;

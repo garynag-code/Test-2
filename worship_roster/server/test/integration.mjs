@@ -193,6 +193,18 @@ await test('admin can set a member title (e.g. Pastor); it shows in state', asyn
   assert.equal(after.data.members.find((m) => m.id === david.id).title, 'Pastor');
 });
 
+await test('admin can change a member’s positions (and clear them)', async () => {
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const leaderId = state.data.me.id;
+  // Set positions, then clear them (an admin with no position shows as "Administrator" in the UI).
+  assert.equal((await call('PUT', `/api/members/${leaderId}`, { token: leaderToken, body: { positions: ['keys', 'bogus'] } })).status, 200);
+  let after = await call('GET', '/api/state', { token: leaderToken });
+  assert.deepEqual(after.data.members.find((m) => m.id === leaderId).positions, ['keys'], 'junk positions dropped');
+  assert.equal((await call('PUT', `/api/members/${leaderId}`, { token: leaderToken, body: { positions: [] } })).status, 200);
+  after = await call('GET', '/api/state', { token: leaderToken });
+  assert.deepEqual(after.data.members.find((m) => m.id === leaderId).positions, [], 'positions cleared');
+});
+
 await test('a non-admin cannot change member roles', async () => {
   const state = await call('GET', '/api/state', { token: leaderToken });
   const peter = state.data.members.find((m) => m.name === 'Peter');
