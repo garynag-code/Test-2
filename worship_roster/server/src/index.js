@@ -94,11 +94,15 @@ function sanitizePositions(v) {
   if (!Array.isArray(v)) return [];
   return [...new Set(v.filter(isPositionId))];
 }
-/** Accept only http(s) URLs (blocks javascript: etc.); empty string otherwise. */
+/** Normalise a link: add https:// if the scheme is missing, keep only http(s)
+ *  URLs that look like a real address (blocks javascript: etc.). '' otherwise. */
 function sanitizeUrl(v) {
   if (typeof v !== 'string') return '';
-  const t = v.trim().slice(0, 500);
-  return /^https?:\/\/[^\s]+$/i.test(t) ? t : '';
+  let t = v.trim().slice(0, 500);
+  if (!t) return '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t) && !/^https?:\/\//i.test(t)) return ''; // has a non-http scheme -> reject
+  if (!/^https?:\/\//i.test(t)) t = 'https://' + t;                          // no scheme -> assume https
+  return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(t) ? t : '';                   // must have a domain dot
 }
 /** Multi-line text: keep newlines/tabs, strip other control chars, bound length. */
 function sanitizeText(v, max) {
@@ -750,5 +754,5 @@ export default {
 export {
   sha256Hex, randomToken, randomInvite, uid, b64url, b64urlToBytes,
   sanitizeName, sanitizePositions, isMonth, isDate, isPositionId, isTypeId,
-  tallyMajority, importVapidKey, vapidJwt,
+  tallyMajority, importVapidKey, vapidJwt, sanitizeUrl,
 };

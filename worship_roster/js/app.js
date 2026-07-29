@@ -857,8 +857,13 @@ function addSongModal(mKey) {
 
 /** Trim a URL and only keep it if it's an http(s) link. */
 function normalizeLink(v) {
-  const t = (v || '').trim();
-  return /^https?:\/\/\S+$/i.test(t) ? t : '';
+  let t = (v || '').trim();
+  if (!t) return '';
+  // Reject other schemes (javascript:, data:, etc.), but auto-add https:// when
+  // the user typed a bare link like "youtu.be/abc" so it isn't silently dropped.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t) && !/^https?:\/\//i.test(t)) return '';
+  if (!/^https?:\/\//i.test(t)) t = 'https://' + t;
+  return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(t) ? t : '';
 }
 
 /** Open an external (http/https) URL safely in a new tab. */
