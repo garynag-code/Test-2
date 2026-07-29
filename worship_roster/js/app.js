@@ -63,6 +63,13 @@ const WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const CFG = window.ROSTER_CONFIG || {};
 const CLOUD = !!(CFG.apiBase && window.RosterAPI && window.RosterAPI.configured());
 
+// Platform detection (for install / notification guidance).
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /android/i.test(navigator.userAgent);
+const IS_STANDALONE = (window.navigator.standalone === true) ||
+  (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
 let state = CLOUD ? emptyState() : load();
 let activeTab = 'roster';
 
@@ -729,11 +736,26 @@ function reminders() {
       <span class="card__title">Device notifications</span>
       <span class="badge ${state.notifyEnabled ? 'badge--ok' : 'badge--muted'}">${state.notifyEnabled ? 'On' : 'Off'}</span>
     </div>`));
-  notifyCard.appendChild(el(`<div class="card__meta">Get a pop-up for reminders due today while the app is open.</div>`));
-  const enable = el(`<button class="btn btn--sm btn--primary btn--block" style="margin-top:10px">${state.notifyEnabled ? 'Notifications enabled' : 'Enable notifications'}</button>`);
-  enable.disabled = state.notifyEnabled;
-  enable.addEventListener('click', requestNotify);
-  notifyCard.appendChild(enable);
+
+  if (IS_IOS && !IS_STANDALONE) {
+    // iPhone: notifications only work from a Home-Screen-installed app.
+    notifyCard.appendChild(el(`<div class="card__meta">On iPhone, reminders can only pop up after you add this app to your Home Screen and open it from that icon (Apple requirement). It takes a few seconds:</div>`));
+    const help = el(`<button class="btn btn--sm btn--primary btn--block" style="margin-top:10px">📲 How to add to Home Screen</button>`);
+    help.addEventListener('click', showInstallHelp);
+    notifyCard.appendChild(help);
+  } else {
+    notifyCard.appendChild(el(`<div class="card__meta">Get a pop-up when reminders are due.</div>`));
+    const enable = el(`<button class="btn btn--sm btn--primary btn--block" style="margin-top:10px">${state.notifyEnabled ? 'Notifications enabled' : 'Enable notifications'}</button>`);
+    enable.disabled = state.notifyEnabled;
+    enable.addEventListener('click', requestNotify);
+    notifyCard.appendChild(enable);
+    // A quiet "add to home screen" helper for everyone not yet installed.
+    if (!IS_STANDALONE) {
+      const inst = el(`<button class="btn btn--sm btn--block" style="margin-top:8px">📲 Add to Home Screen</button>`);
+      inst.addEventListener('click', showInstallHelp);
+      notifyCard.appendChild(inst);
+    }
+  }
   view.appendChild(notifyCard);
 
   const groups = [
@@ -800,8 +822,10 @@ function team() {
         `How to join (2 minutes):\n` +
         `1. Tap the link above.\n` +
         `2. Type your name, then tap “Join team”.\n` +
-        `3. Chrome menu (⋮) → “Add to Home screen” for quick access.\n` +
-        `4. Open the Reminders tab → “Enable notifications”.\n\n` +
+        `3. Add it to your Home Screen for quick access:\n` +
+        `   • iPhone: in Safari, tap Share (□↑) → “Add to Home Screen”.\n` +
+        `   • Android: Chrome menu (⋮) → “Add to Home screen”.\n` +
+        `4. Open it from that new icon, then Reminders tab → “Enable notifications”.\n\n` +
         `Please join on the phone you’ll actually use — it becomes your personal sign-in (no password needed).`;
 
       inv.appendChild(el(`<div class="card__meta" style="word-break:break-all;background:#f3f4f6;border-radius:8px;padding:8px;margin-bottom:8px">${esc(inviteLink)}</div>`));
@@ -963,11 +987,44 @@ function cloudMemberModal(m) {
   });
 }
 
+/** Platform-specific "add to Home Screen" instructions. */
+function showInstallHelp() {
+  let steps;
+  if (IS_IOS) {
+    steps = `
+      <ol style="padding-left:18px;margin:0;line-height:1.9">
+        <li>Open this page in <b>Safari</b> (not Chrome).</li>
+        <li>Tap the <b>Share</b> button <span style="white-space:nowrap">(the □ with an ↑)</span> at the bottom of the screen.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b> (top-right).</li>
+        <li>Open the app from its new <b>Home Screen icon</b> — then you can turn on notifications from the Reminders tab.</li>
+      </ol>
+      <div class="card__meta" style="margin-top:10px">Notifications on iPhone need iOS 16.4 or newer and only work from the installed icon — not a Safari tab.</div>`;
+  } else if (IS_ANDROID) {
+    steps = `
+      <ol style="padding-left:18px;margin:0;line-height:1.9">
+        <li>Open this page in <b>Chrome</b>.</li>
+        <li>Tap the <b>⋮ menu</b> (top-right).</li>
+        <li>Tap <b>Add to Home screen</b> (or <b>Install app</b>) → <b>Add</b>.</li>
+        <li>Open it from the new icon, then enable notifications on the Reminders tab.</li>
+      </ol>`;
+  } else {
+    steps = `
+      <ol style="padding-left:18px;margin:0;line-height:1.9">
+        <li>In your browser's menu, choose <b>Install</b> or <b>Add to Home screen / Apps</b>.</li>
+        <li>Open the installed app, then enable notifications on the Reminders tab.</li>
+      </ol>`;
+  }
+  const body = el(`<div>${steps}</div>`);
+  // Info-only modal: reuse openModal but with a single "Got it" action.
+  openModal('Add to Home Screen', body, () => true, null, 'Got it');
+}
+
 /* -------------------------------------------------------------------------- *
  * Modal + toast + notifications
  * -------------------------------------------------------------------------- */
 
-function openModal(title, bodyEl, onSave, extra) {
+function openModal(title, bodyEl, onSave, extra, okLabel) {
   const backdrop = el(`<div class="modal-backdrop"></div>`);
   const modal = el(`<div class="modal"><h3 class="modal__title">${esc(title)}</h3></div>`);
   modal.appendChild(bodyEl);
@@ -977,11 +1034,16 @@ function openModal(title, bodyEl, onSave, extra) {
     b.addEventListener('click', () => { close(); extra.onClick(); });
     row.appendChild(b);
   }
-  const cancel = el(`<button class="btn btn--sm">Cancel</button>`);
-  const ok = el(`<button class="btn btn--sm btn--primary">Save</button>`);
-  cancel.addEventListener('click', close);
+  // Info-only modals (okLabel like "Got it") show just the one button.
+  const infoOnly = okLabel && okLabel !== 'Save';
+  const ok = el(`<button class="btn btn--sm btn--primary">${esc(okLabel || 'Save')}</button>`);
   ok.addEventListener('click', () => { if (onSave() !== false) close(); });
-  row.appendChild(cancel); row.appendChild(ok);
+  if (!infoOnly) {
+    const cancel = el(`<button class="btn btn--sm">Cancel</button>`);
+    cancel.addEventListener('click', close);
+    row.appendChild(cancel);
+  }
+  row.appendChild(ok);
   modal.appendChild(row);
   backdrop.appendChild(modal);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
@@ -1004,7 +1066,11 @@ function toast(msg) {
 }
 
 function requestNotify() {
-  if (!('Notification' in window)) { toast('Notifications not supported here.'); return; }
+  if (IS_IOS && !IS_STANDALONE) { showInstallHelp(); return; }
+  if (!('Notification' in window)) {
+    toast(IS_IOS ? 'On iPhone, add the app to your Home Screen first (iOS 16.4+).' : 'Notifications aren\'t available in this browser.');
+    return;
+  }
   Notification.requestPermission().then(async (perm) => {
     if (perm === 'granted') {
       state.notifyEnabled = true;
