@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v9 · 2026-07-29';
+const APP_VERSION = 'v10 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -1443,7 +1443,7 @@ function journey() {
   const me = currentUser();
   const k = computeKpis();
   view.appendChild(el(`<h2 class="section-title">📈 My Journey</h2>`));
-  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — your personal growth this week. Only you see your own dashboard; logging is on your honour before God.</p>`));
+  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — your personal growth this week. Logging is on your honour before God. Your worship leaders can see a weekly summary of your Journey and Ministry — your prayer and Word time, devotions read and ministry check-ins — so they can encourage you and pray for you.</p>`));
 
   // Your Spiritual Journey
   const sj = el(`<div class="card"></div>`);
@@ -1502,7 +1502,7 @@ function journey() {
 function growth() {
   const me = currentUser();
   view.appendChild(el(`<h2 class="section-title">📊 Your Review</h2>`));
-  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — coaching on your meeting preparation, spiritual journey and ministry excellence. Private to you.</p>`));
+  view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — coaching on your meeting preparation, spiritual journey and ministry excellence. Your preparation checklist stays on your device; your leaders see a weekly summary of your Journey and Ministry to encourage and pray for you.</p>`));
 
   // Weekly review — the week that just finished (surfaced every Monday).
   const wSunday = mostRecentSunday();
