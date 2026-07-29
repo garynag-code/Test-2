@@ -18,7 +18,7 @@
 
 // ---- Domain constants (mirror the front-end) -------------------------------
 
-const POSITION_IDS = ['lead', 'lead2', 'lead3', 'lead4', 'lead5', 'bass', 'drums', 'guitar', 'keys', 'bv1', 'bv2', 'bv3'];
+const POSITION_IDS = ['lead', 'lead2', 'lead3', 'lead4', 'lead5', 'bass', 'drums', 'guitar', 'keys', 'bv1', 'bv2', 'bv3', 'sound'];
 const TYPE_IDS = ['weekday', 'afterchurch'];
 const MAX_BODY_BYTES = 16 * 1024;          // 16 KB request cap (JSON endpoints)
 const MAX_PDF_BYTES = 800 * 1024;          // 800 KB cap for attached chord PDFs

@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v12 · 2026-07-29';
+const APP_VERSION = 'v13 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -42,6 +42,7 @@ const POSITIONS = [
   { id: 'bv1',     name: 'Backup Singer 1', icon: '🎙️' },
   { id: 'bv2',     name: 'Backup Singer 2', icon: '🎙️' },
   { id: 'bv3',     name: 'Backup Singer 3', icon: '🎙️' },
+  { id: 'sound',   name: 'Sound Crew',      icon: '🎛️' },
 ];
 
 // Extra worship-leader slots, added on demand (a service can have several
