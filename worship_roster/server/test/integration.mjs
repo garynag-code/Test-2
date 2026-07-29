@@ -165,6 +165,15 @@ await test('invalid inputs are rejected', async () => {
   assert.equal((await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'trombone' } })).status, 400);
 });
 
+await test('a co-lead worshipper (lead2) can be assigned', async () => {
+  const state = await call('GET', '/api/state', { token: leaderToken });
+  const ruth = state.data.members.find((m) => m.name === 'Ruth');
+  const r = await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'lead2', memberId: ruth.id } });
+  assert.equal(r.status, 200);
+  const after = await call('GET', '/api/state', { token: leaderToken });
+  assert.ok(after.data.assignments.some((a) => a.position_id === 'lead2' && a.member_id === ruth.id));
+});
+
 await test('assignment only accepts a member of the same team', async () => {
   const ok = await call('PUT', '/api/assignments', { token: leaderToken, body: { date: '2026-07-05', positionId: 'bass', memberId: null } });
   assert.equal(ok.status, 200);

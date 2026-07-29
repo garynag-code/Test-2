@@ -30,7 +30,8 @@ const SEASON = {
 
 // Fixed positions on the team. `single: true` means one person fills it.
 const POSITIONS = [
-  { id: 'lead',    name: 'Lead Worshipper', icon: '🎤' },
+  { id: 'lead',    name: 'Lead Worshipper',    icon: '🎤' },
+  { id: 'lead2',   name: 'Co-Lead Worshipper', icon: '🎤', optional: true },
   { id: 'bass',    name: 'Bass',            icon: '🎸' },
   { id: 'drums',   name: 'Drums',           icon: '🥁' },
   { id: 'guitar',  name: 'Guitar',          icon: '🎸' },
@@ -543,18 +544,19 @@ function roster() {
   const upcoming = state.sundays.filter((s) => s.date >= todayISO());
   const list = upcoming.length ? upcoming : state.sundays;
 
+  const required = POSITIONS.filter((p) => !p.optional);
   for (const sunday of list) {
     const card = el(`<div class="card"></div>`);
-    const filled = POSITIONS.filter((p) => sunday.assignments[p.id]).length;
+    const filled = required.filter((p) => sunday.assignments[p.id]).length;
     card.appendChild(el(`
       <div class="card__head">
         <span class="card__title">${fmtLong(sunday.date)}</span>
-        <span class="badge ${filled === POSITIONS.length ? 'badge--ok' : 'badge--muted'}">${filled}/${POSITIONS.length} set</span>
+        <span class="badge ${filled === required.length ? 'badge--ok' : 'badge--muted'}">${filled}/${required.length} set</span>
       </div>`));
 
     for (const pos of POSITIONS) {
       const row = el(`<div class="assign-row"></div>`);
-      row.appendChild(el(`<div class="assign-row__pos"><span class="pos-icon">${pos.icon}</span>${pos.name}</div>`));
+      row.appendChild(el(`<div class="assign-row__pos"><span class="pos-icon">${pos.icon}</span>${pos.name}${pos.optional ? ' <span class="card__meta">(optional)</span>' : ''}</div>`));
       const sel = el(`<select data-date="${sunday.date}" data-pos="${pos.id}"></select>`);
       // Anyone can fill any position (e.g. different people lead worship on
       // different Sundays); those with the position as a preference sort first.
