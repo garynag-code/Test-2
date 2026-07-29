@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v6 · 2026-07-29';
+const APP_VERSION = 'v7 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -355,8 +355,8 @@ function monthlyReview(anchorISO) {
   const notes = coachingNotes(pcts);
   if (!empty) {
     notes.unshift(activeWeeks === reviews.length
-      ? { icon: '🗓️', text: `Consistent all month — you engaged in all ${reviews.length} weeks. Consistency is the mark of a faithful worshipper.` }
-      : { icon: '🗓️', text: `You were active in ${activeWeeks} of ${reviews.length} weeks this month. Aim for every week — steady rhythm beats occasional effort.` });
+      ? { icon: '🗓️', text: `Consistent all month — you engaged in all ${reviews.length} weeks. Stay the course: “Be steadfast, immovable, always abounding in the work of the Lord, knowing that in the Lord your labour is not in vain.” (1 Corinthians 15:58)` }
+      : { icon: '🗓️', text: `You were active in ${activeWeeks} of ${reviews.length} weeks this month. Press on toward every week: “Forgetting what lies behind… I press on toward the goal.” (Philippians 3:13-14)` });
   }
   return {
     month: monthName(anchorISO), weeks: reviews.length, activeWeeks,
@@ -364,27 +364,29 @@ function monthlyReview(anchorISO) {
   };
 }
 
-/** Turn per-dimension percentages (0..1) into a short list of specific,
- * encouraging coaching notes. Works for both a single week and a month. */
+/** Turn per-dimension percentages (0..1) into a short list of Scripture-based
+ * coaching notes that exhort and encourage. Works for a week or a month. */
 function coachingNotes(p) {
   const notes = [];
   // Preparation
-  if (p.prepPct >= 0.85) notes.push({ icon: '✅', text: 'Outstanding preparation — you worked through almost the whole checklist. Keep this rhythm.' });
-  else if (p.prepPct >= 0.4) notes.push({ icon: '📝', text: 'Solid start on preparation. Complete the “During the Week” items early so Sunday feels effortless.' });
-  else if (p.prepPct > 0) notes.push({ icon: '📝', text: 'Preparation was light. Block midweek time to learn songs, keys and parts before Sunday.' });
-  else notes.push({ icon: '📝', text: 'No preparation recorded. Start early next week: prayer, learning the songs, and confirming your parts.' });
-  // Spiritual journey
-  if (p.prayerPct <= 0) notes.push({ icon: '🙏', text: 'No prayer logged. Even 10 minutes a day in the Spirit builds strength for ministry.' });
-  else if (p.prayerPct < 1) notes.push({ icon: '🙏', text: 'Grow your prayer in the Spirit — you’re close to the goal; a little more each day gets you there.' });
-  if (p.wordPct <= 0) notes.push({ icon: '📖', text: 'No time in the Word logged. Let Scripture shape your worship — start with 15 minutes.' });
-  else if (p.wordPct < 1) notes.push({ icon: '📖', text: 'Add a little more time in the Word to reach your goal.' });
-  if (p.devPct <= 0) notes.push({ icon: '🕮', text: 'Read the team devotions — they keep the whole team spiritually aligned.' });
+  if (p.prepPct >= 0.85) notes.push({ icon: '✅', text: 'Outstanding preparation — you worked through almost the whole checklist. “Do your best to present yourself to God as one approved, a worker who has no need to be ashamed.” (2 Timothy 2:15) Keep it up!' });
+  else if (p.prepPct >= 0.4) notes.push({ icon: '📝', text: 'Good start on preparation — finish the “During the Week” items early. “The plans of the diligent lead surely to abundance.” (Proverbs 21:5)' });
+  else if (p.prepPct > 0) notes.push({ icon: '📝', text: 'Preparation was light this week. Block midweek time for your parts. “Let all things be done decently and in order.” (1 Corinthians 14:40)' });
+  else notes.push({ icon: '📝', text: 'No preparation recorded. Plan your week and count the cost of serving well. “Which of you, desiring to build a tower, does not first sit down and count the cost?” (Luke 14:28)' });
+  // Prayer (in the Spirit)
+  if (p.prayerPct <= 0) notes.push({ icon: '🙏', text: 'No prayer logged — begin with 10 minutes a day. “But you, beloved, building yourselves up in your most holy faith, praying in the Holy Spirit.” (Jude 1:20)' });
+  else if (p.prayerPct < 1) notes.push({ icon: '🙏', text: 'Grow your prayer in the Spirit — you’re close to the goal. “Praying at all times in the Spirit, with all prayer and supplication.” (Ephesians 6:18)' });
+  // The Word
+  if (p.wordPct <= 0) notes.push({ icon: '📖', text: 'No time in the Word logged — let it fill your worship. “Let the word of Christ dwell in you richly… singing psalms and hymns and spiritual songs.” (Colossians 3:16)' });
+  else if (p.wordPct < 1) notes.push({ icon: '📖', text: 'Add a little more time in the Word to reach your goal. “I have stored up your word in my heart, that I might not sin against you.” (Psalm 119:11)' });
+  // Devotions
+  if (p.devPct <= 0) notes.push({ icon: '🕮', text: 'Read the team devotions to stay aligned as one body. “Let us consider how to stir up one another to love and good works, not neglecting to meet together.” (Hebrews 10:24-25)' });
   // Ministry excellence
-  if (p.ministryPct <= 0) notes.push({ icon: '⭐', text: 'Mark your ministry commitments — arriving on time, joining team prayer and contributing all count.' });
-  else if (p.ministryPct >= 1) notes.push({ icon: '⭐', text: 'Excellent — punctual, prayerful and contributing. Keep modelling this for the team.' });
+  if (p.ministryPct <= 0) notes.push({ icon: '⭐', text: 'Mark your ministry commitments — arrive on time, join team prayer, contribute. “Whatever you do, work heartily, as for the Lord and not for men.” (Colossians 3:23)' });
+  else if (p.ministryPct >= 1) notes.push({ icon: '⭐', text: 'Excellent — punctual, prayerful and serving well. “As each has received a gift, use it to serve one another, as good stewards of God’s varied grace.” (1 Peter 4:10)' });
   // Encouragement when everything is strong
   if (p.prepPct >= 0.7 && p.spiritual >= 65 && p.ministry >= 65) {
-    notes.push({ icon: '🔥', text: 'You’re thriving across preparation, spirit and ministry — a real blessing to the team. Press on!' });
+    notes.push({ icon: '🔥', text: 'You’re thriving across preparation, spirit and ministry — a blessing to the team. “Let us not grow weary of doing good, for in due season we will reap, if we do not give up.” (Galatians 6:9)' });
   }
   return notes.slice(0, 5);
 }
@@ -1533,12 +1535,13 @@ function reviewCard(o) {
   return card;
 }
 
-/** The prominent "you haven't logged anything" reminder. */
+/** The prominent "you haven't logged anything" reminder — Scripture-grounded. */
 function bigReminder() {
   return el(`<div style="border:2px solid var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:14px;margin:6px 0 10px;text-align:center">
     <div style="font-size:1.7rem;line-height:1">⚠️</div>
     <div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px">No inputs recorded</div>
-    <div style="font-size:.9rem;color:var(--ink)">Please improve next week — spend time in preparation, prayer and the Word, and mark your ministry. Small, consistent steps grow great worshippers.</div>
+    <div style="font-size:.9rem;color:var(--ink)">Let’s grow next week — spend time in preparation, prayer and the Word, and mark your ministry. His mercy makes every week a fresh start.</div>
+    <div style="font-size:.85rem;font-style:italic;color:var(--brand-dark);margin-top:8px">“The steadfast love of the Lord never ceases; his mercies… are new every morning.” (Lamentations 3:22-23)</div>
   </div>`);
 }
 
