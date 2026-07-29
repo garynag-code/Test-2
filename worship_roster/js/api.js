@@ -64,6 +64,7 @@
     },
 
     getState() { return req('GET', '/api/state'); },
+    teamReport(sunday) { return req('GET', '/api/team-report?sunday=' + encodeURIComponent(sunday)); },
     setAssignment(date, positionId, memberId) { return req('PUT', '/api/assignments', { date, positionId, memberId }); },
     updateMember(id, fields) { return req('PUT', '/api/members/' + encodeURIComponent(id), fields); },
     vote(month, typeId, date) { return req('POST', '/api/votes', { month, typeId, date }); },

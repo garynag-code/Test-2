@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v8 · 2026-07-29';
+const APP_VERSION = 'v9 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -262,6 +262,22 @@ function ratingFor(score) {
 /** The Sunday that anchors the current ministry week (upcoming, or today). */
 function currentServiceSunday() {
   return seasonSundays().find((d) => d >= todayISO()) || (seasonSundays().slice(-1)[0] || todayISO());
+}
+
+/** Pure scoring for the leader report: turns a member's raw weekly figures into
+ * Spiritual Journey and Ministry Excellence scores, using the exact same maths
+ * as a member's own dashboard. (Members' own scoring code is untouched.) */
+function scoreParts(x) {
+  const devTarget = Math.max(1, Math.min((x.devTotal || KPI.devotionTarget), KPI.devotionTarget));
+  const prayerPct = Math.min(1, (x.prayerMin || 0) / KPI.prayerWeekTarget);
+  const wordPct = Math.min(1, (x.wordMin || 0) / KPI.wordWeekTarget);
+  const devPct = Math.min(1, (x.readCount || 0) / devTarget);
+  const spiritual = Math.round(((prayerPct + wordPct + devPct) / 3) * 100);
+  const ministry = Math.round((((x.checkedCount || 0) + spiritual / 100) / (MINISTRY_MARKERS.length + 1)) * 100);
+  // Leader report scores the two server-backed dimensions only.
+  const overall = Math.round((spiritual + ministry) / 2);
+  const empty = (x.prayerMin || 0) === 0 && (x.wordMin || 0) === 0 && (x.readCount || 0) === 0 && (x.checkedCount || 0) === 0;
+  return { devTarget, prayerPct, wordPct, devPct, spiritual, ministry, overall, empty, rating: ratingFor(overall) };
 }
 
 /** Compute both KPI scores for the signed-in member.
@@ -786,10 +802,16 @@ function isLeader() {
 function render() {
   document.getElementById('season-label').textContent = `Season: ${SEASON.label}  ·  ${APP_VERSION}`;
   syncUserSelect();
+  // The Reports dashboard is leader-only: hide its tab for members, and never
+  // leave a non-leader parked on it.
+  const canLead = !!(currentUser() && currentUser().isLeader);
+  const repBtn = document.querySelector('.tabbar__btn[data-tab="reports"]');
+  if (repBtn) repBtn.style.display = canLead ? '' : 'none';
+  if (activeTab === 'reports' && !canLead) activeTab = 'home';
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.tab === activeTab ? 'true' : 'false');
   });
-  const map = { home, roster, voting, songs, library, devotions, journey, growth, reminders, team };
+  const map = { home, roster, voting, songs, library, devotions, journey, growth, reports, reminders, team };
   view.innerHTML = '';
   (map[activeTab] || home)();
   view.scrollTop = 0;
@@ -1559,6 +1581,75 @@ function homeReviewBanner(kind) {
   card.appendChild(el(`<div class="card__meta">${esc(msg)}</div>`));
   card.addEventListener('click', () => { activeTab = 'growth'; render(); });
   return card;
+}
+
+// -- Tab: Reports (leader-only team dashboard) ----------------------------
+
+function reports() {
+  view.appendChild(el(`<h2 class="section-title">📋 Team Reports</h2>`));
+  if (!isLeader()) { view.appendChild(el(`<div class="empty"><div class="empty__icon">🔒</div>This dashboard is for team leaders.</div>`)); return; }
+  view.appendChild(el(`<p class="section-sub">How the team is progressing this week — Spiritual Journey and Ministry Excellence. Private to leaders, for encouragement and pastoral care.</p>`));
+  if (!CLOUD) {
+    view.appendChild(el(`<div class="card"><div class="card__meta">Team reports need the shared online backend so each member’s progress can sync. They’ll populate here once your team is on the cloud version.</div></div>`));
+    return;
+  }
+  const sunday = mostRecentSunday();
+  const slot = el(`<div></div>`);
+  slot.appendChild(el(`<div class="card"><div class="card__meta">Loading team report…</div></div>`));
+  view.appendChild(slot);
+  RosterAPI.teamReport(sunday)
+    .then((rep) => { slot.innerHTML = ''; renderTeamReport(slot, rep); })
+    .catch((e) => { slot.innerHTML = ''; slot.appendChild(el(`<div class="card"><div class="card__meta">${esc(e.message || 'Could not load the report.')}</div></div>`)); });
+}
+
+function renderTeamReport(slot, rep) {
+  const rows = (rep.members || []).map((m) => ({
+    ...m,
+    s: scoreParts({ prayerMin: m.prayerMin, wordMin: m.wordMin, readCount: m.readCount, devTotal: rep.devTotal, checkedCount: m.checkedCount }),
+  }));
+  const n = rows.length;
+  const active = rows.filter((r) => !r.s.empty).length;
+  const avg = (sel) => n ? Math.round(rows.reduce((a, r) => a + sel(r), 0) / n) : 0;
+
+  // Team summary
+  const sum = el(`<div class="card"></div>`);
+  sum.appendChild(el(`<div class="card__head"><span class="card__title">🗓️ Week ending ${fmtLong(rep.sunday)}</span><span class="badge ${n && active === n ? 'badge--ok' : 'badge--muted'}">${active}/${n} active</span></div>`));
+  sum.appendChild(meter('📈 Spiritual journey (team avg)', `${avg((r) => r.s.spiritual)} / 100`, avg((r) => r.s.spiritual) / 100));
+  sum.appendChild(meter('⭐ Ministry excellence (team avg)', `${avg((r) => r.s.ministry)} / 100`, avg((r) => r.s.ministry) / 100));
+  slot.appendChild(sum);
+
+  // Needs encouragement
+  const low = rows.filter((r) => r.s.empty || r.s.overall < 40).sort((a, b) => a.s.overall - b.s.overall);
+  const care = el(`<div class="card"></div>`);
+  care.appendChild(el(`<div class="card__title">🤝 Needs encouragement</div>`));
+  if (!low.length) {
+    care.appendChild(el(`<div class="card__meta">Everyone has engaged this week — give thanks and keep cheering them on. “So encourage each other and build each other up.” (1 Thessalonians 5:11, NLT)</div>`));
+  } else {
+    care.appendChild(el(`<div class="card__meta" style="margin-bottom:6px">Reach out personally and pray with them this week:</div>`));
+    for (const r of low) {
+      care.appendChild(el(`<div class="member"><span class="member__name">${esc(r.name)}</span><span class="member__pos">${r.s.empty ? 'No inputs yet' : 'Overall ' + r.s.overall + '/100'}</span></div>`));
+    }
+  }
+  slot.appendChild(care);
+
+  // Every member
+  const list = el(`<div class="card"></div>`);
+  list.appendChild(el(`<div class="card__title">All members (${n})</div>`));
+  for (const r of [...rows].sort((a, b) => a.name.localeCompare(b.name))) list.appendChild(memberReportRow(r, rep.devTotal));
+  slot.appendChild(list);
+}
+
+function memberReportRow(r, devTotal) {
+  const wrap = el(`<div style="padding:10px 0;border-bottom:1px dashed var(--line)"></div>`);
+  const rt = r.s.rating;
+  const label = r.s.empty ? 'No inputs' : `${r.s.overall} · ${rt.label}`;
+  wrap.appendChild(el(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <span class="member__name">${esc(r.name)}${r.isLeader ? ' <span class="badge badge--muted">admin</span>' : ''}</span>
+    <span class="kpi__rating" style="color:${rt.color};background:${rt.bg}">${esc(label)}</span>
+  </div>`));
+  const devTarget = Math.max(1, Math.min(devTotal || KPI.devotionTarget, KPI.devotionTarget));
+  wrap.appendChild(el(`<div class="card__meta" style="margin-top:4px">🙏 ${r.prayerMin}/${KPI.prayerWeekTarget}m · 📖 ${r.wordMin}/${KPI.wordWeekTarget}m · 🕮 ${r.readCount}/${devTarget} · ⭐ ${r.checkedCount}/${MINISTRY_MARKERS.length}</div>`));
+  return wrap;
 }
 
 function logCustomModal() {

@@ -372,4 +372,24 @@ await test('ministry check-in flags work; junk flags are rejected', async () => 
   assert.equal((await call('POST', '/api/flags', { token: memberTokens[0], body: { key: 'ministry:bad:practice', on: true } })).status, 400);
 });
 
+// ---- Leader team report -----------------------------------------------------
+await test('leader team report aggregates each member’s week; members are refused', async () => {
+  const TODAY = new Date().toISOString().slice(0, 10);
+  // David (memberTokens[0]) already logged 20m prayer + 15m word today; add a ministry check for today.
+  await call('POST', '/api/flags', { token: memberTokens[0], body: { key: `ministry:${TODAY}:practice`, on: true } });
+
+  const rep = await call('GET', '/api/team-report?sunday=' + TODAY, { token: leaderToken });
+  assert.equal(rep.status, 200);
+  assert.ok(Array.isArray(rep.data.members) && rep.data.members.length >= 3, 'every member is listed');
+  assert.equal(rep.data.members.reduce((a, m) => a + m.prayerMin, 0), 20, 'aggregates prayer minutes for the week');
+  assert.equal(rep.data.members.reduce((a, m) => a + m.wordMin, 0), 15, 'aggregates Word minutes for the week');
+  const david = rep.data.members.find((m) => m.prayerMin === 20);
+  assert.ok(david && david.wordMin === 15 && david.checkedCount >= 1, 'same member carries Word + ministry');
+
+  // Members cannot view the report; bad/missing dates are rejected.
+  assert.equal((await call('GET', '/api/team-report?sunday=' + TODAY, { token: memberTokens[0] })).status, 403);
+  assert.equal((await call('GET', '/api/team-report', { token: leaderToken })).status, 400);
+  assert.equal((await call('GET', '/api/team-report?sunday=nope', { token: leaderToken })).status, 400);
+});
+
 console.log(`\n${passed} tests passed.`);

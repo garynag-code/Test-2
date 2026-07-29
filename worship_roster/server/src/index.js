@@ -75,6 +75,12 @@ function daysAgoISO(n) {
   d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 }
+/** ISO date `n` days before the given YYYY-MM-DD. */
+function daysBeforeISO(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
 
 // ---- Validation (pure) -----------------------------------------------------
 
@@ -500,6 +506,44 @@ async function setFlag(request, env, me) {
   return json({ ok: true });
 }
 
+/** Leader/admin only: per-member progress for the week ending `sunday`.
+ * Returns the raw figures each member accrued this week (prayer/Word minutes,
+ * devotion reads, ministry markers); the client turns these into the same
+ * Spiritual Journey / Ministry Excellence scores members see themselves. Reads
+ * only tables that already exist — no schema change, no new stored data. */
+async function teamReport(env, me, url) {
+  if (!me.isLeader) return err(403, 'Only an admin can view team reports');
+  const sunday = url.searchParams.get('sunday');
+  if (!isDate(sunday)) return err(400, 'A valid ?sunday=YYYY-MM-DD is required');
+  const since = daysBeforeISO(sunday, 6);
+  const t = me.teamId;
+  const [members, logs, flags, devs] = await Promise.all([
+    env.DB.prepare('SELECT id, name, is_leader FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
+    env.DB.prepare('SELECT member_id, kind, SUM(minutes) AS m FROM activity_log WHERE team_id = ? AND date >= ? AND date <= ? GROUP BY member_id, kind').bind(t, since, sunday).all(),
+    env.DB.prepare("SELECT member_id, key FROM member_flags WHERE team_id = ? AND (key LIKE 'read:%' OR key LIKE ?)")
+      .bind(t, `ministry:${sunday}:%`).all(),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM devotionals WHERE team_id = ?').bind(t).first(),
+  ]);
+  const blank = () => ({ prayerMin: 0, wordMin: 0, readCount: 0, checkedCount: 0 });
+  const acc = new Map();
+  const ensure = (id) => { if (!acc.has(id)) acc.set(id, blank()); return acc.get(id); };
+  for (const r of (logs.results || [])) {
+    const o = ensure(r.member_id);
+    if (r.kind === 'prayer') o.prayerMin = r.m || 0;
+    else if (r.kind === 'word') o.wordMin = r.m || 0;
+  }
+  for (const r of (flags.results || [])) {
+    const o = ensure(r.member_id);
+    if (r.key.startsWith('read:')) o.readCount++;
+    else if (r.key.startsWith('ministry:')) o.checkedCount++;
+  }
+  return json({
+    sunday,
+    devTotal: (devs && devs.n) || 0,
+    members: (members.results || []).map((m) => ({ id: m.id, name: m.name, isLeader: !!m.is_leader, ...ensure(m.id) })),
+  });
+}
+
 async function deleteSong(env, me, songId) {
   // Any team member can remove a song (so mistakes can be fixed by anyone).
   await env.DB.batch([
@@ -688,6 +732,7 @@ async function handle(request, env) {
   if (!me) return err(401, 'Authentication required');
 
   if (method === 'GET' && path === '/api/state') return json(await getState(env, me));
+  if (method === 'GET' && path === '/api/team-report') return teamReport(env, me, url);
   if (method === 'PUT' && path === '/api/assignments') return setAssignment(request, env, me);
   if (method === 'PUT' && path.startsWith('/api/members/')) return updateMember(request, env, me, decodeURIComponent(path.slice('/api/members/'.length)));
   if (method === 'POST' && path === '/api/votes') return castVote(request, env, me);
