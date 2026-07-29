@@ -344,9 +344,11 @@ await test('members log prayer/word into their own private journey', async () =>
   // another member's journey is separate
   const st2 = await call('GET', '/api/state', { token: memberTokens[1] });
   assert.equal(st2.data.myLog.length, 0, 'logs are per-member');
-  // validation
+  // validation: 0 is allowed (honest "none today"); junk kind and out-of-range rejected
   assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'nope', minutes: 10 } })).status, 400);
-  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'prayer', minutes: 0 } })).status, 400);
+  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'prayer', minutes: 0 } })).status, 201);
+  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'prayer', minutes: -1 } })).status, 400);
+  assert.equal((await call('POST', '/api/log', { token: leaderToken, body: { kind: 'word', minutes: 601 } })).status, 400);
 });
 
 await test('devotion reads: personal flag + team count, toggle off', async () => {

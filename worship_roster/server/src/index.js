@@ -487,7 +487,7 @@ async function addLog(request, env, me) {
   const kind = body && body.kind;
   const minutes = Math.round(Number(body && body.minutes));
   if (kind !== 'prayer' && kind !== 'word') return err(400, 'Invalid kind');
-  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) return err(400, 'Minutes must be 1–600');
+  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 600) return err(400, 'Minutes must be 0–600');
   await env.DB.prepare('INSERT INTO activity_log (id, team_id, member_id, date, kind, minutes, created_at) VALUES (?,?,?,?,?,?,?)')
     .bind(uid('a'), me.teamId, me.id, daysAgoISO(0), kind, minutes, new Date().toISOString()).run();
   return json({ ok: true }, 201);

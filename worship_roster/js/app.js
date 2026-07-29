@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v10 · 2026-07-29';
+const APP_VERSION = 'v11 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -1461,7 +1461,7 @@ function journey() {
   logCard.appendChild(el(`<div class="card__title">Log today</div>`));
   logCard.appendChild(el(`<div class="card__meta" style="margin:2px 0 8px">Prayer in the Spirit</div>`));
   const prayerRow = el(`<div class="btn-row"></div>`);
-  [10, 20, 30].forEach((min) => {
+  [0, 10, 20, 30].forEach((min) => {
     const btn = el(`<button class="btn btn--sm">🙏 ${min} min</button>`);
     btn.addEventListener('click', async () => { await store.log('prayer', min); render(); toast(`Logged ${min} min of prayer.`); });
     prayerRow.appendChild(btn);
@@ -1469,7 +1469,7 @@ function journey() {
   logCard.appendChild(prayerRow);
   logCard.appendChild(el(`<div class="card__meta" style="margin:12px 0 8px">Listening to / reading the Word</div>`));
   const wordRow = el(`<div class="btn-row"></div>`);
-  [15, 30, 45].forEach((min) => {
+  [0, 15, 30, 45].forEach((min) => {
     const btn = el(`<button class="btn btn--sm">📖 ${min} min</button>`);
     btn.addEventListener('click', async () => { await store.log('word', min); render(); toast(`Logged ${min} min in the Word.`); });
     wordRow.appendChild(btn);
@@ -1661,12 +1661,12 @@ function logCustomModal() {
         <option value="word">📖 The Word</option>
       </select>
       <label class="field" for="lg-min">Minutes</label>
-      <input id="lg-min" type="number" inputmode="numeric" min="1" max="600" placeholder="e.g. 25" />
+      <input id="lg-min" type="number" inputmode="numeric" min="0" max="600" placeholder="e.g. 25" />
     </div>`);
   openModal('Log today', body, () => {
     const kind = body.querySelector('#lg-kind').value;
     const min = Math.round(Number(body.querySelector('#lg-min').value));
-    if (!(min >= 1 && min <= 600)) { toast('Enter minutes between 1 and 600.'); return false; }
+    if (!(min >= 0 && min <= 600)) { toast('Enter minutes between 0 and 600.'); return false; }
     store.log(kind, min).then(() => { render(); toast('Logged.'); });
     return true;
   });
