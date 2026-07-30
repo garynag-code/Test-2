@@ -276,7 +276,7 @@ async function recordActivity(env, me) {
 async function getState(env, me) {
   const t = me.teamId;
   await recordActivity(env, me);           // this call means the member is active today
-  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev, myLog, myFlags, readRows, myActivity] = await Promise.all([
+  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev, myLog, myFlags, readRows] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
     env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
@@ -289,8 +289,14 @@ async function getState(env, me) {
     env.DB.prepare('SELECT date, kind, minutes FROM activity_log WHERE team_id = ? AND member_id = ? AND date >= ? ORDER BY date').bind(t, me.id, daysAgoISO(27)).all(),
     env.DB.prepare('SELECT key FROM member_flags WHERE team_id = ? AND member_id = ?').bind(t, me.id).all(),
     env.DB.prepare("SELECT key, COUNT(*) AS n FROM member_flags WHERE team_id = ? AND key LIKE 'read:%' GROUP BY key").bind(t).all(),
-    env.DB.prepare('SELECT date FROM member_activity WHERE team_id = ? AND member_id = ? AND date >= ?').bind(t, me.id, daysBeforeISO(daysAgoISO(0), 31)).all(),
   ]);
+  // Engagement is best-effort: if the activity table isn't there yet, still serve state.
+  let myActiveDates = [];
+  try {
+    const a = await env.DB.prepare('SELECT date FROM member_activity WHERE team_id = ? AND member_id = ? AND date >= ?')
+      .bind(t, me.id, daysBeforeISO(daysAgoISO(0), 31)).all();
+    myActiveDates = (a.results || []).map((r) => r.date);
+  } catch (_) { /* table may not exist yet */ }
   const readCounts = new Map((readRows.results || []).map((r) => [r.key, r.n]));
   const pdfMap = new Map((pdfs.results || []).map((r) => [r.song_id, r.filename || 'chords.pdf']));
   return {
@@ -317,7 +323,7 @@ async function getState(env, me) {
     })),
     myLog: (myLog.results || []).map((r) => ({ date: r.date, kind: r.kind, minutes: r.minutes })),
     myFlags: (myFlags.results || []).map((r) => r.key),
-    engagement: engagementScore((myActivity.results || []).map((r) => r.date), daysAgoISO(0)),
+    engagement: engagementScore(myActiveDates, daysAgoISO(0)),
   };
 }
 
@@ -564,14 +570,19 @@ async function teamReport(env, me, url) {
   const since = daysBeforeISO(sunday, 6);
   const today = daysAgoISO(0);
   const t = me.teamId;
-  const [members, logs, flags, devs, acts] = await Promise.all([
+  const [members, logs, flags, devs] = await Promise.all([
     env.DB.prepare('SELECT id, name, is_leader FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT member_id, kind, SUM(minutes) AS m FROM activity_log WHERE team_id = ? AND date >= ? AND date <= ? GROUP BY member_id, kind').bind(t, since, sunday).all(),
     env.DB.prepare("SELECT member_id, key FROM member_flags WHERE team_id = ? AND (key LIKE 'read:%' OR key LIKE ?)")
       .bind(t, `ministry:${sunday}:%`).all(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM devotionals WHERE team_id = ?').bind(t).first(),
-    env.DB.prepare('SELECT member_id, date FROM member_activity WHERE team_id = ? AND date >= ?').bind(t, daysBeforeISO(today, 31)).all(),
   ]);
+  // Engagement is best-effort: tolerate the activity table not existing yet.
+  let actRows = [];
+  try {
+    const acts = await env.DB.prepare('SELECT member_id, date FROM member_activity WHERE team_id = ? AND date >= ?').bind(t, daysBeforeISO(today, 31)).all();
+    actRows = acts.results || [];
+  } catch (_) { /* table may not exist yet */ }
   const blank = () => ({ prayerMin: 0, wordMin: 0, readCount: 0, checkedCount: 0 });
   const acc = new Map();
   const ensure = (id) => { if (!acc.has(id)) acc.set(id, blank()); return acc.get(id); };
@@ -586,7 +597,7 @@ async function teamReport(env, me, url) {
     else if (r.key.startsWith('ministry:')) o.checkedCount++;
   }
   const activeDays = new Map();  // member_id -> Set of active dates
-  for (const r of (acts.results || [])) {
+  for (const r of actRows) {
     if (!activeDays.has(r.member_id)) activeDays.set(r.member_id, new Set());
     activeDays.get(r.member_id).add(r.date);
   }

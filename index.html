@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The app lives in /worship_roster/. This root page just forwards there so
+       the short address (…/Test-2/) opens the app instead of a 404, carrying
+       any ?join=CODE invite over. -->
+  <meta http-equiv="refresh" content="0; url=./worship_roster/" />
+  <link rel="canonical" href="./worship_roster/" />
+  <title>Ecclesia Glocal — Worship Team Roster</title>
+  <script>
+    location.replace('./worship_roster/' + location.search + location.hash);
+  </script>
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center;padding:40px">
+  <p>Opening the <a href="./worship_roster/">Ecclesia Glocal Worship Team Roster</a>…</p>
+</body>
+</html>
