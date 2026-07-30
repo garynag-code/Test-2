@@ -415,4 +415,19 @@ await test('leader team report aggregates each member’s week; members are refu
   assert.equal((await call('GET', '/api/team-report?sunday=nope', { token: leaderToken })).status, 400);
 });
 
+// ---- App engagement ---------------------------------------------------------
+await test('app engagement is tracked from app use and reported to leaders', async () => {
+  // memberTokens[0] has called getState during these tests, so they're active today.
+  const st = await call('GET', '/api/state', { token: memberTokens[0] });
+  assert.ok(st.data.engagement, 'own engagement is returned');
+  assert.equal(st.data.engagement.activeToday, true, 'active today after using the app');
+  assert.ok(st.data.engagement.days7 >= 1, 'at least one active day this week');
+
+  const TODAY = new Date().toISOString().slice(0, 10);
+  const rep = await call('GET', '/api/team-report?sunday=' + TODAY, { token: leaderToken });
+  assert.equal(rep.status, 200);
+  assert.ok(rep.data.members.every((m) => m.engagement), 'every member carries an engagement object');
+  assert.ok(rep.data.members.some((m) => m.engagement.activeToday), 'at least one member is active today');
+});
+
 console.log(`\n${passed} tests passed.`);

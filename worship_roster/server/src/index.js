@@ -81,6 +81,27 @@ function daysBeforeISO(iso, n) {
   d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 }
+/** App-engagement score from the days a member was active. Pure/testable.
+ *  daily = active today; weekly = active days in the last 7; monthly = active
+ *  days this month over days elapsed. Each expressed 0..100. */
+function engagementScore(activeDates, today) {
+  const set = activeDates instanceof Set ? activeDates : new Set(activeDates);
+  const weekStart = daysBeforeISO(today, 6);
+  const ym = today.slice(0, 7);
+  const monthElapsed = Number(today.slice(8, 10));
+  let days7 = 0, daysMonth = 0;
+  for (const d of set) {
+    if (d >= weekStart && d <= today) days7++;
+    if (d.slice(0, 7) === ym && d <= today) daysMonth++;
+  }
+  return {
+    activeToday: set.has(today),
+    dailyPct: set.has(today) ? 100 : 0,
+    days7, weeklyPct: Math.round((days7 / 7) * 100),
+    daysMonth, monthElapsed,
+    monthlyPct: Math.round((daysMonth / Math.max(1, monthElapsed)) * 100),
+  };
+}
 
 // ---- Validation (pure) -----------------------------------------------------
 
@@ -240,10 +261,22 @@ async function joinTeam(request, env) {
   return json({ teamId: team.id, teamName: team.name, deviceToken: token, role: 'member' }, 201);
 }
 
+/** Record that a member used the app today (for the engagement score). Failure
+ *  here must never break the app, so it's swallowed. */
+async function recordActivity(env, me) {
+  try {
+    await env.DB.prepare(
+      'INSERT INTO member_activity (team_id, member_id, date, hits, updated_at) VALUES (?,?,?,1,?) ' +
+      'ON CONFLICT(team_id, member_id, date) DO UPDATE SET hits = hits + 1, updated_at = excluded.updated_at'
+    ).bind(me.teamId, me.id, daysAgoISO(0), new Date().toISOString()).run();
+  } catch (_) { /* engagement tracking is best-effort */ }
+}
+
 /** Assemble the full shared state for the caller's team. */
 async function getState(env, me) {
   const t = me.teamId;
-  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev, myLog, myFlags, readRows] = await Promise.all([
+  await recordActivity(env, me);           // this call means the member is active today
+  const [team, members, assigns, voteRows, locks, songs, pdfs, lib, dev, myLog, myFlags, readRows, myActivity] = await Promise.all([
     env.DB.prepare('SELECT name, season_start, season_end FROM teams WHERE id = ?').bind(t).first(),
     env.DB.prepare('SELECT id, name, is_leader, title, positions FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT date, position_id, member_id FROM assignments WHERE team_id = ?').bind(t).all(),
@@ -256,6 +289,7 @@ async function getState(env, me) {
     env.DB.prepare('SELECT date, kind, minutes FROM activity_log WHERE team_id = ? AND member_id = ? AND date >= ? ORDER BY date').bind(t, me.id, daysAgoISO(27)).all(),
     env.DB.prepare('SELECT key FROM member_flags WHERE team_id = ? AND member_id = ?').bind(t, me.id).all(),
     env.DB.prepare("SELECT key, COUNT(*) AS n FROM member_flags WHERE team_id = ? AND key LIKE 'read:%' GROUP BY key").bind(t).all(),
+    env.DB.prepare('SELECT date FROM member_activity WHERE team_id = ? AND member_id = ? AND date >= ?').bind(t, me.id, daysBeforeISO(daysAgoISO(0), 31)).all(),
   ]);
   const readCounts = new Map((readRows.results || []).map((r) => [r.key, r.n]));
   const pdfMap = new Map((pdfs.results || []).map((r) => [r.song_id, r.filename || 'chords.pdf']));
@@ -283,6 +317,7 @@ async function getState(env, me) {
     })),
     myLog: (myLog.results || []).map((r) => ({ date: r.date, kind: r.kind, minutes: r.minutes })),
     myFlags: (myFlags.results || []).map((r) => r.key),
+    engagement: engagementScore((myActivity.results || []).map((r) => r.date), daysAgoISO(0)),
   };
 }
 
@@ -527,13 +562,15 @@ async function teamReport(env, me, url) {
   const sunday = url.searchParams.get('sunday');
   if (!isDate(sunday)) return err(400, 'A valid ?sunday=YYYY-MM-DD is required');
   const since = daysBeforeISO(sunday, 6);
+  const today = daysAgoISO(0);
   const t = me.teamId;
-  const [members, logs, flags, devs] = await Promise.all([
+  const [members, logs, flags, devs, acts] = await Promise.all([
     env.DB.prepare('SELECT id, name, is_leader FROM members WHERE team_id = ? ORDER BY created_at').bind(t).all(),
     env.DB.prepare('SELECT member_id, kind, SUM(minutes) AS m FROM activity_log WHERE team_id = ? AND date >= ? AND date <= ? GROUP BY member_id, kind').bind(t, since, sunday).all(),
     env.DB.prepare("SELECT member_id, key FROM member_flags WHERE team_id = ? AND (key LIKE 'read:%' OR key LIKE ?)")
       .bind(t, `ministry:${sunday}:%`).all(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM devotionals WHERE team_id = ?').bind(t).first(),
+    env.DB.prepare('SELECT member_id, date FROM member_activity WHERE team_id = ? AND date >= ?').bind(t, daysBeforeISO(today, 31)).all(),
   ]);
   const blank = () => ({ prayerMin: 0, wordMin: 0, readCount: 0, checkedCount: 0 });
   const acc = new Map();
@@ -548,10 +585,18 @@ async function teamReport(env, me, url) {
     if (r.key.startsWith('read:')) o.readCount++;
     else if (r.key.startsWith('ministry:')) o.checkedCount++;
   }
+  const activeDays = new Map();  // member_id -> Set of active dates
+  for (const r of (acts.results || [])) {
+    if (!activeDays.has(r.member_id)) activeDays.set(r.member_id, new Set());
+    activeDays.get(r.member_id).add(r.date);
+  }
   return json({
-    sunday,
+    sunday, today,
     devTotal: (devs && devs.n) || 0,
-    members: (members.results || []).map((m) => ({ id: m.id, name: m.name, isLeader: !!m.is_leader, ...ensure(m.id) })),
+    members: (members.results || []).map((m) => ({
+      id: m.id, name: m.name, isLeader: !!m.is_leader, ...ensure(m.id),
+      engagement: engagementScore(activeDays.get(m.id) || new Set(), today),
+    })),
   });
 }
 
@@ -810,5 +855,5 @@ export default {
 export {
   sha256Hex, randomToken, randomInvite, uid, b64url, b64urlToBytes,
   sanitizeName, sanitizeTitle, sanitizePositions, isMonth, isDate, isPositionId, isTypeId,
-  tallyMajority, importVapidKey, vapidJwt, sanitizeUrl,
+  tallyMajority, importVapidKey, vapidJwt, sanitizeUrl, engagementScore,
 };

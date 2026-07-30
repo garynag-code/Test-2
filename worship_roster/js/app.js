@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v17 · 2026-07-29';
+const APP_VERSION = 'v18 · 2026-07-29';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
@@ -726,6 +726,7 @@ function cloudMap(s) {
     devotionals: (s.devotionals || []).map((d) => ({ id: d.id, title: d.title, author: d.author || '', link: d.link || '', scripture: d.scripture || '', application: d.application || '', prayer: d.prayer || '', date: d.date || '', reads: d.reads || 0 })),
     myLog: (s.myLog || []).map((x) => ({ date: x.date, kind: x.kind, minutes: x.minutes })),
     myFlags: (s.myFlags || []).slice(),
+    engagement: s.engagement || null,
     notifyEnabled: localStorage.getItem('worship-roster-notify') === '1',
     team: s.team,
     cloud: true,
@@ -1456,6 +1457,16 @@ function journey() {
   view.appendChild(el(`<h2 class="section-title">📈 My Journey</h2>`));
   view.appendChild(el(`<p class="section-sub">${esc(me ? me.name : 'You')} — your personal growth this week. Logging is on your honour before God. Your worship leaders can see a weekly summary of your Journey and Ministry — your prayer and Word time, devotions read and ministry check-ins — so they can encourage you and pray for you.</p>`));
 
+  // App engagement — how consistently you're showing up in the app.
+  if (state.engagement) {
+    const e = state.engagement;
+    const ec = el(`<div class="card"></div>`);
+    ec.appendChild(el(`<div class="card__head"><span class="card__title">📱 App Engagement</span><span class="badge ${e.activeToday ? 'badge--ok' : 'badge--muted'}">${e.activeToday ? 'Active today' : 'Not yet today'}</span></div>`));
+    ec.appendChild(meter('This week', `${e.days7} / 7 days`, e.weeklyPct / 100));
+    ec.appendChild(meter('This month', `${e.daysMonth} / ${e.monthElapsed} days`, e.monthlyPct / 100));
+    view.appendChild(ec);
+  }
+
   // Your Spiritual Journey
   const sj = el(`<div class="card"></div>`);
   const r1 = ratingFor(k.spiritual);
@@ -1599,7 +1610,7 @@ function homeReviewBanner(kind) {
 function reports() {
   view.appendChild(el(`<h2 class="section-title">📋 Team Reports</h2>`));
   if (!isLeader()) { view.appendChild(el(`<div class="empty"><div class="empty__icon">🔒</div>This dashboard is for team leaders.</div>`)); return; }
-  view.appendChild(el(`<p class="section-sub">How the team is progressing this week — Spiritual Journey and Ministry Excellence. Private to leaders, for encouragement and pastoral care.</p>`));
+  view.appendChild(el(`<p class="section-sub">How the team is engaging and growing — app engagement (daily, weekly, monthly), Spiritual Journey and Ministry Excellence. Private to leaders, for encouragement and pastoral care.</p>`));
   if (!CLOUD) {
     view.appendChild(el(`<div class="card"><div class="card__meta">Team reports need the shared online backend so each member’s progress can sync. They’ll populate here once your team is on the cloud version.</div></div>`));
     return;
@@ -1628,6 +1639,15 @@ function renderTeamReport(slot, rep) {
   sum.appendChild(meter('📈 Spiritual journey (team avg)', `${avg((r) => r.s.spiritual)} / 100`, avg((r) => r.s.spiritual) / 100));
   sum.appendChild(meter('⭐ Ministry excellence (team avg)', `${avg((r) => r.s.ministry)} / 100`, avg((r) => r.s.ministry) / 100));
   slot.appendChild(sum);
+
+  // App engagement — daily / weekly / monthly
+  const engPct = (sel) => avg((r) => (r.engagement ? sel(r.engagement) : 0));
+  const activeToday = rows.filter((r) => r.engagement && r.engagement.activeToday).length;
+  const eng = el(`<div class="card"></div>`);
+  eng.appendChild(el(`<div class="card__head"><span class="card__title">📱 App engagement</span><span class="badge ${n && activeToday === n ? 'badge--ok' : 'badge--muted'}">${activeToday}/${n} active today</span></div>`));
+  eng.appendChild(meter('This week (avg active days)', `${engPct((e) => e.weeklyPct)}%`, engPct((e) => e.weeklyPct) / 100));
+  eng.appendChild(meter('This month (avg active days)', `${engPct((e) => e.monthlyPct)}%`, engPct((e) => e.monthlyPct) / 100));
+  slot.appendChild(eng);
 
   // Needs encouragement
   const low = rows.filter((r) => r.s.empty || r.s.overall < 40).sort((a, b) => a.s.overall - b.s.overall);
@@ -1660,6 +1680,10 @@ function memberReportRow(r, devTotal) {
   </div>`));
   const devTarget = Math.max(1, Math.min(devTotal || KPI.devotionTarget, KPI.devotionTarget));
   wrap.appendChild(el(`<div class="card__meta" style="margin-top:4px">🙏 ${r.prayerMin}/${KPI.prayerWeekTarget}m · 📖 ${r.wordMin}/${KPI.wordWeekTarget}m · 🕮 ${r.readCount}/${devTarget} · ⭐ ${r.checkedCount}/${MINISTRY_MARKERS.length}</div>`));
+  if (r.engagement) {
+    const e = r.engagement;
+    wrap.appendChild(el(`<div class="card__meta" style="margin-top:2px">📱 ${e.activeToday ? 'active today · ' : ''}${e.days7}/7 this week · ${e.daysMonth}/${e.monthElapsed} this month</div>`));
+  }
   return wrap;
 }
 

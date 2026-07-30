@@ -108,6 +108,17 @@ CREATE TABLE IF NOT EXISTS activity_log (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_member ON activity_log(team_id, member_id);
 
+-- Daily app engagement: one row per member per day they open/use the app.
+CREATE TABLE IF NOT EXISTS member_activity (
+  team_id    TEXT NOT NULL,
+  member_id  TEXT NOT NULL,
+  date       TEXT NOT NULL,               -- YYYY-MM-DD (UTC)
+  hits       INTEGER NOT NULL DEFAULT 0,  -- times active that day
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (team_id, member_id, date)
+);
+CREATE INDEX IF NOT EXISTS idx_member_activity ON member_activity(team_id, date);
+
 -- Per-member boolean flags: devotion reads ("read:<id>") and weekly ministry
 -- check-ins ("ministry:<sunday>:<marker>"). Presence = true.
 CREATE TABLE IF NOT EXISTS member_flags (
