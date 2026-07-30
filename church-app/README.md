@@ -1,4 +1,6 @@
-# Church Management — Zero-Cost PWA
+# Ecclesia Glocal Church Family Connect — Zero-Cost PWA
+
+*Forming Christ, Driving Change.*
 
 A modern, installable **Progressive Web App** for church operations. Runs on
 **Android and iOS** (and desktop) from one codebase, with **no app-store fees,

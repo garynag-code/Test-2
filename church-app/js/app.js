@@ -23,8 +23,8 @@ function authScreen() {
   $("#root").innerHTML = `
     <div class="auth-wrap">
       <div class="auth-hero">
-        <img class="logo" src="./icons/icon.svg" alt="">
-        <h1>Church Management</h1>
+        <img src="./icons/logo.jpg" alt="Ecclesia Glocal Church" style="width:280px;max-width:82%;height:auto">
+        <h1 style="font-size:18px;margin:8px 0 2px">Family Connect</h1>
         <small class="hint">${isSyncEnabled() ? "Synced across your church" : "Running free · local mode"}</small>
       </div>
       <div class="tabs">
@@ -101,7 +101,7 @@ function shell(inner) {
   $("#root").innerHTML = `
     <div class="topbar">
       <img class="logo" src="./icons/icon.svg" alt="">
-      <div><h1>Church Management</h1></div>
+      <div><h1>EGC Family Connect</h1></div>
       <div class="who">${esc(u.name)} ${esc(u.surname)}<br><span class="badge">${esc(roleName(u.role))}</span></div>
     </div>
     <div class="app"><div class="view" id="view">${inner}</div></div>
