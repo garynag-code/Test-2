@@ -1,0 +1,19 @@
+{
+  "name": "Church Management",
+  "short_name": "Church",
+  "description": "Zero-cost church management PWA: domains, cells, connect groups, prayer and testimonies.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E1230",
+  "theme_color": "#1A1F71",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
