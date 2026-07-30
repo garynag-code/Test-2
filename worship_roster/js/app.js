@@ -23,7 +23,7 @@
 
 // Build stamp — shown in the header so you can confirm the phone loaded the
 // latest version (rather than an old cached one). Bump on notable changes.
-const APP_VERSION = 'v19 · 2026-07-30';
+const APP_VERSION = 'v20 · 2026-07-30';
 
 // The roster season, per the brief: July 2 – December 31, 2026.
 const SEASON = {
