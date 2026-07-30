@@ -346,6 +346,15 @@ await test('a devotional requires a title', async () => {
   assert.equal((await call('POST', '/api/devotionals', { token: leaderToken, body: { prayer: 'no title' } })).status, 400);
 });
 
+await test('a devotional with a long (>60 char) title still saves', async () => {
+  const title = 'Trusting God When Life Gets Hard: Lessons on Faith, Patience and Perseverance';
+  assert.ok(title.length > 60);
+  const add = await call('POST', '/api/devotionals', { token: memberTokens[0], body: { title, application: 'Live it out.' } });
+  assert.equal(add.status, 201, 'long title accepted');
+  const st = await call('GET', '/api/state', { token: leaderToken });
+  assert.equal(st.data.devotionals.find((x) => x.id === add.data.id).title, title, 'full title stored');
+});
+
 // ---- Spiritual journey: logs, flags, read counts ---------------------------
 await test('members log prayer/word into their own private journey', async () => {
   assert.equal((await call('POST', '/api/log', { token: memberTokens[0], body: { kind: 'prayer', minutes: 20 } })).status, 201);

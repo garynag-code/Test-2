@@ -96,6 +96,14 @@ function sanitizeName(v) {
   const t = v.replace(/[\x00-\x1F\x7F]/g, '').replace(/\s+/g, ' ').trim();
   return t.length >= 1 && t.length <= 60 ? t : null;
 }
+/** A user-entered title (song, devotional, library). Same cleaning as a name
+ * but with room for a full phrase — a name's 60-char cap was silently
+ * rejecting longer titles. Returns null only when empty. */
+function sanitizeTitle(v, max = 200) {
+  if (typeof v !== 'string') return null;
+  const t = v.replace(/[\x00-\x1F\x7F]/g, '').replace(/\s+/g, ' ').trim();
+  return t.length >= 1 ? t.slice(0, max) : null;
+}
 function sanitizePositions(v) {
   if (!Array.isArray(v)) return [];
   return [...new Set(v.filter(isPositionId))];
@@ -378,7 +386,7 @@ async function addSong(request, env, me) {
   // Any team member can post songs. `month` holds the service date (a Sunday);
   // song lists are per-week.
   const body = await readJson(request);
-  const title = sanitizeName(body && body.title);
+  const title = sanitizeTitle(body && body.title);
   if (!isDate(body && body.month) || !title) return err(400, 'Invalid song');
   const key = typeof (body && body.key) === 'string' ? body.key.slice(0, 12).trim() : '';
   const link = sanitizeUrl(body && body.link);
@@ -394,7 +402,7 @@ async function editSong(request, env, me, songId) {
   if (!song) return err(404, 'Song not found');
   const body = await readJson(request);
   const sets = [], vals = [];
-  if (typeof body.title === 'string') { const t = sanitizeName(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
+  if (typeof body.title === 'string') { const t = sanitizeTitle(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
   if ('key' in body) { sets.push('key_sig = ?'); vals.push(typeof body.key === 'string' ? body.key.slice(0, 12).trim() : ''); }
   if ('link' in body) { sets.push('link = ?'); vals.push(sanitizeUrl(body.link)); }
   if (!sets.length) return err(400, 'Nothing to update');
@@ -407,7 +415,7 @@ async function editSong(request, env, me, songId) {
 
 function libraryFields(body) {
   return {
-    title: sanitizeName(body && body.title),
+    title: sanitizeTitle(body && body.title),
     artist: sanitizeText(body && body.artist, 80).trim(),
     lyrics: sanitizeText(body && body.lyrics, 20000),
     chords: sanitizeText(body && body.chords, 20000),
@@ -429,7 +437,7 @@ async function updateLibrarySong(request, env, me, id) {
   if (!row) return err(404, 'Library song not found');
   const body = await readJson(request, LIB_BODY_BYTES);
   const sets = [], vals = [];
-  if (typeof body.title === 'string') { const t = sanitizeName(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
+  if (typeof body.title === 'string') { const t = sanitizeTitle(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
   if ('artist' in body) { sets.push('artist = ?'); vals.push(sanitizeText(body.artist, 80).trim()); }
   if ('lyrics' in body) { sets.push('lyrics = ?'); vals.push(sanitizeText(body.lyrics, 20000)); }
   if ('chords' in body) { sets.push('chords = ?'); vals.push(sanitizeText(body.chords, 20000)); }
@@ -449,7 +457,7 @@ async function deleteLibrarySong(env, me, id) {
 
 async function addDevotional(request, env, me) {
   const body = await readJson(request, LIB_BODY_BYTES);
-  const title = sanitizeName(body && body.title);
+  const title = sanitizeTitle(body && body.title);
   if (!title) return err(400, 'Title is required');
   const id = uid('d');
   await env.DB.prepare('INSERT INTO devotionals (id, team_id, title, author, link, scripture, application, prayer, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
@@ -464,7 +472,7 @@ async function updateDevotional(request, env, me, id) {
   if (!row) return err(404, 'Devotional not found');
   const body = await readJson(request, LIB_BODY_BYTES);
   const sets = [], vals = [];
-  if (typeof body.title === 'string') { const t = sanitizeName(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
+  if (typeof body.title === 'string') { const t = sanitizeTitle(body.title); if (!t) return err(400, 'Invalid title'); sets.push('title = ?'); vals.push(t); }
   if ('link' in body) { sets.push('link = ?'); vals.push(sanitizeUrl(body.link)); }
   if ('scripture' in body) { sets.push('scripture = ?'); vals.push(sanitizeText(body.scripture, 4000)); }
   if ('application' in body) { sets.push('application = ?'); vals.push(sanitizeText(body.application, 20000)); }
@@ -801,6 +809,6 @@ export default {
 // ---- Exports for unit testing (pure/security-critical helpers) -------------
 export {
   sha256Hex, randomToken, randomInvite, uid, b64url, b64urlToBytes,
-  sanitizeName, sanitizePositions, isMonth, isDate, isPositionId, isTypeId,
+  sanitizeName, sanitizeTitle, sanitizePositions, isMonth, isDate, isPositionId, isTypeId,
   tallyMajority, importVapidKey, vapidJwt, sanitizeUrl,
 };
