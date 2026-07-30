@@ -1,0 +1,51 @@
+name: Deploy Church PWA to GitHub Pages
+
+# Publishes the church-app/ folder to GitHub Pages for free.
+# One-time setup: repo Settings → Pages → Build and deployment →
+#   Source: "GitHub Actions". Then this workflow serves the app at
+#   https://<owner>.github.io/<repo>/
+#
+# Runs on pushes that touch the app on either the feature branch or the
+# default branch, and can also be triggered manually.
+
+on:
+  push:
+    branches:
+      - claude/church-management-app-design-yz6958
+      - claude/chatgpt-export-cloud-import-aur6sf
+    paths:
+      - "church-app/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; newer runs cancel in-progress ones.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload app as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: church-app
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
