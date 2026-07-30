@@ -1,13 +1,13 @@
 {
-  "name": "Church Management",
-  "short_name": "Church",
-  "description": "Zero-cost church management PWA: domains, cells, connect groups, prayer and testimonies.",
+  "name": "Ecclesia Glocal Church Family Connect",
+  "short_name": "EGC Connect",
+  "description": "Ecclesia Glocal Church Family Connect: domains, cells, connect groups, prayer and testimonies.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0E1230",
-  "theme_color": "#1A1F71",
+  "theme_color": "#2B2D8E",
   "icons": [
     {
       "src": "./icons/icon.svg",

@@ -1,11 +1,12 @@
 // Offline-first caching for the PWA shell. Free, no backend required.
-const CACHE = "church-v1";
+const CACHE = "egc-connect-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./css/styles.css",
   "./manifest.json",
   "./icons/icon.svg",
+  "./icons/logo.jpg",
   "./js/app.js",
   "./js/auth.js",
   "./js/db.js",
