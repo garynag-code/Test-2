@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 330" role="img" aria-label="Ecclesia Glocal Church">
+  <defs>
+    <clipPath id="globe"><circle cx="410" cy="96" r="40"/></clipPath>
+  </defs>
+  <!-- people crown -->
+  <g>
+    <g transform="rotate(-72.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(-54.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(-36.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(-18.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(0.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(18.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(36.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(54.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+    <g transform="rotate(72.0 410 96)"><circle cx="410" cy="50" r="5.2" fill="#232a8f"/><path d="M410,55 C403,64 405,75 410,78 C415,75 417,64 410,55 Z" fill="#232a8f"/></g>
+  </g>
+  <!-- globe -->
+  <circle cx="410" cy="96" r="40" fill="#ffffff" stroke="#3746b8" stroke-width="3"/>
+  <g clip-path="url(#globe)" stroke="#3746b8" stroke-width="2.4" fill="none">
+    <ellipse cx="410" cy="96" rx="14" ry="40"/>
+    <ellipse cx="410" cy="96" rx="28" ry="40"/>
+    <line x1="370" y1="96" x2="450" y2="96"/>
+    <line x1="370" y1="76" x2="450" y2="76"/>
+    <line x1="370" y1="116" x2="450" y2="116"/>
+  </g>
+  <!-- swoosh -->
+  <path d="M356,120 Q410,150 470,104" fill="none" stroke="#232a8f" stroke-width="6" stroke-linecap="round"/>
+  <!-- wordmark (textLength keeps it inside the frame on any device/font) -->
+  <text x="410" y="236" text-anchor="middle" font-family="'Trebuchet MS','Segoe UI',Arial,sans-serif"
+        font-weight="700" font-size="46" fill="#232a8f"
+        textLength="720" lengthAdjust="spacingAndGlyphs">ECCLESIA GLOCAL CHURCH</text>
+  <!-- tagline -->
+  <text x="410" y="284" text-anchor="middle" font-family="Georgia,'Times New Roman',serif"
+        font-style="italic" font-size="30" fill="#232a8f"
+        textLength="360" lengthAdjust="spacingAndGlyphs">Forming Christ, Driving Change</text>
+</svg>

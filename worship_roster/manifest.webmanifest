@@ -1,0 +1,16 @@
+{
+  "name": "Ecclesia Glocal Church — Worship Team Roster",
+  "short_name": "Ecclesia Glocal",
+  "description": "Ecclesia Glocal Church worship team roster: schedule practices by majority vote, post song lists with chords, and send reminders.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#232a8f",
+  "theme_color": "#232a8f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

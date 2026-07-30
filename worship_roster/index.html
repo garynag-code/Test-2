@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Content-Security-Policy: no third-party code, no inline scripts. Blocks
+       injected/remote script execution — the main lever against XSS on a
+       static host. Header-only directives (frame-ancestors, X-Content-Type-
+       Options) are documented in SECURITY.md for when a real host serves this. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; font-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#232a8f" />
+  <meta name="description" content="Mobile-friendly worship team roster, practice scheduling by majority vote, song lists, chords and reminders." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ecclesia Glocal" />
+  <title>Ecclesia Glocal — Worship Team Roster</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <div class="app-header__left">
+        <div class="app-header__logo" aria-hidden="true">✝</div>
+        <div class="app-header__brand">
+          <h1 class="app-header__title">Ecclesia Glocal Church</h1>
+          <p class="app-header__subtitle">Worship Team Roster</p>
+        </div>
+      </div>
+      <div class="app-header__user">
+        <label for="current-user" class="visually-hidden">You are</label>
+        <select id="current-user" class="user-select" aria-label="Sign in as team member"></select>
+      </div>
+    </div>
+    <p class="app-header__season" id="season-label"></p>
+  </header>
+
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <nav class="tabbar" aria-label="Primary">
+    <button class="tabbar__btn" data-tab="home" aria-current="true">
+      <span class="tabbar__icon">🏠</span><span class="tabbar__label">Home</span>
+    </button>
+    <button class="tabbar__btn" data-tab="roster">
+      <span class="tabbar__icon">📅</span><span class="tabbar__label">Roster</span>
+    </button>
+    <button class="tabbar__btn" data-tab="voting">
+      <span class="tabbar__icon">🗳️</span><span class="tabbar__label">Practices</span>
+    </button>
+    <button class="tabbar__btn" data-tab="songs">
+      <span class="tabbar__icon">🎸</span><span class="tabbar__label">Songs</span>
+    </button>
+    <button class="tabbar__btn" data-tab="library">
+      <span class="tabbar__icon">📚</span><span class="tabbar__label">Library</span>
+    </button>
+    <button class="tabbar__btn" data-tab="devotions">
+      <span class="tabbar__icon">🙏</span><span class="tabbar__label">Devos</span>
+    </button>
+    <button class="tabbar__btn" data-tab="journey">
+      <span class="tabbar__icon">📈</span><span class="tabbar__label">Journey</span>
+    </button>
+    <button class="tabbar__btn" data-tab="growth">
+      <span class="tabbar__icon">📊</span><span class="tabbar__label">Review</span>
+    </button>
+    <button class="tabbar__btn" data-tab="reports">
+      <span class="tabbar__icon">📋</span><span class="tabbar__label">Reports</span>
+    </button>
+    <button class="tabbar__btn" data-tab="reminders">
+      <span class="tabbar__icon">🔔</span><span class="tabbar__label">Reminders</span>
+    </button>
+    <button class="tabbar__btn" data-tab="team">
+      <span class="tabbar__icon">👥</span><span class="tabbar__label">Team</span>
+    </button>
+  </nav>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

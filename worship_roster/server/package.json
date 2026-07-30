@@ -1,0 +1,16 @@
+{
+  "name": "worship-roster-api",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker API for the Worship Team Roster (shared roster, majority-vote practices, Web Push reminders).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/unit.mjs && node --experimental-sqlite test/integration.mjs && node --experimental-sqlite test/client.mjs",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute worship-roster --remote --file=./schema.sql",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0"
+  }
+}

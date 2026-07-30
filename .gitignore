@@ -14,3 +14,10 @@ upload-*.json
 # ChatGPT export archives (may contain private data)
 *.zip
 conversations.json
+
+# Node / Cloudflare Worker (worship_roster/server)
+node_modules/
+.wrangler/
+# Never commit secrets (VAPID private key, etc.)
+.dev.vars
+*.local
