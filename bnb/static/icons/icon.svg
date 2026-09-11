@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Perch">
+  <rect width="64" height="64" rx="14" fill="#1f5f4f"/>
+  <g fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round">
+    <rect x="14" y="18" width="36" height="30" rx="4"/>
+    <path d="M14 27h36M23 14v7M41 14v7"/>
+  </g>
+  <circle cx="32" cy="38" r="5.5" fill="#ffffff"/>
+</svg>

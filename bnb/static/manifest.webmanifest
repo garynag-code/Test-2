@@ -1,0 +1,21 @@
+{
+  "name": "Perch — booking manager",
+  "short_name": "Perch",
+  "description": "One calendar for every platform your rooms are sold on.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fbfaf8",
+  "theme_color": "#1f5f4f",
+  "dir": "auto",
+  "categories": ["business", "productivity", "travel"],
+  "icons": [
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/static/icons/maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today", "url": "/?view=today" },
+    { "name": "Clashes", "url": "/?view=conflicts" }
+  ]
+}

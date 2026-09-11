@@ -14,3 +14,10 @@ upload-*.json
 # ChatGPT export archives (may contain private data)
 *.zip
 conversations.json
+
+# Perch booking ledgers — these hold real guest names, emails and phone
+# numbers, so they must never be committed.
+perch.db
+*.db
+*.db-wal
+*.db-shm

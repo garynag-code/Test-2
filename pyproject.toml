@@ -14,11 +14,18 @@ dependencies = []
 [project.optional-dependencies]
 # The web portal (the CLI needs no third-party packages at all).
 web = ["Flask>=2.3.0"]
+# Perch, the bed & breakfast booking manager, needs Flask to serve its app.
+bnb = ["Flask>=2.3.0"]
 dev = ["pytest>=7.0", "Flask>=2.3.0"]
 
 [project.scripts]
 chatgpt-export = "chatgpt_export.cli:main"
 chatgpt-export-portal = "chatgpt_export.web:main"
+perch = "bnb.web:main"
 
 [tool.setuptools]
-packages = ["chatgpt_export"]
+packages = ["chatgpt_export", "bnb"]
+
+[tool.setuptools.package-data]
+# The progressive web app is shipped inside the package, not built.
+bnb = ["static/*", "static/*/*"]

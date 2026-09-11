@@ -1,0 +1,10 @@
+<!-- Maskable icon: the artwork sits inside the 40% safe zone so Android can
+     crop it to a circle, squircle or rounded square without clipping it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Perch">
+  <rect width="64" height="64" fill="#1f5f4f"/>
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round">
+    <rect x="20" y="22" width="24" height="20" rx="3"/>
+    <path d="M20 28h24"/>
+  </g>
+  <circle cx="32" cy="35.5" r="3.6" fill="#ffffff"/>
+</svg>
