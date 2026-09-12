@@ -1,0 +1,384 @@
+/* Perch — interface styles.
+ *
+ * Two rules shape everything here:
+ *
+ * 1. Logical properties only (inline-start, not left).  Setting dir="rtl" on
+ *    <html> then flips the entire layout for Arabic and Hebrew with no
+ *    separate stylesheet and no mirrored one-offs.
+ * 2. Never colour alone.  Every availability state carries a letter, a border
+ *    treatment and an aria-label as well as a fill, so the grid is readable to
+ *    someone with deuteranopia, on a sun-bleached phone in a hallway, or
+ *    through a screen reader.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunk: #f2efea;
+  --ink: #1d1b18;
+  --ink-soft: #55504a;
+  --line: #ddd7ce;
+  --accent: #1f5f4f;
+  --accent-ink: #ffffff;
+  --focus: #0b6bcb;
+
+  /* State fills are chosen for >=4.5:1 against their own text, and to stay
+     distinguishable under the common colour-vision deficiencies. */
+  --open: #ffffff;
+  --open-ink: #55504a;
+  --sold: #1f5f4f;
+  --sold-ink: #ffffff;
+  --held: #8a5a00;
+  --held-ink: #ffffff;
+  --closed: #5b5550;
+  --closed-ink: #ffffff;
+  --danger: #a3231b;
+  --danger-bg: #fdece9;
+  --warn: #8a5a00;
+  --warn-bg: #fdf4e3;
+  --ok: #1f5f4f;
+  --ok-bg: #e7f2ee;
+
+  --radius: 10px;
+  --tap: 44px;               /* WCAG 2.2 target size, not negotiable */
+  --gap: 12px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans",
+          "Noto Sans Arabic", "Noto Sans Hebrew", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161513;
+    --surface: #201f1c;
+    --surface-sunk: #2a2825;
+    --ink: #f2efea;
+    --ink-soft: #b5aea6;
+    --line: #3b3833;
+    --accent: #6fcbb0;
+    --accent-ink: #10221d;
+    --focus: #7db8ff;
+    --open: #201f1c;
+    --open-ink: #b5aea6;
+    --sold: #6fcbb0;
+    --sold-ink: #10221d;
+    --held: #e0a63c;
+    --held-ink: #241a05;
+    --closed: #8b847c;
+    --closed-ink: #1a1917;
+    --danger: #ff9b90;
+    --danger-bg: #3a1a16;
+    --warn: #e0a63c;
+    --warn-bg: #33260d;
+    --ok: #6fcbb0;
+    --ok-bg: #12291f;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Any element given an explicit `display` outranks the browser's built-in
+   [hidden] rule, so `el.hidden = true` silently fails on the header and the
+   tab bar. This puts it back. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 16px;            /* never below 16px: iOS zooms smaller inputs */
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* A single, visible focus treatment everywhere — keyboard users must always
+   be able to see where they are. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  inset-block-start: -100px;
+  inset-inline-start: var(--gap);
+  z-index: 100;
+  padding: 12px 16px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 0 0 var(--radius) var(--radius);
+  text-decoration: none;
+}
+.skip-link:focus { inset-block-start: 0; }
+
+/* ---------------------------------------------------------------- header */
+
+header.app {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  padding: 12px max(16px, env(safe-area-inset-left));
+  background: var(--surface);
+  border-block-end: 1px solid var(--line);
+}
+
+.brand { font-weight: 700; font-size: 1.1rem; margin: 0; }
+.brand small { display: block; font-weight: 400; font-size: .8rem; color: var(--ink-soft); }
+.header-actions { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ------------------------------------------------------------------- nav */
+
+nav.tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 8px max(16px, env(safe-area-inset-left));
+  background: var(--surface);
+  border-block-end: 1px solid var(--line);
+  scrollbar-width: thin;
+}
+
+nav.tabs button {
+  min-height: var(--tap);
+  padding-inline: 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+nav.tabs button:hover { background: var(--surface-sunk); }
+nav.tabs button[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+nav.tabs .badge {
+  display: inline-block;
+  min-width: 22px;
+  margin-inline-start: 6px;
+  padding-inline: 6px;
+  border-radius: 11px;
+  background: var(--danger);
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ main */
+
+main {
+  padding: var(--gap) max(16px, env(safe-area-inset-left)) 96px;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+h2 { font-size: 1.15rem; margin-block: 4px 12px; }
+h3 { font-size: 1rem; margin-block: 16px 8px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-block-end: var(--gap);
+}
+
+.muted { color: var(--ink-soft); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stack > * + * { margin-block-start: 8px; }
+
+button.primary, button.ghost, .linkish {
+  min-height: var(--tap);
+  padding-inline: 16px;
+  border-radius: var(--radius);
+  font: inherit;
+  cursor: pointer;
+}
+button.primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); font-weight: 600; }
+button.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+button[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* --------------------------------------------------------- the calendar */
+
+.grid-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+table.calendar { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+
+table.calendar th, table.calendar td { padding: 0; margin: 0; }
+
+table.calendar th[scope="col"] {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  min-width: 46px;
+  padding: 6px 4px;
+  background: var(--surface-sunk);
+  border-block-end: 1px solid var(--line);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: center;
+}
+table.calendar th[scope="col"] .dow { display: block; font-weight: 400; font-size: .68rem; }
+table.calendar th[scope="col"].is-weekend { background: var(--bg); }
+table.calendar th[scope="col"].is-today { color: var(--accent); text-decoration: underline; }
+
+table.calendar th[scope="row"] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  min-width: 128px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-inline-end: 1px solid var(--line);
+  border-block-end: 1px solid var(--line);
+  text-align: start;
+  font-size: .85rem;
+  font-weight: 600;
+}
+table.calendar th[scope="row"] small { display: block; font-weight: 400; color: var(--ink-soft); }
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 46px;
+  height: var(--tap);
+  border: 0;
+  border-inline-end: 1px solid var(--line);
+  border-block-end: 1px solid var(--line);
+  background: var(--open);
+  color: var(--open-ink);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cell[data-state="sold"]   { background: var(--sold);   color: var(--sold-ink); }
+.cell[data-state="held"]   { background: var(--held);   color: var(--held-ink); }
+/* Off-sale nights are striped as well as filled: the reason an owner most
+   needs to notice is also the one they are least expecting. */
+.cell[data-state="closed"] {
+  background: repeating-linear-gradient(
+    45deg, var(--closed), var(--closed) 5px, transparent 5px, transparent 10px
+  ), var(--closed);
+  color: var(--closed-ink);
+}
+.cell[data-arrival="true"] { border-inline-start: 4px solid var(--ink); }
+.cell.is-conflict { box-shadow: inset 0 0 0 3px var(--danger); }
+
+@media (prefers-contrast: more) {
+  .cell { border: 1px solid var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-block-start: 10px; font-size: .85rem; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+.swatch[data-state="sold"] { background: var(--sold); }
+.swatch[data-state="held"] { background: var(--held); }
+.swatch[data-state="closed"] { background: repeating-linear-gradient(45deg, var(--closed), var(--closed) 4px, transparent 4px, transparent 8px), var(--closed); }
+.swatch[data-state="open"] { background: var(--open); }
+
+/* ------------------------------------------------------------ list view */
+
+ul.stays { list-style: none; padding: 0; margin: 0; }
+ul.stays li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 12px 4px;
+  border-block-end: 1px solid var(--line);
+}
+ul.stays .who { font-weight: 600; flex: 1 1 180px; }
+ul.stays .when, ul.stays .where { color: var(--ink-soft); font-size: .9rem; }
+
+/* --------------------------------------------------------------- alerts */
+
+.notice { border-radius: var(--radius); padding: 12px 14px; margin-block-end: var(--gap); border: 1px solid; }
+.notice.warn   { background: var(--warn-bg);   border-color: var(--warn);   color: var(--ink); }
+.notice.danger { background: var(--danger-bg); border-color: var(--danger); color: var(--ink); }
+.notice.ok     { background: var(--ok-bg);     border-color: var(--ok);     color: var(--ink); }
+
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; border: 1px solid; }
+.pill.ok      { background: var(--ok-bg);     border-color: var(--ok);     color: var(--ink); }
+.pill.warn    { background: var(--warn-bg);   border-color: var(--warn);   color: var(--ink); }
+.pill.danger  { background: var(--danger-bg); border-color: var(--danger); color: var(--ink); }
+.pill.neutral { background: var(--surface-sunk); border-color: var(--line); color: var(--ink-soft); }
+
+/* ----------------------------------------------------------------- form */
+
+form.booking { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+form.booking .full { grid-column: 1 / -1; }
+label { display: block; font-size: .88rem; font-weight: 600; margin-block-end: 4px; }
+input, select, textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+textarea { min-height: 80px; }
+.field-error { color: var(--danger); font-size: .85rem; margin-block-start: 4px; }
+
+/* --------------------------------------------------------------- stats */
+
+.stats { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.stat .value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.stat .label { font-size: .85rem; color: var(--ink-soft); }
+
+table.plain { width: 100%; border-collapse: collapse; }
+table.plain th, table.plain td { text-align: start; padding: 8px; border-block-end: 1px solid var(--line); }
+
+/* ------------------------------------------------------ offline banner */
+
+#offline-banner { display: none; }
+body.is-offline #offline-banner { display: block; }
+
+/* Announce-only text, for the live region and for labels a sighted user gets
+   from layout but a screen-reader user does not. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  main { padding-inline: 12px; }
+  .brand small { display: none; }
+  table.calendar th[scope="row"] { min-width: 104px; font-size: .8rem; }
+}
+
+/* ------------------------------------------------------------ sign-in */
+
+.signin {
+  max-width: 380px;
+  margin-block: 12vh;
+  margin-inline: auto;
+}
+.signin h2 { margin-block-start: 0; }
+.signin form { margin-block-start: 16px; }
+.signin .row { margin-block-start: 8px; }
+#signin-switch { padding-inline: 8px; border: 0; background: none; color: var(--accent);
+                 text-decoration: underline; }

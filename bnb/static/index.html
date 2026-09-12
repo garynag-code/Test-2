@@ -1,0 +1,123 @@
+<!doctype html>
+<!-- lang and dir are set from the property's locale at boot; the values here
+     are only what a viewer sees during the first paint. -->
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f5f4f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="One calendar for every platform your rooms are sold on.">
+  <title>Perch</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon.svg">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="app" id="app-header" hidden>
+    <h1 class="brand">
+      <span id="property-name">Perch</span>
+      <small id="property-meta"></small>
+    </h1>
+    <div class="header-actions">
+      <select id="language"></select>
+      <button type="button" id="sync" class="primary">↻</button>
+      <button type="button" id="signout" class="ghost" hidden></button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections" hidden></nav>
+
+  <!-- Sign-in. Hidden entirely in local mode, where the app is reachable only
+       from the computer it runs on and there is nobody to tell apart. -->
+  <main id="signin-screen" hidden>
+    <section class="card signin">
+      <h2 id="signin-title">Sign in</h2>
+      <p class="muted" id="signin-intro"></p>
+      <form id="signin-form" class="stack">
+        <div>
+          <label for="s-email" id="s-email-label">Email</label>
+          <input id="s-email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div>
+          <label for="s-password" id="s-password-label">Password</label>
+          <input id="s-password" name="password" type="password"
+                 autocomplete="current-password" minlength="6" required>
+        </div>
+        <p class="field-error" id="signin-error" role="alert"></p>
+        <div class="row">
+          <button type="submit" class="primary" id="signin-submit">Sign in</button>
+          <button type="button" class="ghost" id="signin-switch"></button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <main id="app-screen" hidden>
+    <div id="offline-banner" class="notice warn" role="status"></div>
+
+    <!-- aria-live="polite" so results are announced without stealing focus
+         from whatever the owner is doing. -->
+    <div id="status" role="status" aria-live="polite" hidden></div>
+
+    <div id="main" role="tabpanel" tabindex="-1" aria-busy="false"></div>
+  </main>
+
+  <dialog id="booking-dialog" aria-labelledby="booking-title">
+    <form id="booking-form" class="booking" method="dialog">
+      <h2 id="booking-title" class="full">Booking</h2>
+
+      <div>
+        <label for="f-guest">Guest</label>
+        <input id="f-guest" name="guest_name" autocomplete="name" required>
+      </div>
+      <div>
+        <label for="f-room">Room</label>
+        <select id="f-room" name="room_id" required></select>
+      </div>
+      <div>
+        <label for="f-checkin">Arrives</label>
+        <input id="f-checkin" name="checkin" type="date" required>
+      </div>
+      <div>
+        <label for="f-checkout">Leaves</label>
+        <input id="f-checkout" name="checkout" type="date" required>
+      </div>
+      <div>
+        <label for="f-guests">People</label>
+        <input id="f-guests" name="guests" type="number" min="1" max="20" value="2" inputmode="numeric">
+      </div>
+      <div>
+        <label for="f-amount">Total</label>
+        <input id="f-amount" name="amount" type="number" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <div>
+        <label for="f-email">Email</label>
+        <input id="f-email" name="guest_email" type="email" autocomplete="email">
+      </div>
+      <div>
+        <label for="f-phone">Phone</label>
+        <input id="f-phone" name="guest_phone" type="tel" autocomplete="tel">
+      </div>
+      <div class="full">
+        <label for="f-notes">Notes</label>
+        <textarea id="f-notes" name="notes"></textarea>
+      </div>
+
+      <!-- role="alert" so a clash is spoken the moment it appears; the form
+           stays open so the owner can pick another room mid-conversation. -->
+      <p class="field-error full" id="form-error" role="alert"></p>
+
+      <div class="full row">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" class="ghost" id="booking-cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
