@@ -17,6 +17,7 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<VatCode> VatCodes => Set<VatCode>();
     public DbSet<VatRateHistory> VatRateHistories => Set<VatRateHistory>();
+    public DbSet<TaxLine> TaxLines => Set<TaxLine>();
     public DbSet<Journal> Journals => Set<Journal>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<EntityUserAccess> EntityUserAccess => Set<EntityUserAccess>();
@@ -105,6 +106,21 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
             e.Property(x => x.RatePercent).HasColumnType(Rate);
         });
 
+        b.Entity<TaxLine>(e =>
+        {
+            e.HasIndex(x => new { x.EntityId, x.TransactionDate });
+            e.HasIndex(x => new { x.EntityId, x.Vat201MappingCode });
+            e.HasOne(x => x.VatCode).WithMany()
+                .HasForeignKey(x => x.VatCodeId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Treatment).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Direction).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.RatePercent).HasColumnType(Rate);
+            e.Property(x => x.RecoverablePercentage).HasColumnType(Rate);
+            e.Property(x => x.TaxableAmount).HasColumnType(Money);
+            e.Property(x => x.VatAmount).HasColumnType(Money);
+            e.Property(x => x.RecoverableVatAmount).HasColumnType(Money);
+        });
+
         b.Entity<Journal>(e =>
         {
             e.HasIndex(x => new { x.EntityId, x.JournalNumber }).IsUnique();
@@ -128,6 +144,8 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
                 .HasForeignKey(x => x.JournalId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Account).WithMany()
                 .HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.TaxLine).WithMany()
+                .HasForeignKey(x => x.TaxLineId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.DebitAmount).HasColumnType(Money);
             e.Property(x => x.CreditAmount).HasColumnType(Money);
             e.Ignore(x => x.SignedAmount);

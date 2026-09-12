@@ -14,6 +14,7 @@ public interface IAccountingDbContext
     DbSet<Account> Accounts { get; }
     DbSet<VatCode> VatCodes { get; }
     DbSet<VatRateHistory> VatRateHistories { get; }
+    DbSet<TaxLine> TaxLines { get; }
     DbSet<Journal> Journals { get; }
     DbSet<JournalLine> JournalLines { get; }
     DbSet<EntityUserAccess> EntityUserAccess { get; }

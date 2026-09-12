@@ -30,7 +30,11 @@ Authoritative requirements live in `Local_Accounting_ERP_Full_Build_Specificatio
   `numeric(19,8)`. Binary floating point is never used for money.
 - Amounts with more than four decimal places are rejected, not silently rounded.
 - Tax rates, thresholds and reporting rules are effective-dated configuration
-  (`VatRateHistory`, `source_rule_set_version`), never constants in business logic.
+  (`VatRateHistory`, `source_rule_set_version`), never constants in business logic. The transaction
+  date resolves the rate; a reversal resolves it at the original journal's tax point.
+- VAT is recalculated by the posting service and rejected if the caller's amount disagrees. Every
+  posted VAT treatment is persisted as a `TaxLine` carrying the rate, base, code and VAT201 mapping,
+  so a historical return stays reproducible after rates or code definitions change.
 - Entity-level authorisation is enforced in the application services, not only in the API.
   A `UserContext` is always scoped to one entity.
 - The audit trail is append-only; every material state change writes an `AuditEvent`.

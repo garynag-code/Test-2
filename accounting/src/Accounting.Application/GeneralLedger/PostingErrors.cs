@@ -21,4 +21,7 @@ public static class PostingErrors
     public const string PrecisionExceeded = "GL.PRECISION_EXCEEDED";
     public const string DuplicateSource = "GL.DUPLICATE_SOURCE";   // supports INV-007
     public const string ZeroValue = "GL.ZERO_VALUE";
+    public const string VatMismatch = "GL.VAT_MISMATCH";           // section 12.3
+    public const string VatOnControlAccount = "GL.VAT_ON_CONTROL_ACCOUNT";
+    public const string NoVatReasonRequired = "GL.NO_VAT_REASON_REQUIRED";
 }

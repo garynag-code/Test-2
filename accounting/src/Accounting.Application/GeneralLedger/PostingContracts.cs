@@ -5,11 +5,36 @@ namespace Accounting.Application.GeneralLedger;
 public sealed record PostLineRequest
 {
     public required Guid AccountId { get; init; }
+
+    /// <summary>
+    /// Line amounts are always exclusive of VAT. Where a line carries a VAT code, the VAT itself is
+    /// posted on its own line to the VAT control account, as in the specification's section 12.4 example.
+    /// </summary>
     public decimal DebitAmount { get; init; }
     public decimal CreditAmount { get; init; }
+
     public string? Description { get; init; }
     public string? Reference { get; init; }
     public Guid? DocumentLinkId { get; init; }
+
+    /// <summary>VAT code applied to this line, where one applies.</summary>
+    public Guid? VatCodeId { get; init; }
+
+    /// <summary>
+    /// VAT the caller calculated on this line. The posting service recalculates it from the code and
+    /// transaction date and rejects the journal if the two disagree, so a caller cannot post a VAT
+    /// amount the rate does not support. Leave null to accept the calculated amount.
+    /// </summary>
+    public decimal? VatAmount { get; init; }
+
+    /// <summary>Input VAT on purchases, output VAT on supplies. Defaults from the account type.</summary>
+    public VatDirection? VatDirection { get; init; }
+
+    /// <summary>
+    /// Reason recorded when a transaction is deliberately allocated without VAT although the account
+    /// defaults to a taxable code (specification section 12.3). Enforced by the allocation step.
+    /// </summary>
+    public string? NoVatReason { get; init; }
 }
 
 /// <summary>
@@ -24,6 +49,13 @@ public sealed record PostRequest
     public string? Description { get; init; }
     public string? Reference { get; init; }
     public string SourceModule { get; init; } = "GeneralLedger";
+
+    /// <summary>
+    /// Date that determines the VAT rate, where it differs from the transaction date. A reversal pins
+    /// this to the original journal's date so a rate change between the two cannot stop the reversal
+    /// undoing the original exactly.
+    /// </summary>
+    public DateOnly? TaxPointDate { get; init; }
     public Guid? SourceRecordId { get; init; }
     public required IReadOnlyList<PostLineRequest> Lines { get; init; }
 }

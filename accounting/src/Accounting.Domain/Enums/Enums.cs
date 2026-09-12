@@ -20,3 +20,6 @@ public enum JournalType { GEN = 1, BNK = 2, OB = 3, REV = 4, YE = 5, TAX = 6, SY
 public enum VatTreatment { Exempt = 1, Standard = 2, Zero = 3, Custom = 4 }
 
 public enum VatInputOutputMode { Input = 1, Output = 2, Both = 3 }
+
+/// <summary>Whether a tax line is input VAT (on purchases) or output VAT (on supplies).</summary>
+public enum VatDirection { Input = 1, Output = 2 }

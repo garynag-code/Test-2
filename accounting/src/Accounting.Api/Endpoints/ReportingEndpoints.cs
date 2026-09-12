@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Accounting.Application.Abstractions;
 using Accounting.Application.GeneralLedger;
 using Accounting.Application.Security;
+using Accounting.Application.Vat;
 using Microsoft.EntityFrameworkCore;
 
 namespace Accounting.Api.Endpoints;
@@ -43,6 +44,28 @@ public static class ReportingEndpoints
 
             var lines = await reporting.GetAccountActivityAsync(entityId.Value, accountId, fromDate, toDate, ct);
             return Results.Ok(lines);
+        });
+
+        group.MapGet("/entities/{entityId:guid}/vat-return", async (Guid entityId,
+            DateOnly fromDate, DateOnly toDate, ClaimsPrincipal principal,
+            IEntityAccessService access, IVatReturnService returns, CancellationToken ct) =>
+        {
+            if (await access.ResolveAsync(principal, entityId, ct) is null) return Results.Forbid();
+
+            var summary = await returns.GetReturnSummaryAsync(entityId, fromDate, toDate, ct);
+            return Results.Ok(new
+            {
+                summary.EntityId,
+                summary.FromDate,
+                summary.ToDate,
+                summary.OutputVat,
+                summary.InputVat,
+                summary.NetVatPayable,
+                summary.VatControlAccountBalance,
+                summary.UnreconciledDifference,
+                summary.Reconciles,
+                summary.Lines,
+            });
         });
 
         group.MapGet("/entities/{entityId:guid}/audit-events", async (Guid entityId, ClaimsPrincipal principal,

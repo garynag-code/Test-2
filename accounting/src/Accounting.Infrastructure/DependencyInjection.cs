@@ -2,6 +2,7 @@ using Accounting.Application.Abstractions;
 using Accounting.Application.EntitySetup;
 using Accounting.Application.GeneralLedger;
 using Accounting.Application.Security;
+using Accounting.Application.Vat;
 using Accounting.Infrastructure.Persistence;
 using Accounting.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,8 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAuditEventWriter, AuditEventWriter>();
         services.AddScoped<IEntityAccessService, EntityAccessService>();
+        services.AddScoped<IVatCalculationService, VatCalculationService>();
+        services.AddScoped<IVatReturnService, VatReturnService>();
         services.AddScoped<IPostingService, PostingService>();
         services.AddScoped<IDraftJournalService, DraftJournalService>();
         services.AddScoped<ITrialBalanceService, TrialBalanceService>();

@@ -72,6 +72,10 @@ public class JournalLine
 
     public Guid? DocumentLinkId { get; set; }
 
+    /// <summary>VAT treatment of this line, where one applies. Specification section 11.1.</summary>
+    public Guid? TaxLineId { get; set; }
+    public TaxLine? TaxLine { get; set; }
+
     /// <summary>Signed movement in the account, debit positive.</summary>
     public decimal SignedAmount => DebitAmount - CreditAmount;
 

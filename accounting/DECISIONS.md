@@ -51,3 +51,30 @@ a reviewer.
 ## D-010 Bearer tokens for API clients, cookies for the local browser UI
 ASP.NET Core Identity's `MapIdentityApi` provides both. No custom cryptography or token handling
 is introduced (specification section 6.2).
+
+## D-011 VAT is recalculated by the posting service, never trusted from the caller
+A line carrying a VAT code states its own VAT amount, and the posting service recomputes it from the
+code and the tax point and rejects the journal if the two disagree. A subledger, an import or a
+future integration therefore cannot post a VAT amount the rate does not support.
+
+## D-012 The no-VAT override reason belongs to allocation, not to the ledger
+Specification section 12.3 requires a reason when a transaction is posted without VAT although the
+account defaults to a taxable code. Enforcing that on every journal line would break ordinary manual
+journals — accruals, depreciation and reclassifications legitimately post to expense accounts with no
+VAT — so the rule is enforced at the allocation step, where a transaction's VAT treatment is actually
+being decided. `PostLineRequest.NoVatReason` carries the reason through to the tax line.
+
+## D-013 A reversal is pinned to the original journal's tax point
+`PostRequest.TaxPointDate` lets a reversal resolve the VAT rate at the original transaction date. Had
+the reversal used its own date, a rate change between the two would produce a VAT amount that does not
+undo the original, and the VAT control account would not clear.
+
+## D-014 VAT is rounded to the cent, away from zero, and the taxable base takes the remainder
+VAT is rounded to two decimals (matching how a vendor invoice states it) and the taxable base is the
+gross less that VAT, so the two always add back to the amount actually banked. Banker's rounding would
+disagree with supplier invoices on half-cents.
+
+## D-015 The VAT control account carries no VAT code
+VAT codes belong on the income or expense line that bears the taxable amount; the control account
+holds the VAT itself. The posting service rejects a VAT code on an account whose control type is Vat,
+which would otherwise double-count the tax line in the return summary.

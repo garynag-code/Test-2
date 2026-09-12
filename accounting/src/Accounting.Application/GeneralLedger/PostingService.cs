@@ -1,5 +1,6 @@
 using Accounting.Application.Abstractions;
 using Accounting.Application.Security;
+using Accounting.Application.Vat;
 using Accounting.Domain.Entities;
 using Accounting.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace Accounting.Application.GeneralLedger;
 public sealed class PostingService(
     IAccountingDbContext db,
     IAuditEventWriter audit,
+    IVatCalculationService vat,
     IClock clock) : IPostingService
 {
     /// <summary>Monetary scale from specification section 8.1 (numeric(19,4)).</summary>
@@ -28,7 +30,7 @@ public sealed class PostingService(
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        var (errors, period, accounts) = await ValidateCoreAsync(request, user, ct);
+        var (errors, period, taxLines) = await ValidateCoreAsync(request, user, ct);
         if (errors.Count > 0)
         {
             // Nothing is written when validation fails (GL-AC-001).
@@ -42,18 +44,22 @@ public sealed class PostingService(
         var lineNo = 1;
         foreach (var line in request.Lines)
         {
-            journal.Lines.Add(new JournalLine
+            var journalLine = new JournalLine
             {
                 JournalId = journal.Id,
                 EntityId = request.EntityId,
-                LineNo = lineNo++,
+                LineNo = lineNo,
                 AccountId = line.AccountId,
                 DebitAmount = decimal.Round(line.DebitAmount, MoneyScale),
                 CreditAmount = decimal.Round(line.CreditAmount, MoneyScale),
                 Description = line.Description ?? request.Description,
                 Reference = line.Reference ?? request.Reference,
                 DocumentLinkId = line.DocumentLinkId,
-            });
+            };
+
+            AttachTaxLine(journalLine, taxLines, lineNo);
+            journal.Lines.Add(journalLine);
+            lineNo++;
         }
 
         db.Journals.Add(journal);
@@ -171,7 +177,7 @@ public sealed class PostingService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var original = await db.Journals
-            .Include(j => j.Lines)
+            .Include(j => j.Lines).ThenInclude(l => l.TaxLine)
             .FirstOrDefaultAsync(j => j.Id == journalId, ct);
 
         if (original is null)
@@ -192,6 +198,8 @@ public sealed class PostingService(
             Description = $"Reversal of {original.JournalNumber}: {reason}",
             Reference = original.Reference,
             SourceModule = original.SourceModule,
+            // The original journal's date remains the tax point, so the reversal carries the same rate.
+            TaxPointDate = original.TransactionDate,
             Lines = [.. original.Lines
                 .OrderBy(l => l.LineNo)
                 .Select(l => new PostLineRequest
@@ -202,10 +210,14 @@ public sealed class PostingService(
                     Description = l.Description,
                     Reference = l.Reference,
                     DocumentLinkId = l.DocumentLinkId, // INV-005: evidence links are preserved
+                    VatCodeId = l.TaxLine?.VatCodeId,
+                    VatAmount = l.TaxLine?.VatAmount,
+                    // Reversing input VAT does not turn it into output VAT.
+                    VatDirection = l.TaxLine?.Direction,
                 })],
         };
 
-        var (errors, period, _) = await ValidateCoreAsync(reversalRequest, user, ct);
+        var (errors, period, reversalTaxLines) = await ValidateCoreAsync(reversalRequest, user, ct);
         if (errors.Count > 0)
         {
             await tx.RollbackAsync(ct);
@@ -220,18 +232,22 @@ public sealed class PostingService(
         var lineNo = 1;
         foreach (var line in reversalRequest.Lines)
         {
-            reversal.Lines.Add(new JournalLine
+            var reversalLine = new JournalLine
             {
                 JournalId = reversal.Id,
                 EntityId = original.EntityId,
-                LineNo = lineNo++,
+                LineNo = lineNo,
                 AccountId = line.AccountId,
                 DebitAmount = line.DebitAmount,
                 CreditAmount = line.CreditAmount,
                 Description = line.Description,
                 Reference = line.Reference,
                 DocumentLinkId = line.DocumentLinkId,
-            });
+            };
+
+            AttachTaxLine(reversalLine, reversalTaxLines, lineNo);
+            reversal.Lines.Add(reversalLine);
+            lineNo++;
         }
 
         db.Journals.Add(reversal);
@@ -271,23 +287,24 @@ public sealed class PostingService(
         PostedAtUtc = clock.UtcNow,
     };
 
-    private async Task<(List<PostError> Errors, AccountingPeriod? Period, Dictionary<Guid, Account> Accounts)>
+    private async Task<(List<PostError> Errors, AccountingPeriod? Period, Dictionary<int, TaxLine> TaxLines)>
         ValidateCoreAsync(PostRequest request, UserContext user, CancellationToken ct)
     {
         var errors = new List<PostError>();
         var accounts = new Dictionary<Guid, Account>();
+        var taxLines = new Dictionary<int, TaxLine>();
 
         // Entity-level authorisation is enforced here, not only in the API layer (SEC-AC-001).
         if (request.EntityId != user.EntityId)
         {
             errors.Add(new PostError(PostingErrors.Forbidden, "User has no access to this entity."));
-            return (errors, null, accounts);
+            return (errors, null, taxLines);
         }
 
         if (!user.CanPost)
         {
             errors.Add(new PostError(PostingErrors.Forbidden, "User is not permitted to post journals."));
-            return (errors, null, accounts);
+            return (errors, null, taxLines);
         }
 
         var entity = await db.Entities.AsNoTracking()
@@ -295,7 +312,7 @@ public sealed class PostingService(
         if (entity is null)
         {
             errors.Add(new PostError(PostingErrors.NotFound, "Entity not found."));
-            return (errors, null, accounts);
+            return (errors, null, taxLines);
         }
         if (!entity.Active)
             errors.Add(new PostError(PostingErrors.EntityInactive, "Entity is inactive."));
@@ -343,6 +360,9 @@ public sealed class PostingService(
                 if (!account.Active)
                     errors.Add(new PostError(PostingErrors.AccountInactive,
                         $"Line {lineNo}: account {account.Code} is inactive."));
+
+                var taxLine = await ValidateVatAsync(request, line, lineNo, account, errors, ct);
+                if (taxLine is not null) taxLines[lineNo] = taxLine;
             }
 
             totalDebit += line.DebitAmount;
@@ -385,7 +405,83 @@ public sealed class PostingService(
                     "A journal has already been posted for this source record."));
         }
 
-        return (errors, period, accounts);
+        return (errors, period, taxLines);
+    }
+
+    /// <summary>
+    /// Recalculates the VAT on a line from its code and the transaction date, and rejects the journal
+    /// if the caller's amount disagrees. No module can post a VAT amount the rate does not support
+    /// (specification section 12.3).
+    /// </summary>
+    private async Task<TaxLine?> ValidateVatAsync(PostRequest request, PostLineRequest line, int lineNo,
+        Account account, List<PostError> errors, CancellationToken ct)
+    {
+        // A line without a VAT code carries no VAT. Manual journals — accruals, depreciation,
+        // reclassifications — legitimately post to taxable accounts with no VAT, so the ledger does not
+        // demand a reason here. The no-VAT override rule in specification section 12.3 belongs to the
+        // allocation step, where a transaction's VAT treatment is being decided.
+        if (line.VatCodeId is not { } vatCodeId) return null;
+
+        // VAT belongs on the expense or income line, never on the control account holding the VAT itself.
+        if (account.ControlAccountType == ControlAccountType.Vat)
+        {
+            errors.Add(new PostError(PostingErrors.VatOnControlAccount,
+                $"Line {lineNo}: account {account.Code} is the VAT control account and does not carry a VAT code."));
+            return null;
+        }
+
+        var taxPoint = request.TaxPointDate ?? request.TransactionDate;
+        var taxableAmount = line.DebitAmount + line.CreditAmount;
+        var result = await vat.CalculateAsync(request.EntityId, vatCodeId, taxableAmount,
+            amountIncludesVat: false, taxPoint, ct);
+
+        if (!result.Succeeded)
+        {
+            errors.Add(new PostError(result.ErrorCode!, $"Line {lineNo}: {result.Message}"));
+            return null;
+        }
+
+        var calculation = result.Calculation!;
+        if (line.VatAmount is { } supplied &&
+            decimal.Round(supplied, MoneyScale) != decimal.Round(calculation.VatAmount, MoneyScale))
+        {
+            errors.Add(new PostError(PostingErrors.VatMismatch,
+                $"Line {lineNo}: VAT of {supplied:0.00} does not match {calculation.VatAmount:0.00} " +
+                $"calculated at {calculation.RatePercent:0.##}% on {taxableAmount:0.00}."));
+            return null;
+        }
+
+        // A debit to an expense or asset is input VAT; a credit to income is output VAT.
+        var direction = line.VatDirection ?? (line.DebitAmount > 0m
+            ? VatDirection.Input
+            : VatDirection.Output);
+
+        return new TaxLine
+        {
+            EntityId = request.EntityId,
+            VatCodeId = calculation.VatCodeId,
+            VatCodeSnapshot = calculation.Code,
+            Vat201MappingCode = calculation.Vat201MappingCode,
+            Treatment = calculation.Treatment,
+            RatePercent = calculation.RatePercent,
+            TaxableAmount = calculation.TaxableAmount,
+            VatAmount = calculation.VatAmount,
+            RecoverablePercentage = calculation.RecoverablePercentage,
+            RecoverableVatAmount = calculation.RecoverableVatAmount,
+            Direction = direction,
+            CapitalFlag = calculation.CapitalFlag,
+            TransactionDate = taxPoint,
+            CreatedAtUtc = clock.UtcNow,
+        };
+    }
+
+    /// <summary>Persists the validated VAT treatment alongside the line it belongs to.</summary>
+    private void AttachTaxLine(JournalLine journalLine, IReadOnlyDictionary<int, TaxLine> taxLines, int lineNo)
+    {
+        if (!taxLines.TryGetValue(lineNo, out var taxLine)) return;
+
+        db.TaxLines.Add(taxLine);
+        journalLine.TaxLineId = taxLine.Id;
     }
 
     private static bool ExceedsMoneyScale(decimal value) => decimal.Round(value, MoneyScale) != value;

@@ -2,6 +2,7 @@ using Accounting.Application.Abstractions;
 using Accounting.Application.EntitySetup;
 using Accounting.Application.GeneralLedger;
 using Accounting.Application.Security;
+using Accounting.Application.Vat;
 using Accounting.Domain.Enums;
 using Accounting.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +54,7 @@ public sealed class LedgerScenario : IAsyncDisposable
     public required IDraftJournalService Drafts { get; init; }
     public required ITrialBalanceService Reporting { get; init; }
     public required IPeriodService Periods { get; init; }
+    public required IVatCalculationService Vat { get; init; }
     public required Guid EntityId { get; init; }
     public required UserContext Preparer { get; init; }
     public required UserContext Administrator { get; init; }
@@ -77,6 +79,8 @@ public sealed class LedgerScenario : IAsyncDisposable
             OpeningFiscalYearEndingIn = fiscalYearEndingIn,
         }, admin);
 
+        var vat = new VatCalculationService(db);
+
         var accounts = await db.Accounts.AsNoTracking()
             .Where(a => a.EntityId == entity.Id)
             .ToDictionaryAsync(a => a.Code, a => a.Id);
@@ -84,7 +88,8 @@ public sealed class LedgerScenario : IAsyncDisposable
         return new LedgerScenario
         {
             Db = db,
-            Posting = new PostingService(db, audit, clock),
+            Posting = new PostingService(db, audit, vat, clock),
+            Vat = vat,
             Drafts = new DraftJournalService(db, audit, clock),
             Reporting = new TrialBalanceService(db),
             Periods = new PeriodService(db, audit, clock),
