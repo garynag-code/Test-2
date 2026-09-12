@@ -16,7 +16,9 @@ dependencies = []
 web = ["Flask>=2.3.0"]
 # Perch, the bed & breakfast booking manager, needs Flask to serve its app.
 bnb = ["Flask>=2.3.0"]
-dev = ["pytest>=7.0", "Flask>=2.3.0"]
+# ...and psycopg only when its ledger lives on PostgreSQL / Supabase.
+postgres = ["Flask>=2.3.0", "psycopg[binary]>=3.1"]
+dev = ["pytest>=7.0", "Flask>=2.3.0", "psycopg[binary]>=3.1"]
 
 [project.scripts]
 chatgpt-export = "chatgpt_export.cli:main"
@@ -28,4 +30,4 @@ packages = ["chatgpt_export", "bnb"]
 
 [tool.setuptools.package-data]
 # The progressive web app is shipped inside the package, not built.
-bnb = ["static/*", "static/*/*"]
+bnb = ["static/*", "static/*/*", "*.md"]

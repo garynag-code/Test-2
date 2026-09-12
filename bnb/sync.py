@@ -21,7 +21,6 @@ The guard rails matter as much as the sync:
 
 from __future__ import annotations
 
-import sqlite3
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -60,7 +59,7 @@ class SyncResult:
         )
 
 
-def _channel(conn, channel_id: int) -> sqlite3.Row:
+def _channel(conn, channel_id: int):
     row = conn.execute("SELECT * FROM channel WHERE id = ?", (channel_id,)).fetchone()
     if row is None:
         raise ValueError(f"no channel {channel_id}")

@@ -10,8 +10,8 @@ from bnb.web import create_app
 
 
 @pytest.fixture()
-def app(tmp_path):
-    path = tmp_path / "web.db"
+def app(db_url):
+    path = db_url
     conn = open_db(path)
     prop = create_property(conn, "Rose Cottage", timezone="UTC", currency="EUR", locale="en")
     garden = create_room(conn, prop, "Garden Room", base_rate_cents=11000, sort_order=1)

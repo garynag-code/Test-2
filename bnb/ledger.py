@@ -16,7 +16,6 @@ Four rules keep it correct:
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -50,7 +49,7 @@ class Placement:
 
 
 def occupied_nights(conn, room_id: int, checkin, checkout,
-                    *, exclude_booking_id: int | None = None) -> list[sqlite3.Row]:
+                    *, exclude_booking_id: int | None = None) -> list:
     """Which of a stay's nights are already taken, and by what.
 
     ``exclude_booking_id`` ignores a stay's own rows, so a booking can be
@@ -71,7 +70,7 @@ def is_available(conn, room_id: int, checkin, checkout) -> bool:
     return not occupied_nights(conn, room_id, checkin, checkout)
 
 
-def available_rooms(conn, property_id: int, checkin, checkout) -> list[sqlite3.Row]:
+def available_rooms(conn, property_id: int, checkin, checkout) -> list:
     wanted = [fmt(night) for night in nights(checkin, checkout)]
     placeholders = ",".join("?" * len(wanted))
     return list(conn.execute(
@@ -137,6 +136,10 @@ def place_booking(
     stamp = utc_stamp()
 
     with writing(conn):
+        # Claim the room for the duration of this transaction, so a
+        # simultaneous reservation for the same room queues behind us rather
+        # than reading "free" at the same moment we do.
+        conn.lock_room(room_id)
         clashes = occupied_nights(conn, room_id, checkin, checkout)
         if clashes:
             return _record_conflict(
@@ -153,16 +156,15 @@ def place_booking(
                 ),
             )
 
-        cur = conn.execute(
-            "INSERT INTO booking (property_id, room_id, channel_id, external_ref,"
-            " guest_name, guest_email, guest_phone, guests, checkin, checkout,"
-            " amount_cents, currency, notes, kind, status, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'confirmed',?,?)",
-            (property_id, room_id, channel_id, external_ref, guest_name,
-             guest_email, guest_phone, guests, fmt(checkin), fmt(checkout),
-             amount_cents, currency, notes, kind, stamp, stamp),
-        )
-        booking_id = int(cur.lastrowid)
+        booking_id = conn.insert("booking", {
+            "property_id": property_id, "room_id": room_id, "channel_id": channel_id,
+            "external_ref": external_ref, "guest_name": guest_name,
+            "guest_email": guest_email, "guest_phone": guest_phone, "guests": guests,
+            "checkin": fmt(checkin), "checkout": fmt(checkout),
+            "amount_cents": amount_cents, "currency": currency, "notes": notes,
+            "kind": kind, "status": "confirmed",
+            "created_at": stamp, "updated_at": stamp,
+        })
 
         try:
             conn.executemany(
@@ -171,7 +173,7 @@ def place_booking(
                 [(room_id, night, state, booking_id, channel_id, None, stamp)
                  for night in stay_nights],
             )
-        except sqlite3.IntegrityError:
+        except conn.IntegrityError:
             # Belt and braces: another writer committed between our check and
             # our insert.  The primary key caught it; nothing is sold twice.
             raise LedgerError(
@@ -179,11 +181,10 @@ def place_booking(
             )
 
         if idempotency_key:
-            conn.execute(
-                "INSERT INTO idempotency (key, booking_id, outcome, created_at)"
-                " VALUES (?, ?, 'placed', ?)",
-                (idempotency_key, booking_id, stamp),
-            )
+            conn.insert("idempotency", {
+                "key": idempotency_key, "booking_id": booking_id,
+                "outcome": "placed", "created_at": stamp,
+            }, returning=None)
 
     return Placement(ok=True, booking_id=booking_id)
 
@@ -198,35 +199,34 @@ def _record_conflict(conn, *, property_id, room_id, clashes, stamp,
     conflict_id = None
 
     if authoritative:
-        cur = conn.execute(
-            "INSERT INTO booking (property_id, room_id, channel_id, external_ref,"
-            " guest_name, guest_email, guest_phone, guests, checkin, checkout,"
-            " amount_cents, currency, notes, kind, status, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'conflicted',?,?)",
-            (property_id, room_id, booking_fields["channel_id"],
-             booking_fields["external_ref"], booking_fields["guest_name"],
-             booking_fields["guest_email"], booking_fields["guest_phone"],
-             booking_fields["guests"], booking_fields["checkin"],
-             booking_fields["checkout"], booking_fields["amount_cents"],
-             booking_fields["currency"], booking_fields["notes"],
-             booking_fields["kind"], stamp, stamp),
-        )
-        challenger_id = int(cur.lastrowid)
+        challenger_id = conn.insert("booking", {
+            "property_id": property_id, "room_id": room_id,
+            "channel_id": booking_fields["channel_id"],
+            "external_ref": booking_fields["external_ref"],
+            "guest_name": booking_fields["guest_name"],
+            "guest_email": booking_fields["guest_email"],
+            "guest_phone": booking_fields["guest_phone"],
+            "guests": booking_fields["guests"],
+            "checkin": booking_fields["checkin"],
+            "checkout": booking_fields["checkout"],
+            "amount_cents": booking_fields["amount_cents"],
+            "currency": booking_fields["currency"],
+            "notes": booking_fields["notes"],
+            "kind": booking_fields["kind"], "status": "conflicted",
+            "created_at": stamp, "updated_at": stamp,
+        })
 
-        cur = conn.execute(
-            "INSERT INTO conflict (property_id, room_id, incumbent_id,"
-            " challenger_id, nights, detected_at) VALUES (?,?,?,?,?,?)",
-            (property_id, room_id, incumbent_id, challenger_id,
-             ",".join(clashing), stamp),
-        )
-        conflict_id = int(cur.lastrowid)
+        conflict_id = conn.insert("conflict", {
+            "property_id": property_id, "room_id": room_id,
+            "incumbent_id": incumbent_id, "challenger_id": challenger_id,
+            "nights": ",".join(clashing), "detected_at": stamp,
+        })
 
     if idempotency_key:
-        conn.execute(
-            "INSERT OR REPLACE INTO idempotency (key, booking_id, outcome, created_at)"
-            " VALUES (?, ?, 'conflicted', ?)",
-            (idempotency_key, challenger_id, stamp),
-        )
+        conn.upsert("idempotency", {
+            "key": idempotency_key, "booking_id": challenger_id,
+            "outcome": "conflicted", "created_at": stamp,
+        }, key="key")
 
     return Placement(
         ok=False,
@@ -273,6 +273,7 @@ def move_booking(conn, booking_id: int, *, room_id: int | None = None,
     stamp = utc_stamp()
 
     with writing(conn):
+        conn.lock_room(target_room)
         taken = occupied_nights(conn, target_room, target_in, target_out,
                                 exclude_booking_id=booking_id)
         if taken:
@@ -308,12 +309,14 @@ def close_nights(conn, room_id: int, dates: list, *, reason: str,
     stamp = utc_stamp()
     wanted = [fmt(night) for night in dates]
     with writing(conn):
-        cur = conn.executemany(
-            "INSERT OR IGNORE INTO room_night (room_id, night, state, booking_id,"
-            " channel_id, reason, updated_at) VALUES (?,?,'closed',NULL,?,?,?)",
-            [(room_id, night, channel_id, reason, stamp) for night in wanted],
+        conn.lock_room(room_id)
+        closed = conn.insert_ignore_many(
+            "room_night",
+            ["room_id", "night", "state", "booking_id", "channel_id", "reason",
+             "updated_at"],
+            [(room_id, night, "closed", None, channel_id, reason, stamp)
+             for night in wanted],
         )
-        closed = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
     return closed
 
 

@@ -1,6 +1,12 @@
 # Web portal, and Perch (the bed & breakfast booking manager, `python -m bnb`)
 Flask>=2.3.0
 
-# (Everything else — the ChatGPT parsing/rendering, the CLI, and Perch's
-# booking ledger, iCal sync and channel engine — uses only the Python
-# standard library.  Flask is needed only to serve the browser apps.)
+# To run Perch against PostgreSQL / Supabase instead of a local file, also:
+#
+#     pip install "psycopg[binary]>=3.1"
+#
+# It is left out here deliberately: it is a compiled package, and the local
+# double-click launchers never need it. See bnb/DEPLOY.md.
+#
+# Everything else — the booking ledger, iCal sync, the channel engine and the
+# sign-in checks — uses only the Python standard library.

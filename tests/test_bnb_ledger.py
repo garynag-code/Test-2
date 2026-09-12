@@ -1,6 +1,5 @@
 """The double-booking guarantees, which are the reason the product exists."""
 
-import sqlite3
 import threading
 
 import pytest
@@ -15,8 +14,8 @@ from bnb.ledger import (
 
 
 @pytest.fixture()
-def db(tmp_path):
-    conn = open_db(tmp_path / "test.db")
+def db(db_url):
+    conn = open_db(db_url)
     yield conn
     conn.close()
 
@@ -78,7 +77,7 @@ def test_the_ledger_itself_rejects_a_second_sale(house):
     """
     placement = book(house, "garden", "2026-04-01", "2026-04-02", guest_name="Ada")
     conn = house["conn"]
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(conn.IntegrityError):
         conn.execute(
             "INSERT INTO room_night (room_id, night, state, booking_id, updated_at)"
             " VALUES (?, '2026-04-01', 'sold', ?, '2026-01-01T00:00:00')",
@@ -144,9 +143,9 @@ def test_a_replayed_clash_stays_a_clash(house):
 
 # ----------------------------------------------------------- concurrency
 
-def test_two_simultaneous_writers_cannot_both_sell_the_same_night(tmp_path):
+def test_two_simultaneous_writers_cannot_both_sell_the_same_night(db_url):
     """The realistic failure: two channels deliver the same night at once."""
-    path = tmp_path / "race.db"
+    path = db_url
     setup = open_db(path)
     prop = create_property(setup, "Rose Cottage")
     room = create_room(setup, prop, "Garden Room")
@@ -220,9 +219,9 @@ def test_closing_nights_never_overwrites_a_real_booking(house):
     close_nights(house["conn"], house["rooms"]["garden"],
                  ["2026-04-01", "2026-04-02", "2026-04-03"], reason="channel_dark:7")
 
-    states = dict(house["conn"].execute(
+    states = {row["night"]: row["state"] for row in house["conn"].execute(
         "SELECT night, state FROM room_night WHERE room_id = ?",
-        (house["rooms"]["garden"],)).fetchall())
+        (house["rooms"]["garden"],))}
     assert states["2026-04-02"] == "sold", "Ada's night must survive a closure sweep"
     assert states["2026-04-01"] == "closed"
 

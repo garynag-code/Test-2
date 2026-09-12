@@ -7,6 +7,17 @@ same room-night be sold twice.
 Runs on Python 3.9+ and Flask. No build step, no container platform, no
 third-party services. A four-room guesthouse should not need a DevOps team.
 
+It runs two ways from one codebase:
+
+* **On the owner's own computer** — a single SQLite file, no login, no account
+  anywhere. Double-click a Start file and it opens. This is the default.
+* **Hosted, on Supabase** — PostgreSQL for the ledger and Supabase Auth for the
+  login, so the owner can use it from their phone. See **[DEPLOY.md](DEPLOY.md)**.
+
+The ledger, the sync engine and the API are written once; `bnb/sql.py` absorbs
+the difference between the two databases, and the whole test suite runs against
+both.
+
 ## Starting it
 
 **If you don't write code**, open the `bnb` folder and double-click the Start
@@ -107,11 +118,34 @@ Because iCal channels are slow, they are treated as untrusted:
 
 ---
 
+## Signing in
+
+With no Supabase configured, there is no login: the app is bound to the machine
+it runs on and there is nobody to tell apart. Set `SUPABASE_URL` and it requires
+a Supabase access token on every owner-facing request, and each owner sees only
+their own property.
+
+Binding to a network address (`--host 0.0.0.0`) without a login configured is a
+**hard refusal to start**, not a warning. A guesthouse's Wi-Fi is shared with
+its guests, and every guest's name, email and phone number is in that database.
+
+Two endpoints deliberately do not use the login, because the party calling them
+cannot sign in: the calendar feed and the reservation hook carry an unguessable
+token in the URL, and the scheduled sync (`POST /api/cron/sync`) uses
+`PERCH_SYNC_TOKEN`. Tokens are compared in constant time, and an unset sync
+token refuses everything rather than allowing everything.
+
+Supabase HS256 tokens are verified with `hmac` from the standard library — no
+cryptography dependency. Projects using asymmetric keys are verified by asking
+Supabase, with a short cache. The token's own `alg` header is never trusted.
+
 ## Layout
 
 ```
 bnb/
   dates.py        stay-date arithmetic — calendar dates, never instants
+  sql.py          the one place that knows SQLite from PostgreSQL
+  auth.py         Supabase sign-in checks, and the exposure guard
   db.py           schema; the (room_id, night) primary key lives here
   ledger.py       placing, moving, cancelling, closing; the clash inbox
   icalendar.py    RFC 5545 reader and writer (stdlib only)
@@ -182,9 +216,16 @@ Built to WCAG 2.2 AA, and tested rather than asserted:
 ## Tests
 
 ```bash
-python -m pytest tests/ -q
+python -m pytest tests/ -q                      # SQLite only
+
+# ...and against a real PostgreSQL, which is what Supabase runs:
+PERCH_TEST_POSTGRES=postgresql://postgres@127.0.0.1:5433/perch_test \
+  python -m pytest tests/ -q
 ```
 
-Covering the storage-level double-booking guarantee, a genuine two-thread race,
-idempotent replays, feed reconciliation, the fail-closed guards, UTF-8 line
-folding for non-Latin guest names, and the full HTTP surface.
+Every ledger, sync and HTTP test runs against **both** backends — a port tested
+on one backend is a port that is correct on one backend. Coverage includes the
+storage-level double-booking guarantee, a genuine two-thread race, idempotent
+replays, feed reconciliation, the fail-closed guards, UTF-8 line folding for
+non-Latin guest names, one owner's inability to see another's bookings, and
+forged sign-in tokens (including `alg: none`).

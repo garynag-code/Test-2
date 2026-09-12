@@ -78,6 +78,11 @@
 
 * { box-sizing: border-box; }
 
+/* Any element given an explicit `display` outranks the browser's built-in
+   [hidden] rule, so `el.hidden = true` silently fails on the header and the
+   tab bar. This puts it back. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: var(--font);
@@ -364,3 +369,16 @@ body.is-offline #offline-banner { display: block; }
   .brand small { display: none; }
   table.calendar th[scope="row"] { min-width: 104px; font-size: .8rem; }
 }
+
+/* ------------------------------------------------------------ sign-in */
+
+.signin {
+  max-width: 380px;
+  margin-block: 12vh;
+  margin-inline: auto;
+}
+.signin h2 { margin-block-start: 0; }
+.signin form { margin-block-start: 16px; }
+.signin .row { margin-block-start: 8px; }
+#signin-switch { padding-inline: 8px; border: 0; background: none; color: var(--accent);
+                 text-decoration: underline; }

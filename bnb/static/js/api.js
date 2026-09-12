@@ -1,6 +1,8 @@
 /* Thin fetch wrapper.  Errors carry their status so callers can tell a clash
    (409, the owner must choose) from a dropped connection (queue and retry). */
 
+import { token } from './session.js';
+
 export class ApiError extends Error {
   constructor(message, status, body) {
     super(message);
@@ -10,6 +12,7 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  const bearer = await token();
   let response;
   try {
     response = await fetch(path, {
@@ -17,7 +20,11 @@ async function request(path, options = {}) {
       // Merged last, and on top of options.headers: spreading options after
       // this would replace the whole headers object, silently dropping the
       // content type for any call that passes a header of its own.
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        ...(options.headers || {}),
+      },
     });
   } catch (cause) {
     throw new ApiError('offline', 0, { cause: String(cause) });
@@ -37,6 +44,7 @@ const qs = (params) => new URLSearchParams(
 ).toString();
 
 export const api = {
+  authConfig: () => request('/api/auth-config'),
   bootstrap: (locale) => request(`/api/bootstrap?${qs({ locale })}`),
   calendar: (start, end) => request(`/api/calendar?${qs({ start, end })}`),
   agenda: (start, end) => request(`/api/agenda?${qs({ start, end })}`),

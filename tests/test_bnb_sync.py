@@ -27,8 +27,8 @@ def stay(uid, start_offset, nights_count, summary="Guest"):
 
 
 @pytest.fixture()
-def house(tmp_path):
-    conn = open_db(tmp_path / "sync.db")
+def house(db_url):
+    conn = open_db(db_url)
     prop = create_property(conn, "Rose Cottage", timezone="UTC")
     garden = create_room(conn, prop, "Garden Room", sort_order=1)
     attic = create_room(conn, prop, "Attic Room", sort_order=2)
@@ -178,9 +178,9 @@ def test_the_last_open_room_can_be_held_back_from_the_platforms(house):
                         TODAY + timedelta(days=20), TODAY + timedelta(days=21))
 
 
-def test_holding_the_last_room_is_skipped_for_a_one_room_property(tmp_path):
+def test_holding_the_last_room_is_skipped_for_a_one_room_property(db_url):
     """Otherwise the policy would simply mean never selling anything."""
-    conn = open_db(tmp_path / "solo.db")
+    conn = open_db(db_url)
     prop = create_property(conn, "Tiny", hold_last_room=True)
     room = create_room(conn, prop, "The Room")
     channel = create_channel(conn, prop, "airbnb", "Airbnb", room_id=room)

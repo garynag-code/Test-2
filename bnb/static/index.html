@@ -17,7 +17,7 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <header class="app">
+  <header class="app" id="app-header" hidden>
     <h1 class="brand">
       <span id="property-name">Perch</span>
       <small id="property-meta"></small>
@@ -25,12 +25,38 @@
     <div class="header-actions">
       <select id="language"></select>
       <button type="button" id="sync" class="primary">↻</button>
+      <button type="button" id="signout" class="ghost" hidden></button>
     </div>
   </header>
 
-  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections" hidden></nav>
 
-  <main>
+  <!-- Sign-in. Hidden entirely in local mode, where the app is reachable only
+       from the computer it runs on and there is nobody to tell apart. -->
+  <main id="signin-screen" hidden>
+    <section class="card signin">
+      <h2 id="signin-title">Sign in</h2>
+      <p class="muted" id="signin-intro"></p>
+      <form id="signin-form" class="stack">
+        <div>
+          <label for="s-email" id="s-email-label">Email</label>
+          <input id="s-email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div>
+          <label for="s-password" id="s-password-label">Password</label>
+          <input id="s-password" name="password" type="password"
+                 autocomplete="current-password" minlength="6" required>
+        </div>
+        <p class="field-error" id="signin-error" role="alert"></p>
+        <div class="row">
+          <button type="submit" class="primary" id="signin-submit">Sign in</button>
+          <button type="button" class="ghost" id="signin-switch"></button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <main id="app-screen" hidden>
     <div id="offline-banner" class="notice warn" role="status"></div>
 
     <!-- aria-live="polite" so results are announced without stealing focus

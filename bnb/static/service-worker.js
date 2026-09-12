@@ -22,6 +22,7 @@ const SHELL = [
   '/static/js/grid.js',
   '/static/js/format.js',
   '/static/js/queue.js',
+  '/static/js/session.js',
   '/static/icons/icon.svg',
   '/manifest.webmanifest',
 ];

@@ -10,7 +10,8 @@ import os
 from datetime import date, timedelta
 
 from . import icalendar as ics
-from .db import create_channel, create_property, create_room, open_db
+from .db import (create_channel, create_property, create_room, default_url,
+                 dialect_of, open_db)
 from .dates import fmt
 from .ledger import place_booking
 from .sync import import_feed
@@ -18,11 +19,12 @@ from .sync import import_feed
 DEMO_PROPERTY = "Rose Cottage B&B"
 
 
-def seed_demo(db_path: str = "perch.db", *, today: date | None = None,
-              force: bool = False) -> dict:
-    """Create the sample property if the database is empty."""
-    fresh = force or not os.path.exists(db_path)
-    conn = open_db(db_path)
+def seed_demo(db_url: str | None = None, *, today: date | None = None,
+              force: bool = False, owner_id: str | None = None) -> dict:
+    """Create the sample property if the database has none."""
+    db_url = db_url or default_url()
+    fresh = force or (dialect_of(db_url) == "sqlite" and not os.path.exists(db_url))
+    conn = open_db(db_url)
 
     existing = conn.execute("SELECT id FROM property ORDER BY id LIMIT 1").fetchone()
     if existing and not force:
@@ -30,7 +32,8 @@ def seed_demo(db_path: str = "perch.db", *, today: date | None = None,
 
     today = today or date.today()
     prop = create_property(conn, DEMO_PROPERTY, timezone="Europe/Dublin",
-                           currency="EUR", locale="en", hold_last_room=True)
+                           currency="EUR", locale="en", hold_last_room=True,
+                           owner_id=owner_id)
 
     rooms = {
         "Garden Room": create_room(conn, prop, "Garden Room", capacity=2,
@@ -96,4 +99,4 @@ def seed_demo(db_path: str = "perch.db", *, today: date | None = None,
 
 if __name__ == "__main__":
     import sys
-    print(seed_demo(sys.argv[1] if len(sys.argv) > 1 else "perch.db"))
+    print(seed_demo(sys.argv[1] if len(sys.argv) > 1 else None))

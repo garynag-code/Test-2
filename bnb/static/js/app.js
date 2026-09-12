@@ -9,6 +9,9 @@ import { api, ApiError } from './api.js';
 import { addDays, interpolate, isoOf, makeFormatters, nightsBetween, toLocalDate } from './format.js';
 import { renderGrid } from './grid.js';
 import { enqueue, flush, newKey, pending } from './queue.js';
+import {
+  configure, currentEmail, isEnabled, signIn, signOut, signUp, token,
+} from './session.js';
 
 const state = {
   boot: null,
@@ -20,6 +23,7 @@ const state = {
 };
 
 const $ = (selector) => document.querySelector(selector);
+const show = (selector, visible) => { $(selector).hidden = !visible; };
 const t = (key, values) => interpolate(state.strings[key] ?? key, values);
 
 /* A polite live region: the owner is told what happened without losing their
@@ -38,6 +42,49 @@ function setBusy(isBusy) {
 // --------------------------------------------------------------------------
 // Boot
 // --------------------------------------------------------------------------
+
+/* Entry point. Works out whether this instance has a login at all, and only
+   then decides what to put on screen. */
+async function start() {
+  const chosen = localStorage.getItem('perch.locale') || undefined;
+  const config = await api.authConfig();
+  configure(config);
+
+  // Strings for the sign-in screen arrive with the config, since there is no
+  // property to take a language from until someone has signed in.
+  state.strings = config.i18n.strings;
+  document.documentElement.lang = config.i18n.locale;
+  document.documentElement.dir = config.i18n.dir;
+
+  if (!isEnabled() || await token()) {
+    await boot();
+    return;
+  }
+  showSignIn();
+}
+
+function showSignIn() {
+  show('#signin-screen', true);
+  show('#app-screen', false);
+  show('#app-header', false);
+  show('#tabs', false);
+
+  $('#signin-title').textContent = t('auth.title');
+  $('#signin-intro').textContent = t('auth.intro');
+  $('#s-email-label').textContent = t('auth.email');
+  $('#s-password-label').textContent = t('auth.password');
+  $('#signin-submit').textContent = t('auth.signin');
+  $('#signin-switch').textContent = t('auth.switch_signup');
+  $('#signin-error').textContent = '';
+  $('#s-email').focus();
+}
+
+function showApp() {
+  show('#signin-screen', false);
+  show('#app-screen', true);
+  show('#app-header', true);
+  show('#tabs', true);
+}
 
 async function boot() {
   const chosen = localStorage.getItem('perch.locale') || undefined;
@@ -58,6 +105,15 @@ async function boot() {
   buildLanguagePicker(i18n);
   buildTabs();
   bindGlobalEvents();
+  showApp();
+
+  const signout = $('#signout');
+  signout.hidden = !isEnabled();
+  if (isEnabled()) {
+    signout.textContent = t('auth.signout');
+    signout.title = currentEmail() || '';
+  }
+
   await render();
   registerServiceWorker();
   void flushQueue({ quiet: true });
@@ -136,6 +192,10 @@ function select(view) {
 
 function bindGlobalEvents() {
   $('#sync').addEventListener('click', runSync);
+  $('#signout').addEventListener('click', () => {
+    signOut();
+    showSignIn();
+  });
   window.addEventListener('online', () => {
     document.body.classList.remove('is-offline');
     void flushQueue();
@@ -171,6 +231,12 @@ async function render() {
 }
 
 function errorCard(error) {
+  if (error instanceof ApiError && error.status === 401 && isEnabled()) {
+    // The session lapsed while the app was open.
+    signOut();
+    showSignIn();
+    return document.createElement('span');
+  }
   const card = document.createElement('div');
   card.className = 'notice danger';
   card.setAttribute('role', 'alert');
@@ -567,6 +633,55 @@ async function flushQueue({ quiet = false } = {}) {
   }
 }
 
+let creatingAccount = false;
+
+function wireSignInForm() {
+  const form = $('#signin-form');
+  const error = $('#signin-error');
+
+  $('#signin-switch').addEventListener('click', () => {
+    creatingAccount = !creatingAccount;
+    $('#signin-submit').textContent = t(creatingAccount ? 'auth.signup' : 'auth.signin');
+    $('#signin-switch').textContent = t(creatingAccount ? 'auth.switch_signin' : 'auth.switch_signup');
+    $('#s-password').autocomplete = creatingAccount ? 'new-password' : 'current-password';
+    error.textContent = '';
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = $('#signin-submit');
+    const email = form.elements.email.value.trim();
+    const password = form.elements.password.value;
+
+    submit.disabled = true;
+    const label = submit.textContent;
+    submit.textContent = t('auth.working');
+    error.textContent = '';
+
+    try {
+      if (creatingAccount) {
+        const { needsConfirmation } = await signUp(email, password);
+        if (needsConfirmation) {
+          // Supabase sent a confirmation link; there is no token yet, so
+          // say so rather than dropping them on a sign-in screen again.
+          error.textContent = t('auth.check_email');
+          return;
+        }
+      } else {
+        await signIn(email, password);
+      }
+      await boot();
+    } catch (caught) {
+      error.textContent = caught.status >= 400 && caught.status < 500
+        ? t('auth.failed')
+        : (caught.message || t('common.error'));
+    } finally {
+      submit.disabled = false;
+      submit.textContent = label;
+    }
+  });
+}
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('/service-worker.js').catch(() => {
@@ -575,6 +690,7 @@ function registerServiceWorker() {
 }
 
 wireBookingForm();
-boot().catch((error) => {
+wireSignInForm();
+start().catch((error) => {
   document.querySelector('#main').replaceChildren(errorCard(error));
 });

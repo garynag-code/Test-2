@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from functools import wraps
 
 from flask import Flask, g, jsonify, request, send_from_directory
 
 from . import i18n
-from .db import open_db
+from .auth import Auth, AuthError, guard_exposure
+from .db import create_room, default_url, describe, open_db
 from .dates import fmt, parse_date, today_in, utc_stamp
 from .ledger import (
     LedgerError, agenda, available_rooms, calendar, cancel_booking, day_sheet,
@@ -28,7 +28,6 @@ from .sync import (
 )
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-DEFAULT_DB = os.environ.get("PERCH_DB", "perch.db")
 
 
 class NotFound(Exception):
@@ -36,13 +35,15 @@ class NotFound(Exception):
     LookupError — using it here turns a missing request field into a 404."""
 
 
-def create_app(db_path: str | None = None) -> Flask:
+def create_app(db_path: str | None = None, auth: Auth | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
-    app.config["DB_PATH"] = db_path or DEFAULT_DB
+    app.config["DB_PATH"] = db_path or default_url()
+    auth = auth if auth is not None else Auth()
+    app.config["AUTH"] = auth
 
     # ---------------------------------------------------------------- db
 
-    def db() -> sqlite3.Connection:
+    def db():
         if "db" not in g:
             g.db = open_db(app.config["DB_PATH"])
         return g.db
@@ -53,21 +54,70 @@ def create_app(db_path: str | None = None) -> Flask:
         if conn is not None:
             conn.close()
 
-    def current_property() -> sqlite3.Row:
-        row = db().execute("SELECT * FROM property ORDER BY id LIMIT 1").fetchone()
+    def current_user():
+        """Who is making this request.
+
+        In local mode this is always the same notional owner; the app is only
+        reachable from the machine it runs on.
+        """
+        if "user" not in g:
+            g.user = auth.verify(auth.token_from_header(
+                request.headers.get("Authorization")))
+        return g.user
+
+    def current_property():
+        """The property belonging to whoever is asking.
+
+        Scoping by owner is what keeps two Perch users on the same hosted
+        instance from seeing each other's guests.
+        """
+        user = current_user()
+        if not auth.enabled:
+            row = db().execute("SELECT * FROM property ORDER BY id LIMIT 1").fetchone()
+            if row is None:
+                raise NotFound("no property has been set up yet")
+            return row
+
+        row = db().execute(
+            "SELECT * FROM property WHERE owner_id = ? ORDER BY id LIMIT 1",
+            (user.id,)).fetchone()
         if row is None:
-            raise NotFound("no property has been set up yet")
+            row = start_property_for(user)
         return row
+
+    def start_property_for(user):
+        """First sign-in: give them somewhere to put bookings.
+
+        Three empty rooms rather than a blank page, and deliberately no sample
+        guests — invented reservations in a real account are indistinguishable
+        from a sync that has gone wrong.
+        """
+        from .db import create_property
+
+        property_id = create_property(
+            db(), "My guesthouse", owner_id=user.id,
+            timezone=os.environ.get("PERCH_DEFAULT_TZ", "UTC"),
+            currency=os.environ.get("PERCH_DEFAULT_CURRENCY", "EUR"))
+        for index, name in enumerate(("Room 1", "Room 2", "Room 3"), start=1):
+            create_room(db(), property_id, name, sort_order=index)
+        return db().execute("SELECT * FROM property WHERE id = ?",
+                            (property_id,)).fetchone()
 
     def json_error(status: int, message: str, **extra):
         return jsonify({"error": message, **extra}), status
 
-    def api(fn):
+    def _handled(fn, *, signed_in: bool):
         """Turn the handful of expected failures into honest status codes."""
         @wraps(fn)
         def wrapper(*args, **kwargs):
             try:
+                if signed_in:
+                    current_user()
                 return fn(*args, **kwargs)
+            except AuthError as exc:
+                # 401 rather than 403: the browser's job is to show the sign-in
+                # screen, not to tell the owner they are forbidden.
+                return json_error(401, str(exc))
             except NotFound as exc:
                 return json_error(404, str(exc))
             except LedgerError as exc:
@@ -77,6 +127,18 @@ def create_app(db_path: str | None = None) -> Flask:
             except (ValueError, TypeError) as exc:
                 return json_error(400, str(exc))
         return wrapper
+
+    def api(fn):
+        """An owner-facing endpoint: requires a signed-in user when hosted."""
+        return _handled(fn, signed_in=True)
+
+    def token_api(fn):
+        """An endpoint authenticated by its own unguessable URL token.
+
+        The platforms cannot sign in, so the calendar feed and the inbound
+        reservation hook carry their credential in the path instead.
+        """
+        return _handled(fn, signed_in=False)
 
     def window(default_days: int = 30) -> tuple[str, str]:
         prop = current_property()
@@ -115,12 +177,15 @@ def create_app(db_path: str | None = None) -> Flask:
     @app.get("/api/bootstrap")
     @api
     def bootstrap():
+        user = current_user()
         prop = current_property()
         locale = request.args.get("locale") or prop["locale"]
         rooms = [dict(r) for r in db().execute(
             "SELECT * FROM room WHERE property_id = ? AND active = 1"
             " ORDER BY sort_order, name", (prop["id"],))]
         return jsonify({
+            "auth": auth.client_config(),
+            "user": {"id": user.id, "email": user.email},
             "property": dict(prop),
             "rooms": rooms,
             "channels": channel_overview(db(), prop["id"]),
@@ -298,7 +363,7 @@ def create_app(db_path: str | None = None) -> Flask:
                      "Cache-Control": "no-cache"})
 
     @app.post("/hooks/<token>")
-    @api
+    @token_api
     def inbound_hook(token):
         """The paid tier's inbound path — a reservation pushed to us in seconds."""
         row = db().execute("SELECT id FROM channel WHERE inbound_token = ?",
@@ -314,9 +379,52 @@ def create_app(db_path: str | None = None) -> Flask:
         # retry forever over a clash only the owner can settle.
         return jsonify(result), 200
 
+    @app.post("/api/cron/sync")
+    @token_api
+    def cron_sync():
+        """Poll every property's channels. Called by a scheduler, not a person.
+
+        Authenticated by PERCH_SYNC_TOKEN rather than a sign-in, and it walks
+        every property because the scheduler has no owner to scope it to.
+        """
+        auth.check_sync_token(request.headers.get("X-Perch-Sync-Token"))
+
+        summary = []
+        for row in db().execute("SELECT id, name FROM property ORDER BY id"):
+            channels = [r.as_dict() for r in sync_all(db(), row["id"])]
+            guards = [r.as_dict() for r in enforce_guards(db(), row["id"])]
+            summary.append({
+                "property_id": row["id"],
+                "channels": len(channels),
+                "imported": sum(c["imported"] for c in channels),
+                "cancelled": sum(c["cancelled"] for c in channels),
+                "conflicts": sum(c["conflicts"] for c in channels),
+                "closed": sum(g["closed"] for g in guards),
+                "reopened": sum(g["reopened"] for g in guards),
+            })
+        return jsonify({"synced": summary, "at": utc_stamp()})
+
+    @app.get("/api/auth-config")
+    def auth_config():
+        """Read before sign-in, so it cannot itself require one.
+
+        It carries a language bundle too: the sign-in screen has to be readable
+        before there is a property to take a locale from, and an owner who
+        cannot read English should not have to guess which box is the password.
+        """
+        requested = (request.args.get("locale")
+                     or request.accept_languages.best
+                     or "en")
+        return jsonify({**auth.client_config(), "i18n": i18n.bundle(requested)})
+
     @app.get("/healthz")
     def healthz():
-        return jsonify({"ok": True, "at": utc_stamp()})
+        return jsonify({
+            "ok": True,
+            "at": utc_stamp(),
+            "database": describe(app.config["DB_PATH"]),
+            "login": "supabase" if auth.enabled else "local (no login)",
+        })
 
     return app
 
@@ -325,7 +433,8 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Run the Perch booking manager.")
-    parser.add_argument("--db", default=DEFAULT_DB, help="path to the ledger database")
+    parser.add_argument("--db", default=None,
+                        help="database: a file path, or a postgresql:// URL")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--demo", action="store_true",
@@ -333,6 +442,11 @@ def main() -> None:
     parser.add_argument("--quiet", action="store_true",
                         help="hide the server's own logging (used by the Start files)")
     args = parser.parse_args()
+    args.db = args.db or default_url()
+
+    auth = Auth()
+    # Never serve guest data to a network with no login in front of it.
+    guard_exposure(args.host, auth)
 
     if args.demo:
         from .sample import seed_demo
@@ -350,7 +464,7 @@ def main() -> None:
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         flask.cli.show_server_banner = lambda *a, **k: None
 
-    create_app(args.db).run(host=args.host, port=args.port)
+    create_app(args.db, auth=auth).run(host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
