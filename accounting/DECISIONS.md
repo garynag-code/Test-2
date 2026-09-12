@@ -78,3 +78,23 @@ disagree with supplier invoices on half-cents.
 VAT codes belong on the income or expense line that bears the taxable amount; the control account
 holds the VAT itself. The posting service rejects a VAT code on an account whose control type is Vat,
 which would otherwise double-count the tax line in the return summary.
+
+## D-016 Duplicate detection counts occurrences rather than matching on distinctness
+A real statement contains identical transactions on one day — two purchases of the same amount at the
+same merchant. Treating a repeated (date, amount, description) as a duplicate would silently discard
+the second and understate the bank. Instead, each incoming line takes an ordinal among identical lines
+in its file, and only as many as are already held for that bank account count as duplicates. A file
+with three identical charges where two are held imports exactly one. The running balance is included
+in the key where the format supplies it, since it distinguishes otherwise identical transactions.
+
+## D-017 Imported bank lines are not accounting records
+An import writes `bank_transactions` only. Nothing reaches the ledger until a line is allocated and
+posted through `IPostingService`, which keeps the rule that only the posting service creates posted
+journal lines (specification section 5.4) and lets a bookkeeper import freely without accounting
+consequence. INV-007 is enforced by the existing unique index on
+`(entity_id, source_module, source_record_id)` plus a unique index on `bank_transactions.journal_id`.
+
+## D-018 A broken running-balance chain is a warning for CSV and will block auto-posting for PDF
+Specification BNK-AC-003 requires that a PDF failing statement-balance validation cannot auto-post.
+For CSV the same check runs but reports a warning, because a partial or filtered export legitimately
+starts mid-chain. The PDF parser will treat it as blocking when it is built.

@@ -1,4 +1,5 @@
 using Accounting.Application.Abstractions;
+using Accounting.Application.Banking;
 using Accounting.Application.EntitySetup;
 using Accounting.Application.GeneralLedger;
 using Accounting.Application.Security;
@@ -55,6 +56,8 @@ public sealed class LedgerScenario : IAsyncDisposable
     public required ITrialBalanceService Reporting { get; init; }
     public required IPeriodService Periods { get; init; }
     public required IVatCalculationService Vat { get; init; }
+    public required IBankImportService BankImport { get; init; }
+    public required Guid BankAccountId { get; init; }
     public required Guid EntityId { get; init; }
     public required UserContext Preparer { get; init; }
     public required UserContext Administrator { get; init; }
@@ -85,9 +88,25 @@ public sealed class LedgerScenario : IAsyncDisposable
             .Where(a => a.EntityId == entity.Id)
             .ToDictionaryAsync(a => a.Code, a => a.Id);
 
+        // A bank account mapped to the starter chart's bank control account.
+        var bankAccount = new Accounting.Domain.Entities.BankAccount
+        {
+            EntityId = entity.Id,
+            Name = "FNB Business Cheque",
+            BankKey = "FNB",
+            AccountNumber = "62000000000",
+            LedgerAccountId = accounts["1000"],
+            CreatedAtUtc = clock.UtcNow,
+            CreatedBy = admin.UserId,
+        };
+        db.BankAccounts.Add(bankAccount);
+        await db.SaveChangesAsync();
+
         return new LedgerScenario
         {
             Db = db,
+            BankImport = new BankImportService(db, [new FnbCsvStatementParser()], audit, clock),
+            BankAccountId = bankAccount.Id,
             Posting = new PostingService(db, audit, vat, clock),
             Vat = vat,
             Drafts = new DraftJournalService(db, audit, clock),

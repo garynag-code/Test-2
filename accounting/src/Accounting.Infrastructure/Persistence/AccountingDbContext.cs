@@ -18,6 +18,9 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
     public DbSet<VatCode> VatCodes => Set<VatCode>();
     public DbSet<VatRateHistory> VatRateHistories => Set<VatRateHistory>();
     public DbSet<TaxLine> TaxLines => Set<TaxLine>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<BankImportBatch> BankImportBatches => Set<BankImportBatch>();
+    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
     public DbSet<Journal> Journals => Set<Journal>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<EntityUserAccess> EntityUserAccess => Set<EntityUserAccess>();
@@ -157,6 +160,36 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
 
         b.Entity<Journal>().Ignore(x => x.TotalDebit).Ignore(x => x.TotalCredit)
             .Ignore(x => x.IsBalanced).Ignore(x => x.IsPosted);
+
+        b.Entity<BankAccount>(e =>
+        {
+            e.HasIndex(x => new { x.EntityId, x.Name }).IsUnique();
+            e.HasOne(x => x.LedgerAccount).WithMany()
+                .HasForeignKey(x => x.LedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Version).IsConcurrencyToken();
+        });
+
+        b.Entity<BankImportBatch>(e =>
+        {
+            e.HasIndex(x => new { x.BankAccountId, x.FileHash });
+            e.HasIndex(x => new { x.EntityId, x.ImportedAtUtc });
+            e.HasOne(x => x.BankAccount).WithMany()
+                .HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
+
+        b.Entity<BankTransaction>(e =>
+        {
+            e.HasIndex(x => new { x.BankAccountId, x.TransactionDate });
+            e.HasIndex(x => new { x.EntityId, x.Status });
+            // INV-007: a bank line reaches the ledger at most once.
+            e.HasIndex(x => x.JournalId).IsUnique().HasFilter("journal_id IS NOT NULL");
+            e.HasOne(x => x.ImportBatch).WithMany(x => x.Transactions)
+                .HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Amount).HasColumnType(Money);
+            e.Property(x => x.StatementBalance).HasColumnType(Money);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
 
         b.Entity<EntityUserAccess>(e =>
         {

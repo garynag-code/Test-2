@@ -9,5 +9,6 @@
     <Project Path="tests/Application.Tests/Application.Tests.csproj" />
     <Project Path="tests/Domain.Tests/Domain.Tests.csproj" />
     <Project Path="tests/Integration.Tests/Integration.Tests.csproj" />
+    <Project Path="tests/Parser.Tests/Parser.Tests.csproj" />
   </Folder>
 </Solution>

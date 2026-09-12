@@ -2,6 +2,7 @@ using Accounting.Application.Abstractions;
 using Accounting.Application.EntitySetup;
 using Accounting.Application.GeneralLedger;
 using Accounting.Application.Security;
+using Accounting.Application.Banking;
 using Accounting.Application.Vat;
 using Accounting.Infrastructure.Persistence;
 using Accounting.Infrastructure.Security;
@@ -21,6 +22,8 @@ public static class DependencyInjection
         services.AddScoped<IAuditEventWriter, AuditEventWriter>();
         services.AddScoped<IEntityAccessService, EntityAccessService>();
         services.AddScoped<IVatCalculationService, VatCalculationService>();
+        services.AddScoped<IBankStatementParser, FnbCsvStatementParser>();
+        services.AddScoped<IBankImportService, BankImportService>();
         services.AddScoped<IVatReturnService, VatReturnService>();
         services.AddScoped<IPostingService, PostingService>();
         services.AddScoped<IDraftJournalService, DraftJournalService>();

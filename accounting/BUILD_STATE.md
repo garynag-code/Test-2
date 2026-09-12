@@ -1,6 +1,6 @@
 # Build state
 
-**Milestone:** M2 — Banking/VAT. VAT engine complete; banking next.
+**Milestone:** M2 — Banking/VAT. VAT engine and FNB CSV import complete; allocation next.
 
 ## Completed
 - **M0 Foundation** — solution scaffold, PostgreSQL schema and migrations, ASP.NET Core Identity
@@ -17,27 +17,47 @@
   the posting service, reversals pinned to the original tax point, and `IVatReturnService` giving a
   return-period summary by VAT201 classification with VAT control-account reconciliation.
 
+- **M2 bank import** — `bank_accounts`, `bank_import_batches`, `bank_transactions`;
+  `IBankStatementParser` with an FNB CSV implementation read from real export shape;
+  `IBankImportService` with preview and commit, file-hash re-import detection and occurrence-counting
+  duplicate detection. Imported lines are held unallocated and never reach the ledger until posted.
+
 ## Tests
-`dotnet test` — 88 passing (19 domain, 13 application, 56 integration against real PostgreSQL).
-Covers INV-001 to INV-005, INV-007 groundwork, GL-AC-001 to GL-AC-003, SEC-AC-001,
-VAT-AC-001 and VAT-AC-002, period locking, reversal, rate-change handling, trial balance derivation,
-VAT control reconciliation and audit events.
+`dotnet test` — 116 passing (19 domain, 13 application, 17 parser, 67 integration against real
+PostgreSQL).
+Covers INV-001 to INV-006, GL-AC-001 to GL-AC-003, SEC-AC-001, VAT-AC-001 and VAT-AC-002,
+BNK-AC-001 and BNK-AC-002, period locking, reversal, rate-change handling, trial balance derivation,
+VAT control reconciliation, statement parsing and audit events.
 
 ## Blockers
 None.
 
 ## Next action
-Continue **M2 — Banking**, specification section 29.1 step 6 onwards:
-1. `bank_accounts`, `bank_import_batches`, `bank_transactions`; FNB CSV parser behind
-   `IBankStatementParser`; duplicate detection on file hash and transaction level (BNK-AC-001/002).
-2. Allocation rules and the cashbook, posting through `IPostingService`. The no-VAT override reason
-   of section 12.3 is enforced here, not in the ledger — see DECISIONS.md D-012.
-3. Bank reconciliation with zero unexplained difference (REC-AC-001).
-4. Nedbank, Absa and Standard Bank parsers; PDF parsing after the CSV path is stable.
+Continue **M2 — Banking**, specification sections 15 and 16:
+1. Allocation: allocate a `BankTransaction` to accounts with VAT, split allocations, and post through
+   `IPostingService` using `SourceModule = "Banking"` and the transaction id as `SourceRecordId`, so
+   INV-007 is enforced by the existing unique index. The no-VAT override reason of section 12.3 is
+   enforced here, not in the ledger — see DECISIONS.md D-012.
+2. Allocation rules: exact/contains/wildcard conditions with VAT defaults, and the matched rule shown
+   on the suggestion (AUT-AC-001); manual override retained and able to reduce confidence (AUT-AC-002).
+3. Bank reconciliation, finalisable only at zero unexplained difference (REC-AC-001).
+4. Nedbank, Absa and Standard Bank CSV parsers; PDF parsing once the CSV path is stable.
 
 Do not start M3 financial-statement mapping until the M2 exit criteria in specification section 29 pass.
 
 ## Bank statement format notes (from real FNB samples)
+
+### FNB CSV ("Account Transaction History") — implemented
+- Six preamble lines (title, blank, `Name:`, `Account:`, `Balance:`, blank) before the
+  `Date, Amount, Balance, Description` header. Fields carry leading spaces; rows end with a trailing comma.
+- Dates are `dd MM yyyy` **with** the year, unlike the PDF.
+- Amounts are signed, money out negative. Balance is the running balance.
+- Rows are newest first, and not strictly ordered within a day.
+- A file can legitimately contain identical rows (same date, amount and description) — two real
+  purchases. Duplicate detection counts occurrences rather than matching on distinctness; collapsing
+  them would understate the bank.
+
+### FNB PDF — not yet implemented
 - Transaction dates carry no year; derive it from the statement period and handle a December rollover.
 - Credits are marked by a `Cr` suffix on the amount; debits carry no suffix. Balances always carry
   `Cr` or `Dr`.

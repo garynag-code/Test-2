@@ -51,6 +51,7 @@ app.MapIdentityApi<IdentityUser>().WithTags("Identity");
 app.MapEntityEndpoints();
 app.MapJournalEndpoints();
 app.MapReportingEndpoints();
+app.MapBankingEndpoints();
 
 app.MapGet("/api/v1/system/info", (IConfiguration config) => Results.Ok(new
 {

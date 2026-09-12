@@ -23,3 +23,9 @@ public enum VatInputOutputMode { Input = 1, Output = 2, Both = 3 }
 
 /// <summary>Whether a tax line is input VAT (on purchases) or output VAT (on supplies).</summary>
 public enum VatDirection { Input = 1, Output = 2 }
+
+/// <summary>Lifecycle of a statement import.</summary>
+public enum BankImportStatus { Preview = 1, Committed = 2, Discarded = 3 }
+
+/// <summary>Lifecycle of an imported bank line.</summary>
+public enum BankTransactionStatus { Unallocated = 1, Allocated = 2, Excluded = 3 }
