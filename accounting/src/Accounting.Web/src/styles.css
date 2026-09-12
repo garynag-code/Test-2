@@ -1,0 +1,11 @@
+:root { font-family: system-ui, sans-serif; color-scheme: light dark; }
+body { margin: 0; padding: 1.5rem; }
+h1, h2 { margin: 0 0 0.75rem; }
+section { margin-bottom: 2rem; }
+label { display: block; margin-bottom: 0.5rem; }
+input, select, button { font: inherit; padding: 0.35rem; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border-bottom: 1px solid #8884; padding: 0.35rem 0.5rem; text-align: left; }
+td.amount, th.amount { text-align: right; font-variant-numeric: tabular-nums; }
+.error { white-space: pre-wrap; color: #b00020; }
+.status { color: #555; }
