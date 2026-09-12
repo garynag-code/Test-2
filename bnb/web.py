@@ -330,11 +330,25 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--demo", action="store_true",
                         help="seed a sample property and start with data to look at")
+    parser.add_argument("--quiet", action="store_true",
+                        help="hide the server's own logging (used by the Start files)")
     args = parser.parse_args()
 
     if args.demo:
         from .sample import seed_demo
         seed_demo(args.db)
+
+    if args.quiet:
+        # The double-click launchers print their own plain-language status, and
+        # a "WARNING: This is a development server" underneath it reads as
+        # something having gone wrong to an owner who has never seen a terminal.
+        # Both banners come from these two places; real errors still surface.
+        import logging
+
+        import flask.cli
+
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        flask.cli.show_server_banner = lambda *a, **k: None
 
     create_app(args.db).run(host=args.host, port=args.port)
 

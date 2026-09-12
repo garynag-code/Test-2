@@ -21,3 +21,7 @@ perch.db
 *.db
 *.db-wal
 *.db-shm
+
+# Created by the Start files
+.perch-log.txt
+.perch-env/

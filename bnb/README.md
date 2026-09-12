@@ -7,13 +7,33 @@ same room-night be sold twice.
 Runs on Python 3.9+ and Flask. No build step, no container platform, no
 third-party services. A four-room guesthouse should not need a DevOps team.
 
+## Starting it
+
+**If you don't write code**, open the `bnb` folder and double-click the Start
+file for your computer:
+
+| | |
+|---|---|
+| Mac | `start-mac.command` |
+| Windows | `start-windows.bat` |
+| Linux | `start-linux.sh` |
+
+It checks what's needed, installs the one missing piece if it has to, and opens
+Perch in your browser. If Python isn't on the computer yet it says so in plain
+language and opens the download page. Nothing needs an administrator password.
+
+Leave that window open while you're using Perch; closing it stops the app.
+
+**From a terminal:**
+
 ```bash
 pip install -r requirements.txt          # just Flask
 python -m bnb --demo                     # then open http://localhost:5000
 ```
 
-`--demo` seeds a sample property whose Garden Room has been sold twice — once on
-Airbnb, once on Booking.com — so you can see the clash being caught.
+Either way, `--demo` seeds a sample property whose Garden Room has been sold
+twice — once on Airbnb, once on Booking.com — so you can see the clash being
+caught. Delete `perch.db` to start over.
 
 ---
 
