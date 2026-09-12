@@ -57,6 +57,8 @@ public sealed class LedgerScenario : IAsyncDisposable
     public required IPeriodService Periods { get; init; }
     public required IVatCalculationService Vat { get; init; }
     public required IBankImportService BankImport { get; init; }
+    public required IBankAllocationService Allocation { get; init; }
+    public required IAllocationRuleEngine Rules { get; init; }
     public required Guid BankAccountId { get; init; }
     public required Guid EntityId { get; init; }
     public required UserContext Preparer { get; init; }
@@ -106,6 +108,8 @@ public sealed class LedgerScenario : IAsyncDisposable
         {
             Db = db,
             BankImport = new BankImportService(db, [new FnbCsvStatementParser()], audit, clock),
+            Allocation = new BankAllocationService(db, new PostingService(db, audit, vat, clock), vat, audit, clock),
+            Rules = new AllocationRuleEngine(db),
             BankAccountId = bankAccount.Id,
             Posting = new PostingService(db, audit, vat, clock),
             Vat = vat,

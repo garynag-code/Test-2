@@ -1,6 +1,6 @@
 # Build state
 
-**Milestone:** M2 — Banking/VAT. VAT engine and FNB CSV import complete; allocation next.
+**Milestone:** M2 — Banking/VAT. VAT, import and allocation complete; reconciliation next.
 
 ## Completed
 - **M0 Foundation** — solution scaffold, PostgreSQL schema and migrations, ASP.NET Core Identity
@@ -22,26 +22,31 @@
   `IBankImportService` with preview and commit, file-hash re-import detection and occurrence-counting
   duplicate detection. Imported lines are held unallocated and never reach the ledger until posted.
 
+- **M2 allocation** — `allocation_rules` with exact/contains/starts-with/wildcard matching, sequence
+  precedence, money-in/out restriction and confidence that falls on override; `IBankAllocationService`
+  turns a bank line into a posted journal through `IPostingService`, splitting VAT out of the gross,
+  supporting multi-account splits, and enforcing the section 12.3 no-VAT reason.
+
 ## Tests
-`dotnet test` — 116 passing (19 domain, 13 application, 17 parser, 67 integration against real
+`dotnet test` — 141 passing (19 domain, 13 application, 17 parser, 92 integration against real
 PostgreSQL).
 Covers INV-001 to INV-006, GL-AC-001 to GL-AC-003, SEC-AC-001, VAT-AC-001 and VAT-AC-002,
-BNK-AC-001 and BNK-AC-002, period locking, reversal, rate-change handling, trial balance derivation,
+BNK-AC-001, BNK-AC-002, AUT-AC-001 and AUT-AC-002, period locking, reversal, rate-change handling, trial balance derivation,
 VAT control reconciliation, statement parsing and audit events.
 
 ## Blockers
 None.
 
 ## Next action
-Continue **M2 — Banking**, specification sections 15 and 16:
-1. Allocation: allocate a `BankTransaction` to accounts with VAT, split allocations, and post through
-   `IPostingService` using `SourceModule = "Banking"` and the transaction id as `SourceRecordId`, so
-   INV-007 is enforced by the existing unique index. The no-VAT override reason of section 12.3 is
-   enforced here, not in the ledger — see DECISIONS.md D-012.
-2. Allocation rules: exact/contains/wildcard conditions with VAT defaults, and the matched rule shown
-   on the suggestion (AUT-AC-001); manual override retained and able to reduce confidence (AUT-AC-002).
-3. Bank reconciliation, finalisable only at zero unexplained difference (REC-AC-001).
-4. Nedbank, Absa and Standard Bank CSV parsers; PDF parsing once the CSV path is stable.
+Finish **M2 — Banking**, specification section 16:
+1. `bank_reconciliations` and `bank_reconciliation_lines`: match imported bank lines against posted
+   ledger movement on the bank control account, carry outstanding items, and refuse to finalise unless
+   the unexplained difference is exactly zero (REC-AC-001).
+2. Nedbank, Absa and Standard Bank CSV parsers behind the same `IBankStatementParser`.
+3. FNB PDF parsing, treating a broken statement-balance chain as blocking (BNK-AC-003).
+4. A cashbook UI over import, suggestion, allocation and reconciliation.
+
+Do not start M3 financial-statement mapping until the M2 exit criteria in specification section 29 pass.
 
 Do not start M3 financial-statement mapping until the M2 exit criteria in specification section 29 pass.
 

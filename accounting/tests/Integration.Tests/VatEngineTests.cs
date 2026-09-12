@@ -290,6 +290,44 @@ public class VatEngineTests(DatabaseFixture fixture)
         Assert.Equal(VatDirection.Input, reversingTaxLine.Direction);
     }
 
+    /// <summary>
+    /// A VAT-inclusive amount splits by the gross, not by recalculating from the rounded net.
+    /// R655.00 inclusive is R569.57 plus R85.43; 15% of the rounded R569.57 would be R85.44, and
+    /// rejecting the correct split over that cent would make real bank charges unpostable.
+    /// </summary>
+    [Fact]
+    public async Task Vat_stated_from_a_gross_amount_is_accepted_despite_the_rounded_net()
+    {
+        await using var scenario = await LedgerScenario.CreateAsync(fixture);
+        var standard = await VatCodeIdAsync(scenario, "01");
+
+        var result = await scenario.Posting.PostAsync(new PostRequest
+        {
+            EntityId = scenario.EntityId,
+            TransactionDate = PostingDate,
+            Description = "Monthly account fee, R655.00 inclusive",
+            Lines =
+            [
+                new PostLineRequest
+                {
+                    AccountId = scenario.Account("6020"),
+                    DebitAmount = 569.57m,
+                    VatCodeId = standard,
+                    VatAmount = 85.43m,
+                },
+                new PostLineRequest { AccountId = scenario.Account("2100"), DebitAmount = 85.43m },
+                new PostLineRequest { AccountId = scenario.Account("1000"), CreditAmount = 655.00m },
+            ],
+        }, scenario.Preparer);
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(e => e.Message)));
+
+        var taxLine = await scenario.Db.TaxLines.AsNoTracking().FirstAsync(t => t.EntityId == scenario.EntityId);
+        Assert.Equal(569.57m, taxLine.TaxableAmount);
+        Assert.Equal(85.43m, taxLine.VatAmount);
+        Assert.Equal(655.00m, taxLine.TaxableAmount + taxLine.VatAmount);
+    }
+
     [Fact]
     public async Task Partly_recoverable_code_records_the_recoverable_portion()
     {

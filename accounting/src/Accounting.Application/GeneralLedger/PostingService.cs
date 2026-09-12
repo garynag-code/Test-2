@@ -432,8 +432,16 @@ public sealed class PostingService(
 
         var taxPoint = request.TaxPointDate ?? request.TransactionDate;
         var taxableAmount = line.DebitAmount + line.CreditAmount;
-        var result = await vat.CalculateAsync(request.EntityId, vatCodeId, taxableAmount,
-            amountIncludesVat: false, taxPoint, ct);
+
+        // Where the caller states a VAT amount, it is validated as the split of the gross the two make
+        // together, not by recalculating from the rounded net. A bank charge of 655.00 inclusive is
+        // 569.57 plus 85.43; recomputing 15% of the rounded 569.57 gives 85.44, which would reject a
+        // correct allocation over a rounding artefact. The gross is the figure the bank actually moved.
+        var result = line.VatAmount is { } statedVat
+            ? await vat.CalculateAsync(request.EntityId, vatCodeId, taxableAmount + statedVat,
+                amountIncludesVat: true, taxPoint, ct)
+            : await vat.CalculateAsync(request.EntityId, vatCodeId, taxableAmount,
+                amountIncludesVat: false, taxPoint, ct);
 
         if (!result.Succeeded)
         {
@@ -443,11 +451,13 @@ public sealed class PostingService(
 
         var calculation = result.Calculation!;
         if (line.VatAmount is { } supplied &&
-            decimal.Round(supplied, MoneyScale) != decimal.Round(calculation.VatAmount, MoneyScale))
+            (decimal.Round(supplied, MoneyScale) != decimal.Round(calculation.VatAmount, MoneyScale)
+             || decimal.Round(taxableAmount, MoneyScale) != decimal.Round(calculation.TaxableAmount, MoneyScale)))
         {
             errors.Add(new PostError(PostingErrors.VatMismatch,
-                $"Line {lineNo}: VAT of {supplied:0.00} does not match {calculation.VatAmount:0.00} " +
-                $"calculated at {calculation.RatePercent:0.##}% on {taxableAmount:0.00}."));
+                $"Line {lineNo}: {taxableAmount:0.00} plus VAT of {supplied:0.00} does not split at " +
+                $"{calculation.RatePercent:0.##}%; the correct split of {taxableAmount + supplied:0.00} " +
+                $"is {calculation.TaxableAmount:0.00} plus {calculation.VatAmount:0.00}."));
             return null;
         }
 

@@ -18,6 +18,7 @@ public interface IAccountingDbContext
     DbSet<BankAccount> BankAccounts { get; }
     DbSet<BankImportBatch> BankImportBatches { get; }
     DbSet<BankTransaction> BankTransactions { get; }
+    DbSet<AllocationRule> AllocationRules { get; }
     DbSet<Journal> Journals { get; }
     DbSet<JournalLine> JournalLines { get; }
     DbSet<EntityUserAccess> EntityUserAccess { get; }

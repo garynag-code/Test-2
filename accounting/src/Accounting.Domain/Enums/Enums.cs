@@ -29,3 +29,6 @@ public enum BankImportStatus { Preview = 1, Committed = 2, Discarded = 3 }
 
 /// <summary>Lifecycle of an imported bank line.</summary>
 public enum BankTransactionStatus { Unallocated = 1, Allocated = 2, Excluded = 3 }
+
+/// <summary>How an allocation rule matches a bank transaction description (specification section 15).</summary>
+public enum RuleMatchType { Exact = 1, Contains = 2, StartsWith = 3, Wildcard = 4 }

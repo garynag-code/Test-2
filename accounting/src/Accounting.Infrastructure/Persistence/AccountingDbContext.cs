@@ -21,6 +21,7 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
     public DbSet<BankImportBatch> BankImportBatches => Set<BankImportBatch>();
     public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
+    public DbSet<AllocationRule> AllocationRules => Set<AllocationRule>();
     public DbSet<Journal> Journals => Set<Journal>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<EntityUserAccess> EntityUserAccess => Set<EntityUserAccess>();
@@ -189,6 +190,19 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
             e.Property(x => x.Amount).HasColumnType(Money);
             e.Property(x => x.StatementBalance).HasColumnType(Money);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
+
+        b.Entity<AllocationRule>(e =>
+        {
+            e.HasIndex(x => new { x.EntityId, x.Sequence });
+            e.HasIndex(x => new { x.EntityId, x.Name }).IsUnique();
+            e.HasOne(x => x.Account).WithMany()
+                .HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.VatCode).WithMany()
+                .HasForeignKey(x => x.VatCodeId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.MatchType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Version).IsConcurrencyToken();
+            e.Ignore(x => x.IsSuggestible);
         });
 
         b.Entity<EntityUserAccess>(e =>

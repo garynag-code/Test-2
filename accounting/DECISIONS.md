@@ -98,3 +98,22 @@ consequence. INV-007 is enforced by the existing unique index on
 Specification BNK-AC-003 requires that a PDF failing statement-balance validation cannot auto-post.
 For CSV the same check runs but reports a warning, because a partial or filtered export legitimately
 starts mid-chain. The PDF parser will treat it as blocking when it is built.
+
+## D-019 A stated VAT amount is validated against the gross, not recalculated from the rounded net
+A bank charge of R655.00 inclusive is R569.57 plus R85.43 VAT. Recalculating 15% of the rounded
+R569.57 gives R85.44, so validating that way would reject a correct allocation over a rounding
+artefact, and real bank charges would be unpostable. Where a line states its VAT, the posting service
+adds the two back into a gross and checks that the gross splits at the code's rate into exactly that
+net and that VAT. This accepts both VAT-exclusive and VAT-inclusive derivations while still rejecting
+an amount the rate does not support.
+
+## D-020 Allocation splits are gross; the bank line's sign decides the direction
+Each split states a positive amount as it appears on the statement, VAT included, and the splits must
+add up to the statement amount exactly. Whether the journal debits or credits the expense follows from
+the bank line's own sign, which removes a class of error where a payment is allocated as a receipt.
+
+## D-021 Rule confidence falls on override and rises on use
+A rule the user overrides loses 20 points; one they accept gains 1, capped at 100. Below 40 the rule is
+remembered but no longer suggested, so a rule that keeps guessing wrong stops interrupting, without the
+user having to find and disable it (AUT-AC-002). A rule is never deleted automatically: the history of
+what was suggested stays intact.
