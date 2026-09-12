@@ -117,3 +117,17 @@ A rule the user overrides loses 20 points; one they accept gains 1, capped at 10
 remembered but no longer suggested, so a rule that keeps guessing wrong stops interrupting, without the
 user having to find and disable it (AUT-AC-002). A rule is never deleted automatically: the history of
 what was suggested stays intact.
+
+## D-022 The reconciliation is recomputed from posted data, never stored as a running state
+Opening a reconciliation recalculates the ledger balance, the unallocated bank lines and the explained
+outstanding items from posted journals and imported transactions. Only the explanations a user adds are
+stored. A stored running difference would drift the moment a journal was posted or reversed behind it,
+and would then disagree with the ledger it is meant to prove. On finalisation the figures are frozen on
+the record, so the evidence of that reconciliation stays reproducible.
+
+## D-023 A ledger entry originating from an allocated bank line is reconciled by construction
+Such an entry carries `SourceModule = "Banking"` and the bank transaction's id, so it cannot be
+outstanding: the statement is where it came from. Only ledger entries with no bank line behind them —
+manual journals to the bank account — can be outstanding, and each must be explained individually
+before it counts towards reaching zero. An unexplained one blocks finalisation, which is what makes
+REC-AC-001 mean something rather than being a formality.

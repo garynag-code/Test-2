@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IBankImportService, BankImportService>();
         services.AddScoped<IAllocationRuleEngine, AllocationRuleEngine>();
         services.AddScoped<IBankAllocationService, BankAllocationService>();
+        services.AddScoped<IBankReconciliationService, BankReconciliationService>();
         services.AddScoped<IVatReturnService, VatReturnService>();
         services.AddScoped<IPostingService, PostingService>();
         services.AddScoped<IDraftJournalService, DraftJournalService>();

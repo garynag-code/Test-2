@@ -18,6 +18,9 @@ public sealed record CreateAllocationRuleRequest(
     string Name, RuleMatchType MatchType, string MatchText, Guid AccountId,
     Guid? VatCodeId, string? NoVatReason, int? Sequence, Guid? BankAccountId, bool? AppliesToMoneyIn);
 
+public sealed record StartReconciliationRequest(DateOnly StatementDate, decimal StatementBalance);
+public sealed record ExplainReconciliationRequest(Guid JournalLineId, string Explanation);
+
 public sealed record CreateBankAccountRequest(
     string Name, string BankKey, string? AccountNumber, string? BranchCode, Guid LedgerAccountId);
 
@@ -251,6 +254,62 @@ public static class BankingEndpoints
             }));
         });
 
+        group.MapPost("/bank-accounts/{bankAccountId:guid}/reconciliations", async (Guid bankAccountId,
+            StartReconciliationRequest request, ClaimsPrincipal principal, IEntityAccessService access,
+            IBankReconciliationService reconciliations, IAccountingDbContext db, CancellationToken ct) =>
+        {
+            var user = await ResolveForBankAccountAsync(bankAccountId, principal, access, db, ct);
+            if (user is null) return Results.Forbid();
+
+            var outcome = await reconciliations.StartAsync(bankAccountId, request.StatementDate,
+                request.StatementBalance, user, ct);
+            return ToResult(outcome);
+        });
+
+        group.MapGet("/reconciliations/{reconciliationId:guid}", async (Guid reconciliationId,
+            ClaimsPrincipal principal, IEntityAccessService access,
+            IBankReconciliationService reconciliations, IAccountingDbContext db, CancellationToken ct) =>
+        {
+            var user = await ResolveForReconciliationAsync(reconciliationId, principal, access, db, ct);
+            if (user is null) return Results.Forbid();
+
+            return ToResult(await reconciliations.GetAsync(reconciliationId, user, ct));
+        });
+
+        group.MapPost("/reconciliations/{reconciliationId:guid}/explain", async (Guid reconciliationId,
+            ExplainReconciliationRequest request, ClaimsPrincipal principal, IEntityAccessService access,
+            IBankReconciliationService reconciliations, IAccountingDbContext db, CancellationToken ct) =>
+        {
+            var user = await ResolveForReconciliationAsync(reconciliationId, principal, access, db, ct);
+            if (user is null) return Results.Forbid();
+
+            return ToResult(await reconciliations.ExplainAsync(reconciliationId, request.JournalLineId,
+                request.Explanation, user, ct));
+        });
+
+        group.MapDelete("/reconciliations/{reconciliationId:guid}/explain/{journalLineId:guid}",
+            async (Guid reconciliationId, Guid journalLineId, ClaimsPrincipal principal,
+            IEntityAccessService access, IBankReconciliationService reconciliations,
+            IAccountingDbContext db, CancellationToken ct) =>
+        {
+            var user = await ResolveForReconciliationAsync(reconciliationId, principal, access, db, ct);
+            if (user is null) return Results.Forbid();
+
+            return ToResult(await reconciliations.RemoveExplanationAsync(reconciliationId,
+                journalLineId, user, ct));
+        });
+
+        // REC-AC-001: refused unless the unexplained difference is exactly zero.
+        group.MapPost("/reconciliations/{reconciliationId:guid}/finalise", async (Guid reconciliationId,
+            ClaimsPrincipal principal, IEntityAccessService access,
+            IBankReconciliationService reconciliations, IAccountingDbContext db, CancellationToken ct) =>
+        {
+            var user = await ResolveForReconciliationAsync(reconciliationId, principal, access, db, ct);
+            if (user is null) return Results.Forbid();
+
+            return ToResult(await reconciliations.FinaliseAsync(reconciliationId, user, ct));
+        });
+
         group.MapGet("/bank-accounts/{bankAccountId:guid}/transactions", async (Guid bankAccountId,
             BankTransactionStatus? status, ClaimsPrincipal principal, IEntityAccessService access,
             IAccountingDbContext db, CancellationToken ct) =>
@@ -271,6 +330,20 @@ public static class BankingEndpoints
                 .ToListAsync(ct);
             return Results.Ok(transactions);
         });
+    }
+
+    private static IResult ToResult(ReconciliationOutcome outcome) =>
+        outcome.Succeeded
+            ? Results.Ok(outcome.View)
+            : Results.Json(new { outcome.ErrorCode, outcome.Message }, statusCode: 422);
+
+    private static async Task<UserContext?> ResolveForReconciliationAsync(Guid reconciliationId,
+        ClaimsPrincipal principal, IEntityAccessService access, IAccountingDbContext db,
+        CancellationToken ct)
+    {
+        var entityId = await db.BankReconciliations.AsNoTracking()
+            .Where(r => r.Id == reconciliationId).Select(r => (Guid?)r.EntityId).FirstOrDefaultAsync(ct);
+        return entityId is null ? null : await access.ResolveAsync(principal, entityId.Value, ct);
     }
 
     private static async Task<UserContext?> ResolveForBankAccountAsync(Guid bankAccountId,

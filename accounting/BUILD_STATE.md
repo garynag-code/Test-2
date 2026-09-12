@@ -1,6 +1,6 @@
 # Build state
 
-**Milestone:** M2 — Banking/VAT. VAT, import and allocation complete; reconciliation next.
+**Milestone:** M2 — Banking/VAT. Accounting engine complete; cashbook UI and further parsers remain.
 
 ## Completed
 - **M0 Foundation** — solution scaffold, PostgreSQL schema and migrations, ASP.NET Core Identity
@@ -27,24 +27,30 @@
   turns a bank line into a posted journal through `IPostingService`, splitting VAT out of the gross,
   supporting multi-account splits, and enforcing the section 12.3 no-VAT reason.
 
+- **M2 reconciliation** — `bank_reconciliations` and `bank_reconciliation_lines`. The view is
+  recomputed from posted data: ledger balance, unallocated bank lines, and ledger entries explained as
+  not yet presented. Finalisation is refused unless the unexplained difference is exactly zero
+  (INV-008, REC-AC-001), and the figures are frozen on the record when it is.
+
 ## Tests
-`dotnet test` — 141 passing (19 domain, 13 application, 17 parser, 92 integration against real
+`dotnet test` — 150 passing (19 domain, 13 application, 17 parser, 101 integration against real
 PostgreSQL).
 Covers INV-001 to INV-006, GL-AC-001 to GL-AC-003, SEC-AC-001, VAT-AC-001 and VAT-AC-002,
-BNK-AC-001, BNK-AC-002, AUT-AC-001 and AUT-AC-002, period locking, reversal, rate-change handling, trial balance derivation,
+BNK-AC-001, BNK-AC-002, AUT-AC-001, AUT-AC-002 and REC-AC-001, period locking, reversal, rate-change handling, trial balance derivation,
 VAT control reconciliation, statement parsing and audit events.
 
 ## Blockers
 None.
 
 ## Next action
-Finish **M2 — Banking**, specification section 16:
-1. `bank_reconciliations` and `bank_reconciliation_lines`: match imported bank lines against posted
-   ledger movement on the bank control account, carry outstanding items, and refuse to finalise unless
-   the unexplained difference is exactly zero (REC-AC-001).
+Finish **M2 — Banking**:
+1. **Cashbook UI** over the whole path: import a statement, review the preview with its duplicate
+   flags, accept or override rule suggestions, allocate with VAT, and reconcile. Nothing built since
+   the ledger has been exercised by a person rather than by tests — the UI is how that gap closes.
 2. Nedbank, Absa and Standard Bank CSV parsers behind the same `IBankStatementParser`.
 3. FNB PDF parsing, treating a broken statement-balance chain as blocking (BNK-AC-003).
-4. A cashbook UI over import, suggestion, allocation and reconciliation.
+
+Do not start M3 financial-statement mapping until the M2 exit criteria in specification section 29 pass.
 
 Do not start M3 financial-statement mapping until the M2 exit criteria in specification section 29 pass.
 

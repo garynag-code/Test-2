@@ -22,6 +22,8 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
     public DbSet<BankImportBatch> BankImportBatches => Set<BankImportBatch>();
     public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
     public DbSet<AllocationRule> AllocationRules => Set<AllocationRule>();
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+    public DbSet<BankReconciliationLine> BankReconciliationLines => Set<BankReconciliationLine>();
     public DbSet<Journal> Journals => Set<Journal>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<EntityUserAccess> EntityUserAccess => Set<EntityUserAccess>();
@@ -203,6 +205,29 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
             e.Property(x => x.MatchType).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Version).IsConcurrencyToken();
             e.Ignore(x => x.IsSuggestible);
+        });
+
+        b.Entity<BankReconciliation>(e =>
+        {
+            e.HasIndex(x => new { x.BankAccountId, x.StatementDate });
+            e.HasOne(x => x.BankAccount).WithMany()
+                .HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.StatementBalance).HasColumnType(Money);
+            e.Property(x => x.FinalLedgerBalance).HasColumnType(Money);
+            e.Property(x => x.FinalUnallocatedTotal).HasColumnType(Money);
+            e.Property(x => x.FinalOutstandingTotal).HasColumnType(Money);
+            e.Property(x => x.FinalUnexplainedDifference).HasColumnType(Money);
+        });
+
+        b.Entity<BankReconciliationLine>(e =>
+        {
+            e.HasIndex(x => new { x.ReconciliationId, x.JournalLineId }).IsUnique();
+            e.HasOne(x => x.Reconciliation).WithMany(x => x.Lines)
+                .HasForeignKey(x => x.ReconciliationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.JournalLine).WithMany()
+                .HasForeignKey(x => x.JournalLineId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Amount).HasColumnType(Money);
         });
 
         b.Entity<EntityUserAccess>(e =>

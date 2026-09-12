@@ -32,3 +32,6 @@ public enum BankTransactionStatus { Unallocated = 1, Allocated = 2, Excluded = 3
 
 /// <summary>How an allocation rule matches a bank transaction description (specification section 15).</summary>
 public enum RuleMatchType { Exact = 1, Contains = 2, StartsWith = 3, Wildcard = 4 }
+
+/// <summary>Lifecycle of a bank reconciliation (specification section 16).</summary>
+public enum ReconciliationStatus { Draft = 1, Final = 2 }
