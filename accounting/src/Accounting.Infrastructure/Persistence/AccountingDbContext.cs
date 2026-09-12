@@ -24,7 +24,7 @@ public class AccountingDbContext(DbContextOptions<AccountingDbContext> options)
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     /// <summary>Database schema version reported by System Information (specification section 7.2).</summary>
-    public const string SchemaVersion = "1.0.0";
+    public const string AccountingSchemaVersion = "1.0.0";
 
     /// <summary>Monetary columns, specification section 8.1.</summary>
     private const string Money = "numeric(19,4)";

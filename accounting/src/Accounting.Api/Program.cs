@@ -56,7 +56,7 @@ app.MapGet("/api/v1/system/info", (IConfiguration config) => Results.Ok(new
 {
     Application = "Local Accounting Platform",
     Version = typeof(Program).Assembly.GetName().Version?.ToString(),
-    SchemaVersion = AccountingDbContext.SchemaVersion,
+    SchemaVersion = AccountingDbContext.AccountingSchemaVersion,
     Framework = "IFRS for SMEs",
 })).AllowAnonymous();
 

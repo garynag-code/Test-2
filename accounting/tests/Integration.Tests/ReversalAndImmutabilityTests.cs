@@ -66,7 +66,7 @@ public class ReversalAndImmutabilityTests(DatabaseFixture fixture)
             "Incorrect expense account", scenario.Preparer);
 
         var after = await scenario.Reporting.GetTrialBalanceAsync(scenario.EntityId, from, to);
-        Assert.Empty(after.Rows.Where(r => r.ClosingBalance != 0m));
+        Assert.DoesNotContain(after.Rows, r => r.ClosingBalance != 0m);
         Assert.True(after.IsBalanced);
     }
 
