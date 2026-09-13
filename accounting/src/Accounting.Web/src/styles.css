@@ -9,3 +9,8 @@ th, td { border-bottom: 1px solid #8884; padding: 0.35rem 0.5rem; text-align: le
 td.amount, th.amount { text-align: right; font-variant-numeric: tabular-nums; }
 .error { white-space: pre-wrap; color: #b00020; }
 .status { color: #555; }
+nav { margin-bottom: 1.5rem; display: flex; gap: 0.5rem; }
+nav button { padding: 0.4rem 0.9rem; }
+nav button[aria-current='true'] { font-weight: 600; border-bottom: 2px solid currentColor; }
+h3 { margin: 1.25rem 0 0.5rem; }
+tr.muted td { opacity: 0.55; }

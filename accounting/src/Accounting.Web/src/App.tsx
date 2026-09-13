@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
-import { api, type Account, type EntitySummary, type TrialBalance } from './api';
+import {
+  api,
+  ApiUnreachableError,
+  type Account,
+  type BankAccountSummary,
+  type EntitySummary,
+  type TrialBalance,
+} from './api';
 import { TrialBalanceView } from './TrialBalanceView';
 import { JournalEntryForm } from './JournalEntryForm';
+import { Cashbook } from './Cashbook';
+import { Reconciliation } from './Reconciliation';
+
+type Tab = 'journals' | 'cashbook' | 'reconciliation';
 
 export function App() {
   const [signedIn, setSignedIn] = useState(api.signedIn);
@@ -13,6 +24,8 @@ export function App() {
   const [toDate, setToDate] = useState('2027-02-28');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<Tab>('journals');
+  const [bankAccounts, setBankAccounts] = useState<BankAccountSummary[]>([]);
 
   async function run(work: () => Promise<void>) {
     setBusy(true);
@@ -38,12 +51,14 @@ export function App() {
   const refresh = () =>
     run(async () => {
       if (!entityId) return;
-      const [loadedAccounts, tb] = await Promise.all([
+      const [loadedAccounts, tb, banks] = await Promise.all([
         api.accounts(entityId),
         api.trialBalance(entityId, fromDate, toDate),
+        api.bankAccounts(entityId),
       ]);
       setAccounts(loadedAccounts);
       setTrialBalance(tb);
+      setBankAccounts(banks);
     });
 
   useEffect(() => {
@@ -79,35 +94,71 @@ export function App() {
 
       {entityId && (
         <>
-          <section>
-            <h2>Journal entry</h2>
-            <JournalEntryForm
-              entityId={entityId}
-              accounts={accounts.filter((account) => account.postingAllowed)}
-              onPosted={refresh}
-              onError={setError}
-            />
-          </section>
+          <nav>
+            {(['journals', 'cashbook', 'reconciliation'] as Tab[]).map((name) => (
+              <button
+                key={name}
+                onClick={() => {
+                  setTab(name);
+                  setError(null);
+                }}
+                aria-current={tab === name}
+              >
+                {name === 'journals' ? 'Journals' : name === 'cashbook' ? 'Cashbook' : 'Reconciliation'}
+              </button>
+            ))}
+          </nav>
 
-          <section>
-            <h2>Trial balance</h2>
-            <label>
-              From
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-              />
-            </label>
-            <label>
-              To
-              <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-            </label>
-            <button onClick={refresh} disabled={busy}>
-              {busy ? 'Loading…' : 'Refresh'}
-            </button>
-            {trialBalance && <TrialBalanceView trialBalance={trialBalance} />}
-          </section>
+          {tab === 'journals' && (
+            <>
+              <section>
+                <h2>Journal entry</h2>
+                <JournalEntryForm
+                  entityId={entityId}
+                  accounts={accounts.filter((account) => account.postingAllowed)}
+                  onPosted={refresh}
+                  onError={setError}
+                />
+              </section>
+
+              <section>
+                <h2>Trial balance</h2>
+                <label>
+                  From
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(event) => setFromDate(event.target.value)}
+                  />
+                </label>
+                <label>
+                  To
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(event) => setToDate(event.target.value)}
+                  />
+                </label>
+                <button onClick={refresh} disabled={busy}>
+                  {busy ? 'Loading…' : 'Refresh'}
+                </button>
+                {trialBalance && <TrialBalanceView trialBalance={trialBalance} />}
+              </section>
+            </>
+          )}
+
+          {tab === 'cashbook' && (
+            <Cashbook
+              entityId={entityId}
+              accounts={accounts}
+              onError={setError}
+              onPosted={refresh}
+            />
+          )}
+
+          {tab === 'reconciliation' && (
+            <Reconciliation bankAccounts={bankAccounts} onError={setError} />
+          )}
         </>
       )}
     </main>
@@ -137,9 +188,14 @@ function SignIn({
           try {
             await api.signIn(email, password);
             onSignedIn();
-          } catch {
-            // The server does not disclose which credential was wrong.
-            onError('Sign-in failed. Check your email address and password.');
+          } catch (failure) {
+            // Distinguish a service that is not running from credentials that were refused;
+            // the server itself never discloses which credential was wrong.
+            onError(
+              failure instanceof ApiUnreachableError
+                ? failure.message
+                : 'Sign-in failed. Check your email address and password.',
+            );
           } finally {
             setBusy(false);
           }
