@@ -23,9 +23,7 @@ export const recurrenceFrequencySchema = z.enum([
   'CUSTOM',
 ]);
 
-const localDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date');
+const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date');
 
 export const createTaskSchema = z
   .object({
@@ -61,10 +59,10 @@ export const createTaskSchema = z
     }),
   })
   // BR-8: a mission has to be worth something.
-  .refine(
-    (value) => value.xpValue + value.rewardPointsValue + value.characterStarValue > 0,
-    { message: 'A mission needs to be worth some XP, points or stars.', path: ['xpValue'] },
-  )
+  .refine((value) => value.xpValue + value.rewardPointsValue + value.characterStarValue > 0, {
+    message: 'A mission needs to be worth some XP, points or stars.',
+    path: ['xpValue'],
+  })
   // A star-bearing task must say which trait it builds.
   .refine((value) => value.characterStarValue === 0 || Boolean(value.characterTraitId), {
     message: 'Pick the character trait this mission builds.',

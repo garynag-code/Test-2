@@ -2,12 +2,12 @@
 
 ## 1. Shape of the pyramid
 
-| Tier | Runner | Speed | What it proves |
-| --- | --- | --- | --- |
-| **Domain unit** | Vitest (node) | ms | Pure rules: level curve, recurrence expansion, streak arithmetic, weighted draw, badge tiers, idempotency keys, copy guard |
-| **Service integration** | Vitest + real PostgreSQL | ~100ms | Transactions, constraints, idempotency, authorization, race conditions. **This is where the money tests live.** |
-| **Component** | Vitest + jsdom + Testing Library | ms | Accessibility affordances, states (loading/empty/error), reduced motion |
-| **E2E** | Playwright | seconds | The three vertical slices, exactly as §47–49 describe them |
+| Tier                    | Runner                           | Speed   | What it proves                                                                                                             |
+| ----------------------- | -------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Domain unit**         | Vitest (node)                    | ms      | Pure rules: level curve, recurrence expansion, streak arithmetic, weighted draw, badge tiers, idempotency keys, copy guard |
+| **Service integration** | Vitest + real PostgreSQL         | ~100ms  | Transactions, constraints, idempotency, authorization, race conditions. **This is where the money tests live.**            |
+| **Component**           | Vitest + jsdom + Testing Library | ms      | Accessibility affordances, states (loading/empty/error), reduced motion                                                    |
+| **E2E**                 | Playwright                       | seconds | The three vertical slices, exactly as §47–49 describe them                                                                 |
 
 The integration tier is deliberately the heaviest. The risky logic in this product is
 "did exactly one ledger row get written under concurrency", which a mocked database
@@ -26,35 +26,35 @@ real migrations applied.
 
 ## 3. The §46 critical test list, mapped
 
-| # | Test | Tier | Rule |
-| --- | --- | --- | --- |
-| 1 | Parent creates family | integration | BR-55 |
-| 2 | Parent creates child | integration | — |
-| 3 | Parent creates daily task | integration | BR-8 |
-| 4 | Task recurs correctly | unit + integration | BR-18…24 |
-| 5 | Child submits completion | integration | BR-9 |
-| 6 | No points before approval | integration | **BR-10** |
-| 7 | Parent approves | integration | BR-11 |
-| 8 | XP awarded once | integration | BR-6 |
-| 9 | Reward points awarded once | integration | BR-6 |
-| 10 | Duplicate approval does not duplicate points | integration | **BR-12** |
-| 11 | Rejected task awards nothing | integration | BR-13 |
-| 12 | Child cannot approve their own task | integration | **BR-11** |
-| 13 | Child cannot change point values | integration | BR-1, schema allow-list |
-| 14 | Daily check-in rewards once | integration | **BR-25** |
-| 15 | Character submission awards nothing before approval | integration | BR-28 |
-| 16 | Character approval awards exactly one star | integration | **BR-29** |
-| 17 | Memory challenge awards once | integration | BR-49 |
-| 18 | Wheel locked below threshold | integration | BR-44 |
-| 19 | Wheel unlocked above threshold | integration | BR-44 |
-| 20 | Wheel result persisted | integration | **BR-45** |
-| 21 | Reward points correctly deducted | integration | BR-47 |
-| 22 | Unauthorised family access blocked | integration | **BR-56/58** |
-| 23 | Child cannot access another child | integration | **BR-57** |
-| 24 | Parent cannot access another family | integration | **BR-56** |
-| 25 | Secret mission completion works | integration | BR-53 |
-| 26 | Streak increments correctly | unit + integration | BR-38 |
-| 27 | Reward redemption works atomically | integration | **BR-41** |
+| #   | Test                                                | Tier               | Rule                    |
+| --- | --------------------------------------------------- | ------------------ | ----------------------- |
+| 1   | Parent creates family                               | integration        | BR-55                   |
+| 2   | Parent creates child                                | integration        | —                       |
+| 3   | Parent creates daily task                           | integration        | BR-8                    |
+| 4   | Task recurs correctly                               | unit + integration | BR-18…24                |
+| 5   | Child submits completion                            | integration        | BR-9                    |
+| 6   | No points before approval                           | integration        | **BR-10**               |
+| 7   | Parent approves                                     | integration        | BR-11                   |
+| 8   | XP awarded once                                     | integration        | BR-6                    |
+| 9   | Reward points awarded once                          | integration        | BR-6                    |
+| 10  | Duplicate approval does not duplicate points        | integration        | **BR-12**               |
+| 11  | Rejected task awards nothing                        | integration        | BR-13                   |
+| 12  | Child cannot approve their own task                 | integration        | **BR-11**               |
+| 13  | Child cannot change point values                    | integration        | BR-1, schema allow-list |
+| 14  | Daily check-in rewards once                         | integration        | **BR-25**               |
+| 15  | Character submission awards nothing before approval | integration        | BR-28                   |
+| 16  | Character approval awards exactly one star          | integration        | **BR-29**               |
+| 17  | Memory challenge awards once                        | integration        | BR-49                   |
+| 18  | Wheel locked below threshold                        | integration        | BR-44                   |
+| 19  | Wheel unlocked above threshold                      | integration        | BR-44                   |
+| 20  | Wheel result persisted                              | integration        | **BR-45**               |
+| 21  | Reward points correctly deducted                    | integration        | BR-47                   |
+| 22  | Unauthorised family access blocked                  | integration        | **BR-56/58**            |
+| 23  | Child cannot access another child                   | integration        | **BR-57**               |
+| 24  | Parent cannot access another family                 | integration        | **BR-56**               |
+| 25  | Secret mission completion works                     | integration        | BR-53                   |
+| 26  | Streak increments correctly                         | unit + integration | BR-38                   |
+| 27  | Reward redemption works atomically                  | integration        | **BR-41**               |
 
 ## 4. Adversarial tests (beyond the brief's list)
 
@@ -99,7 +99,7 @@ A small amount of randomised testing where the input space is large:
 no string matches the banned-phrase regex (BR-60), so an enthusiastic future
 contributor cannot ship "You failed!" to a nine-year-old.
 
-## 8. What is deliberately *not* mocked
+## 8. What is deliberately _not_ mocked
 
 Prisma, the database, `crypto.randomInt`, and time (time is injected as a `Clock`
 interface so tests pass a fixed clock rather than monkey-patching `Date`).

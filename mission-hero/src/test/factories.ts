@@ -53,14 +53,17 @@ export async function createFamilyFixture(
       familyId: family.id,
       nickname: 'Josh',
       ageBracket: 'AGE_9_11',
-      ...(options.childPin
-        ? { pinHash: await hashPin(options.childPin), pinRequired: true }
-        : {}),
+      ...(options.childPin ? { pinHash: await hashPin(options.childPin), pinRequired: true } : {}),
       setting: { create: {} },
     },
   });
   const secondChild = await prisma.childProfile.create({
-    data: { familyId: family.id, nickname: 'Sarah', ageBracket: 'AGE_6_8', setting: { create: {} } },
+    data: {
+      familyId: family.id,
+      nickname: 'Sarah',
+      ageBracket: 'AGE_6_8',
+      setting: { create: {} },
+    },
   });
 
   return {

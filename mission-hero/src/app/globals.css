@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens as CSS variables so a child's chosen theme repaints the whole
+ * shell without touching component styles. Contrast of every text token
+ * against its surface is at least 4.5:1 (docs/03, accessibility).
+ */
+:root {
+  --mh-ink: 15 23 42;
+  --mh-muted: 71 85 105;
+  --mh-surface: 248 250 252;
+  --mh-card: 255 255 255;
+  --mh-border: 226 232 240;
+  --mh-brand: 79 70 229;
+  --mh-brand-soft: 224 231 255;
+  --mh-accent: 14 165 233;
+  --mh-gradient-from: #4f46e5;
+  --mh-gradient-to: #0ea5e9;
+}
+
+[data-theme='space'] {
+  --mh-brand: 99 102 241;
+  --mh-accent: 168 85 247;
+  --mh-gradient-from: #4338ca;
+  --mh-gradient-to: #a855f7;
+}
+[data-theme='jungle'] {
+  --mh-brand: 22 163 74;
+  --mh-accent: 132 204 22;
+  --mh-gradient-from: #15803d;
+  --mh-gradient-to: #84cc16;
+}
+[data-theme='superhero'] {
+  --mh-brand: 220 38 38;
+  --mh-accent: 245 158 11;
+  --mh-gradient-from: #b91c1c;
+  --mh-gradient-to: #f59e0b;
+}
+[data-theme='underwater'] {
+  --mh-brand: 2 132 199;
+  --mh-accent: 6 182 212;
+  --mh-gradient-from: #0369a1;
+  --mh-gradient-to: #06b6d4;
+}
+[data-theme='sports'] {
+  --mh-brand: 234 88 12;
+  --mh-accent: 250 204 21;
+  --mh-gradient-from: #c2410c;
+  --mh-gradient-to: #facc15;
+}
+[data-theme='fantasy'] {
+  --mh-brand: 147 51 234;
+  --mh-accent: 236 72 153;
+  --mh-gradient-from: #7e22ce;
+  --mh-gradient-to: #ec4899;
+}
+[data-theme='racing'] {
+  --mh-brand: 190 18 60;
+  --mh-accent: 30 41 59;
+  --mh-gradient-from: #be123c;
+  --mh-gradient-to: #1e293b;
+}
+[data-theme='robots'] {
+  --mh-brand: 71 85 105;
+  --mh-accent: 6 182 212;
+  --mh-gradient-from: #334155;
+  --mh-gradient-to: #06b6d4;
+}
+[data-theme='dinosaurs'] {
+  --mh-brand: 21 128 61;
+  --mh-accent: 202 138 4;
+  --mh-gradient-from: #166534;
+  --mh-gradient-to: #ca8a04;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-surface text-ink antialiased;
+    /* Room for the fixed child tab bar on small screens. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  :focus-visible {
+    @apply outline-none ring-4 ring-brand/40 ring-offset-2 ring-offset-surface;
+  }
+}
+
+@layer components {
+  .mh-gradient {
+    background-image: linear-gradient(135deg, var(--mh-gradient-from), var(--mh-gradient-to));
+  }
+  /* Touch targets: 56px on the child surface, 44px on the parent one. */
+  .mh-tap {
+    @apply min-h-[56px] min-w-[56px];
+  }
+  .mh-tap-sm {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}
+
+/*
+ * Reduced motion is honoured by removing motion, not by speeding it up: a
+ * confetti burst at 10x speed is worse than none at all (docs/08 §6).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

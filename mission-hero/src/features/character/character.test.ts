@@ -94,7 +94,7 @@ describe('confirmation (BR-29, §48)', () => {
     expect(stars[0]!.traitId).toBe(kindnessId);
   });
 
-  it('awards the family\'s configured XP alongside the star, as a separate row (BR-31)', async () => {
+  it("awards the family's configured XP alongside the star, as a separate row (BR-31)", async () => {
     const submission = await submit();
     await character.confirmCharacterMoment(fixture.parentActor, { submissionId: submission.id });
 
@@ -131,7 +131,7 @@ describe('confirmation (BR-29, §48)', () => {
     expect(await prisma.characterStarTransaction.count()).toBe(1);
   });
 
-  it('records the parent\'s encouragement and name', async () => {
+  it("records the parent's encouragement and name", async () => {
     const submission = await submit();
     const celebration = await character.confirmCharacterMoment(fixture.parentActor, {
       submissionId: submission.id,
@@ -172,7 +172,7 @@ describe('confirmation (BR-29, §48)', () => {
     expect(await prisma.characterStarTransaction.count()).toBe(0);
   });
 
-  it('a parent cannot confirm another family\'s moment', async () => {
+  it("a parent cannot confirm another family's moment", async () => {
     const other = await createFamilyFixture();
     const otherTrait = await traitId(other.familyId, 'kindness');
     const submission = await character.submitCharacterMoment(other.childActor, {
@@ -290,7 +290,7 @@ describe('character profile (BR-34)', () => {
     expect(kindness?.message).toBe('4 more kindness moments to your next badge.');
   });
 
-  it('refuses to show another child\'s profile (BR-57)', async () => {
+  it("refuses to show another child's profile (BR-57)", async () => {
     await expect(
       character.getCharacterProfile(fixture.childActor, fixture.secondChildId),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });

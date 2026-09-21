@@ -5,7 +5,7 @@
 The realistic adversaries, in order of likelihood:
 
 1. **A motivated 11-year-old with the browser dev tools open.** Wants more XP, a free
-   wheel spin, or to approve their own reading task. This is the *primary* threat and
+   wheel spin, or to approve their own reading task. This is the _primary_ threat and
    the one the architecture is shaped around.
 2. **A sibling.** Wants to act as the other child — spend their points, submit on their
    behalf, or read their reflections.
@@ -20,8 +20,8 @@ Every request resolves to exactly one of:
 ```ts
 type Actor =
   | { type: 'parent'; userId: string; familyId: string; role: FamilyRole; freshAt: Date }
-  | { type: 'child';  childId: string; familyId: string }
-  | { type: 'system' }          // seeds, jobs — never reachable from HTTP
+  | { type: 'child'; childId: string; familyId: string }
+  | { type: 'system' }; // seeds, jobs — never reachable from HTTP
 ```
 
 `familyId` comes **only** from the signed session cookie. It is never read from a form
@@ -31,14 +31,14 @@ an extra key is stripped rather than honoured (mass-assignment defence).
 
 Guards, all in `src/server/auth/guards.ts`:
 
-| Guard | Fails when |
-| --- | --- |
-| `requireParent()` | no parent session, or no active `FamilyMember` row |
-| `requireFreshParent()` | parent session older than `parentGateTimeoutMinutes` |
-| `requireChild()` | no child session, or child is archived |
-| `requireOwner()` | parent's role is not `OWNER` (family deletion, transferring ownership) |
-| `assertChildInFamily(childId, actor)` | `child.familyId !== actor.familyId` |
-| `assertSelfChild(childId, actor)` | child actor is acting for a different child |
+| Guard                                 | Fails when                                                             |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| `requireParent()`                     | no parent session, or no active `FamilyMember` row                     |
+| `requireFreshParent()`                | parent session older than `parentGateTimeoutMinutes`                   |
+| `requireChild()`                      | no child session, or child is archived                                 |
+| `requireOwner()`                      | parent's role is not `OWNER` (family deletion, transferring ownership) |
+| `assertChildInFamily(childId, actor)` | `child.familyId !== actor.familyId`                                    |
+| `assertSelfChild(childId, actor)`     | child actor is acting for a different child                            |
 
 ## 3. Defence against IDOR (the #3/#4 threats)
 
@@ -47,18 +47,18 @@ tenant key from the session in the same query:
 
 ```ts
 // WRONG — leaks across families if the id is guessed
-prisma.taskCompletion.findUnique({ where: { id } })
+prisma.taskCompletion.findUnique({ where: { id } });
 
 // RIGHT — a wrong family yields null, which the caller turns into a 404
 prisma.taskCompletion.findFirst({
   where: { id, child: { familyId: actor.familyId } },
-})
+});
 ```
 
 A missing row and a forbidden row both return **404**, never 403. Telling an attacker
 "that exists but isn't yours" is itself a leak of the id space.
 
-This is enforced by convention *and* by a lint rule: `findUnique` on any
+This is enforced by convention _and_ by a lint rule: `findUnique` on any
 family-scoped model is banned outside `src/server/db`; the repositories expose
 `findForFamily`-style helpers instead.
 
@@ -74,7 +74,7 @@ family-scoped model is banned outside `src/server/db`; the repositories expose
   (`child cannot approve their own task`).
 - Point values live on the `Task` row. The approval action's Zod schema accepts only
   `{ completionId, encouragementMessage? }` — there is literally no field through which
-  a client could suggest an amount. Manual bonus awards are a *separate*, parent-only
+  a client could suggest an amount. Manual bonus awards are a _separate_, parent-only
   action that requires a `reason` and writes an `AuditLog` entry.
 
 ## 5. Child session hardening
@@ -116,26 +116,26 @@ On top of that:
 
 Covered structurally rather than by hoping:
 
-| Race | Defence |
-| --- | --- |
-| Two parents approve the same completion simultaneously | `SELECT … FOR UPDATE` on the completion + status guard inside the tx |
-| Double-tap on **Approve** | idempotency key unique index; second call returns the first result |
-| Two children redeem the last reward | `FOR UPDATE` on the `Reward` row before decrementing inventory |
-| Spin spam to farm rewards | eligibility + cooldown + spins-per-period re-checked inside the tx; points debited in the same tx |
-| Reopening the app to farm check-in XP | unique `(childId, localDate)` |
-| Concurrent streak updates | streak row locked in the same tx as the award |
+| Race                                                   | Defence                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Two parents approve the same completion simultaneously | `SELECT … FOR UPDATE` on the completion + status guard inside the tx                              |
+| Double-tap on **Approve**                              | idempotency key unique index; second call returns the first result                                |
+| Two children redeem the last reward                    | `FOR UPDATE` on the `Reward` row before decrementing inventory                                    |
+| Spin spam to farm rewards                              | eligibility + cooldown + spins-per-period re-checked inside the tx; points debited in the same tx |
+| Reopening the app to farm check-in XP                  | unique `(childId, localDate)`                                                                     |
+| Concurrent streak updates                              | streak row locked in the same tx as the award                                                     |
 
 ## 9. Rate limiting
 
 A small token-bucket keyed by `(ip, route)` and `(actorId, route)`:
 
-| Route | Limit |
-| --- | --- |
-| Parent login | 10 / 15 min / IP, 5 / 15 min / email |
-| Child PIN verify | 5 / 15 min / childId (then row-level lockout) |
-| Family code redeem | 10 / hour / IP |
-| Wheel spin | 30 / hour / child (well above legitimate use; catches scripts) |
-| Any mutation | 120 / min / actor |
+| Route              | Limit                                                          |
+| ------------------ | -------------------------------------------------------------- |
+| Parent login       | 10 / 15 min / IP, 5 / 15 min / email                           |
+| Child PIN verify   | 5 / 15 min / childId (then row-level lockout)                  |
+| Family code redeem | 10 / hour / IP                                                 |
+| Wheel spin         | 30 / hour / child (well above legitimate use; catches scripts) |
+| Any mutation       | 120 / min / actor                                              |
 
 ## 10. Secrets & configuration
 
@@ -147,16 +147,16 @@ enforced by keeping them behind `server-only`.
 
 ## 11. Child privacy (§40) as hard constraints
 
-| Rule | How it is enforced |
-| --- | --- |
-| No child email | `ChildProfile` has no email column |
-| No child phone | no column |
-| No full legal name | `nickname` only; the UI labels it "What should we call you?" |
-| No full DOB | `birthMonth` + `birthYear` only, both optional |
-| No public anything | there are no public routes that render child data; no share links, no leaderboards across families |
-| No chat / DM | not modelled; parent encouragement is a field on an approval, not a message thread |
-| No location | not collected |
-| Media is opt-in | `FamilySetting.mediaUploadsEnabled` defaults to **false**; evidence types degrade to `NOTE`/`PARENT_CONFIRM` |
+| Rule                   | How it is enforced                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| No child email         | `ChildProfile` has no email column                                                                                             |
+| No child phone         | no column                                                                                                                      |
+| No full legal name     | `nickname` only; the UI labels it "What should we call you?"                                                                   |
+| No full DOB            | `birthMonth` + `birthYear` only, both optional                                                                                 |
+| No public anything     | there are no public routes that render child data; no share links, no leaderboards across families                             |
+| No chat / DM           | not modelled; parent encouragement is a field on an approval, not a message thread                                             |
+| No location            | not collected                                                                                                                  |
+| Media is opt-in        | `FamilySetting.mediaUploadsEnabled` defaults to **false**; evidence types degrade to `NOTE`/`PARENT_CONFIRM`                   |
 | Data export & deletion | family owner can export (JSON) and delete; deletion hard-deletes child rows and media, retaining only an anonymised audit stub |
 
 Analytics: no third-party analytics or ad SDKs on any child-facing route. Product
@@ -167,7 +167,7 @@ telemetry, if added, is aggregate and server-side only.
 The brief's ethical rules are treated as security rules because they protect the user
 just as much:
 
-- **No loot boxes, no paid randomness.** The wheel costs *earned* points, is configured
+- **No loot boxes, no paid randomness.** The wheel costs _earned_ points, is configured
   by the parent, and its odds are visible to the parent. There is no purchase path.
 - **No casino styling.** No coins raining, no slot-machine sounds, no "near miss"
   animation. The wheel decelerates smoothly to a server-decided result; near-miss
@@ -183,7 +183,7 @@ just as much:
 ## 13. Auditability
 
 Every state change a parent could later question is recorded in `AuditLog` with actor,
-before/after JSON and a reason where one is required. Manual point adjustments *require*
+before/after JSON and a reason where one is required. Manual point adjustments _require_
 a reason at the schema level. The audit log is append-only: there is no update or delete
 path in the repository, and the service exposes only `record()` and `listForFamily()`.
 
@@ -195,4 +195,4 @@ path in the repository, and the service exposes only `record()` and `listForFami
 3. Does every query filter on `actor.familyId`?
 4. If it moves value — is it inside `$transaction`, with a row lock and an idempotency key?
 5. Does it write an `AuditLog` row?
-6. Is there a test asserting the *unauthorised* case returns 404/throws?
+6. Is there a test asserting the _unauthorised_ case returns 404/throws?

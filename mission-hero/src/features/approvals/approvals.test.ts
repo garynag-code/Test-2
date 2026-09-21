@@ -44,7 +44,9 @@ describe('submission (BR-10)', () => {
 
   it('marks the occurrence as waiting for a parent', async () => {
     const { occurrence, completion } = await readyCompletion();
-    const refreshed = await prisma.taskOccurrence.findUniqueOrThrow({ where: { id: occurrence.id } });
+    const refreshed = await prisma.taskOccurrence.findUniqueOrThrow({
+      where: { id: occurrence.id },
+    });
     expect(refreshed.status).toBe('SUBMITTED');
     expect(completion.status).toBe('PENDING');
   });
@@ -63,7 +65,9 @@ describe('submission (BR-10)', () => {
     const occurrence = await createOccurrence(fixture, task.id, fixture.childId, TODAY);
 
     const first = await tasks.submitCompletion(fixture.childActor, { occurrenceId: occurrence.id });
-    const second = await tasks.submitCompletion(fixture.childActor, { occurrenceId: occurrence.id });
+    const second = await tasks.submitCompletion(fixture.childActor, {
+      occurrenceId: occurrence.id,
+    });
 
     expect(second.created).toBe(false);
     expect(second.completion.id).toBe(first.completion.id);
@@ -145,7 +149,9 @@ describe('approval (BR-11, BR-12, §47)', () => {
 
     await approvals.approveTaskCompletion(fixture.parentActor, { completionId: completion.id });
 
-    const stars = await prisma.characterStarTransaction.findMany({ where: { childId: fixture.childId } });
+    const stars = await prisma.characterStarTransaction.findMany({
+      where: { childId: fixture.childId },
+    });
     expect(stars).toHaveLength(1);
     expect(stars[0]!.amount).toBe(1);
   });
@@ -164,9 +170,7 @@ describe('approval (BR-11, BR-12, §47)', () => {
     const balances = await ledger.getBalances(prisma, fixture.childId);
     expect(balances.lifetimeXp).toBe(20); // 10 task + 10 First Mission
     expect(balances.rewardPoints).toBe(5);
-    expect(
-      await prisma.xpTransaction.count({ where: { sourceType: 'TASK_COMPLETION' } }),
-    ).toBe(1);
+    expect(await prisma.xpTransaction.count({ where: { sourceType: 'TASK_COMPLETION' } })).toBe(1);
   });
 
   it('survives two parents approving at the same moment', async () => {
@@ -262,7 +266,7 @@ describe('authorization (BR-11, BR-56, BR-58)', () => {
     expect(await prisma.xpTransaction.count()).toBe(0);
   });
 
-  it('a parent cannot approve another family\'s task, and gets a 404 not a 403', async () => {
+  it("a parent cannot approve another family's task, and gets a 404 not a 403", async () => {
     const other = await createFamilyFixture();
     const task = await createTaskFixture(other, [other.childId]);
     const occurrence = await createOccurrence(other, task.id, other.childId, TODAY);
@@ -360,7 +364,9 @@ describe('rejection and redo (BR-13, BR-14)', () => {
       message: 'How long did you read for?',
     });
 
-    const refreshed = await prisma.taskCompletion.findUniqueOrThrow({ where: { id: completion.id } });
+    const refreshed = await prisma.taskCompletion.findUniqueOrThrow({
+      where: { id: completion.id },
+    });
     expect(refreshed.status).toBe('PENDING');
   });
 });

@@ -60,7 +60,11 @@ export async function unbindDevice(): Promise<void> {
   (await cookies()).delete(COOKIE_DEVICE);
 }
 
-export async function readParentClaims(): Promise<{ userId: string; familyId: string; issuedAt: Date } | null> {
+export async function readParentClaims(): Promise<{
+  userId: string;
+  familyId: string;
+  issuedAt: Date;
+} | null> {
   const token = (await cookies()).get(COOKIE_PARENT_SESSION)?.value;
   if (!token) return null;
   const claims = await parentToken.verify(token);

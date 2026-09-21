@@ -83,5 +83,8 @@ export function didLevelUp(
   newXp: number,
   levels: readonly LevelDefinition[] = DEFAULT_LEVELS,
 ): boolean {
-  return resolveLevel(newXp, levels).level.levelNumber > resolveLevel(previousXp, levels).level.levelNumber;
+  return (
+    resolveLevel(newXp, levels).level.levelNumber >
+    resolveLevel(previousXp, levels).level.levelNumber
+  );
 }

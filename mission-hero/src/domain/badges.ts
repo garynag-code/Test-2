@@ -14,7 +14,9 @@ export function thresholdFor(tier: BadgeTier): number {
 
 /** The tiers a count newly satisfies, given what is already unlocked. */
 export function tiersUnlockedBy(count: number, alreadyUnlocked: readonly BadgeTier[]): BadgeTier[] {
-  return BADGE_TIERS.filter((tier) => count >= thresholdFor(tier) && !alreadyUnlocked.includes(tier));
+  return BADGE_TIERS.filter(
+    (tier) => count >= thresholdFor(tier) && !alreadyUnlocked.includes(tier),
+  );
 }
 
 export function highestTier(count: number): BadgeTier | null {

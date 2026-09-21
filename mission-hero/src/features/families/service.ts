@@ -129,7 +129,11 @@ export async function getSettings(actor: Actor) {
   return setting;
 }
 
-async function uniqueFamilyCode(db: { family: { findUnique: (args: { where: { familyCode: string }; select: { id: true } }) => Promise<unknown> } }): Promise<string> {
+async function uniqueFamilyCode(db: {
+  family: {
+    findUnique: (args: { where: { familyCode: string }; select: { id: true } }) => Promise<unknown>;
+  };
+}): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const code = generateFamilyCode();
     const clash = await db.family.findUnique({ where: { familyCode: code }, select: { id: true } });

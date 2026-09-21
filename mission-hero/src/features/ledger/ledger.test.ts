@@ -47,8 +47,16 @@ describe('balances are derived, never stored (ADR-002)', () => {
 
 describe('idempotency (BR-6)', () => {
   it('a repeated key is a no-op that returns the original row', async () => {
-    const first = await ledger.awardXp(prisma, { ...base(fixture), amount: 10, idempotencyKey: 'dup' });
-    const second = await ledger.awardXp(prisma, { ...base(fixture), amount: 10, idempotencyKey: 'dup' });
+    const first = await ledger.awardXp(prisma, {
+      ...base(fixture),
+      amount: 10,
+      idempotencyKey: 'dup',
+    });
+    const second = await ledger.awardXp(prisma, {
+      ...base(fixture),
+      amount: 10,
+      idempotencyKey: 'dup',
+    });
 
     expect(first.created).toBe(true);
     expect(second.created).toBe(false);
@@ -261,9 +269,24 @@ describe('stars by trait', () => {
     const kindnessId = await traitId(fixture.familyId, 'kindness');
     const honestyId = await traitId(fixture.familyId, 'honesty');
 
-    await ledger.awardStars(prisma, { ...base(fixture), traitId: kindnessId, amount: 2, idempotencyKey: 'k1' });
-    await ledger.awardStars(prisma, { ...base(fixture), traitId: kindnessId, amount: 1, idempotencyKey: 'k2' });
-    await ledger.awardStars(prisma, { ...base(fixture), traitId: honestyId, amount: 4, idempotencyKey: 'h1' });
+    await ledger.awardStars(prisma, {
+      ...base(fixture),
+      traitId: kindnessId,
+      amount: 2,
+      idempotencyKey: 'k1',
+    });
+    await ledger.awardStars(prisma, {
+      ...base(fixture),
+      traitId: kindnessId,
+      amount: 1,
+      idempotencyKey: 'k2',
+    });
+    await ledger.awardStars(prisma, {
+      ...base(fixture),
+      traitId: honestyId,
+      amount: 4,
+      idempotencyKey: 'h1',
+    });
 
     const totals = await ledger.getStarsByTrait(prisma, fixture.childId);
     expect(totals).toContainEqual({ traitId: kindnessId, total: 3 });

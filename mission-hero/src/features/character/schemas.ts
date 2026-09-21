@@ -8,11 +8,7 @@ import { MAX_ENCOURAGEMENT_LENGTH, MAX_STORY_LENGTH } from '@/domain/constants';
 
 export const submitCharacterSchema = z.object({
   traitId: z.string().uuid(),
-  story: z
-    .string()
-    .trim()
-    .min(3, 'Tell us what happened.')
-    .max(MAX_STORY_LENGTH),
+  story: z.string().trim().min(3, 'Tell us what happened.').max(MAX_STORY_LENGTH),
   mood: z.string().trim().max(24).optional(),
 });
 

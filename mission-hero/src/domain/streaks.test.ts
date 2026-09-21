@@ -57,7 +57,14 @@ describe('recordStreakActivity (BR-38)', () => {
   it('keeps longestCount monotonic across any sequence (BR-39)', () => {
     let state: StreakOutcome = recordStreakActivity(EMPTY_STREAK, '2026-09-01');
     let best = state.longestCount;
-    const days = ['2026-09-02', '2026-09-05', '2026-09-06', '2026-09-07', '2026-09-07', '2026-09-20'];
+    const days = [
+      '2026-09-02',
+      '2026-09-05',
+      '2026-09-06',
+      '2026-09-07',
+      '2026-09-07',
+      '2026-09-20',
+    ];
     for (const date of days) {
       state = recordStreakActivity(state, date);
       expect(state.longestCount).toBeGreaterThanOrEqual(best);
@@ -81,12 +88,22 @@ describe('recordStreakActivity (BR-38)', () => {
 
 describe('effectiveStreakCount', () => {
   it('still counts a streak whose last activity was yesterday', () => {
-    const state = { currentCount: 5, longestCount: 5, lastActivityDate: '2026-09-20', startedDate: '2026-09-16' };
+    const state = {
+      currentCount: 5,
+      longestCount: 5,
+      lastActivityDate: '2026-09-20',
+      startedDate: '2026-09-16',
+    };
     expect(effectiveStreakCount(state, '2026-09-21')).toBe(5);
   });
 
   it('shows zero once a day has been skipped, without writing anything', () => {
-    const state = { currentCount: 5, longestCount: 5, lastActivityDate: '2026-09-19', startedDate: '2026-09-15' };
+    const state = {
+      currentCount: 5,
+      longestCount: 5,
+      lastActivityDate: '2026-09-19',
+      startedDate: '2026-09-15',
+    };
     expect(effectiveStreakCount(state, '2026-09-21')).toBe(0);
   });
 

@@ -41,7 +41,7 @@ describe('challenges are family-authored, whatever the family values', () => {
     }
   });
 
-  it('only assigns children in the parent\'s own family', async () => {
+  it("only assigns children in the parent's own family", async () => {
     const other = await createFamilyFixture();
     await expect(
       memory.createChallenge(fixture.parentActor, {
@@ -98,7 +98,9 @@ describe('approval awards once, ever (BR-49)', () => {
     await memory.approve(fixture.parentActor, { submissionId: submission.id });
     await memory.approve(fixture.parentActor, { submissionId: submission.id });
 
-    expect(await prisma.xpTransaction.count({ where: { sourceType: 'MEMORY_SUBMISSION' } })).toBe(1);
+    expect(await prisma.xpTransaction.count({ where: { sourceType: 'MEMORY_SUBMISSION' } })).toBe(
+      1,
+    );
   });
 
   it('refuses a second recitation of a mastered challenge', async () => {
@@ -110,7 +112,9 @@ describe('approval awards once, ever (BR-49)', () => {
       memory.recite(fixture.childActor, { challengeId: challenge.id }),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
-    expect(await prisma.xpTransaction.count({ where: { sourceType: 'MEMORY_SUBMISSION' } })).toBe(1);
+    expect(await prisma.xpTransaction.count({ where: { sourceType: 'MEMORY_SUBMISSION' } })).toBe(
+      1,
+    );
   });
 
   it('pays each child separately for the same challenge', async () => {

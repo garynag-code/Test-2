@@ -1,0 +1,62 @@
+name: Mission Hero CI
+
+on:
+  push:
+    paths: ['mission-hero/**', '.github/workflows/mission-hero-ci.yml']
+  pull_request:
+    paths: ['mission-hero/**', '.github/workflows/mission-hero-ci.yml']
+
+defaults:
+  run:
+    working-directory: mission-hero
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mission_hero_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mission_hero_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mission_hero_test?schema=public
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mission-hero/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+
+      # The gate from docs/07: any red step blocks the merge.
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npx prisma migrate deploy
+      - run: npm run test:integration
+      - run: npm run build
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: mission-hero/playwright-report/
+          retention-days: 7

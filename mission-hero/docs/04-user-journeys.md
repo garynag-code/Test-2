@@ -17,7 +17,7 @@ Landing (/)
          └─ → /parent  (dashboard)
 ```
 
-Design note: onboarding must leave the family in a *playable* state. A parent who stops
+Design note: onboarding must leave the family in a _playable_ state. A parent who stops
 after step 2 still has traits, levels and a check-in — the child surface is never empty.
 
 ## J2 — Child first login
@@ -147,7 +147,7 @@ chosen by a per-child, per-day seed so it moves but is stable within a day
 ## J11 — Family with two parents
 
 A second adult is invited by email; the invite creates a `FamilyMember(PARENT)` on
-acceptance. Either parent can approve anything; the approval records *which* parent
+acceptance. Either parent can approve anything; the approval records _which_ parent
 decided, and the child's celebration says "Mom approved your reading".
 
 ## J12 — Streak break (the empathy path)

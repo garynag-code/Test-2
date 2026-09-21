@@ -22,7 +22,12 @@ import {
   type DeclineCharacterInput,
   type SubmitCharacterInput,
 } from './schemas';
-import type { CharacterCelebration, PendingCharacterSubmission, TraitCard, TraitTotal } from './types';
+import type {
+  CharacterCelebration,
+  PendingCharacterSubmission,
+  TraitCard,
+  TraitTotal,
+} from './types';
 
 /**
  * Vertical Slice 2 (brief §48): "Who I was today".
@@ -51,7 +56,10 @@ export async function listTraits(actor: Actor): Promise<TraitCard[]> {
 export async function createTrait(actor: Actor, input: CreateTraitInput) {
   if (actor.type !== 'parent') throw notFound();
   const parsed = createTraitSchema.parse(input);
-  const key = parsed.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const key = parsed.label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 
   return prisma.$transaction(async (tx) => {
     const count = await tx.characterTrait.count({ where: { familyId: actor.familyId } });
@@ -311,8 +319,8 @@ export async function declineCharacterMoment(actor: Actor, input: DeclineCharact
         submissionId: submission.id,
         parentUserId: actor.type === 'parent' ? actor.userId : null,
         decision: parsed.decision,
-        question: parsed.decision === 'ASK_QUESTION' ? parsed.message ?? null : null,
-        encouragementMessage: parsed.decision === 'REJECT' ? parsed.message ?? null : null,
+        question: parsed.decision === 'ASK_QUESTION' ? (parsed.message ?? null) : null,
+        encouragementMessage: parsed.decision === 'REJECT' ? (parsed.message ?? null) : null,
         starsAwarded: 0,
         xpAwarded: 0,
       },
@@ -359,7 +367,11 @@ export async function listPendingSubmissions(actor: Actor): Promise<PendingChara
       const progress = badgeProgress(total);
       const nextBadge = progress.nextTier
         ? await prisma.characterBadge.findFirst({
-            where: { familyId: actor.familyId, traitId: submission.traitId, tier: progress.nextTier },
+            where: {
+              familyId: actor.familyId,
+              traitId: submission.traitId,
+              tier: progress.nextTier,
+            },
             select: { name: true, tier: true },
           })
         : null;
@@ -382,10 +394,7 @@ export async function listPendingSubmissions(actor: Actor): Promise<PendingChara
 }
 
 /** The child's character profile (brief §8) — growth framing throughout. */
-export async function getCharacterProfile(
-  actor: Actor,
-  childId: string,
-): Promise<TraitTotal[]> {
+export async function getCharacterProfile(actor: Actor, childId: string): Promise<TraitTotal[]> {
   assertSelfChild(childId, actor);
 
   const [traits, totals] = await Promise.all([
@@ -493,12 +502,12 @@ async function buildCelebration(
   ]);
 
   const parentName = params.parentUserId
-    ? (
+    ? ((
         await db.parentProfile.findUnique({
           where: { familyId_userId: { familyId: params.familyId, userId: params.parentUserId } },
           select: { displayName: true },
         })
-      )?.displayName ?? null
+      )?.displayName ?? null)
     : null;
 
   const nextBadge = await db.characterBadge.findFirst({
@@ -513,9 +522,7 @@ async function buildCelebration(
     xpAwarded: params.xpAwarded,
     newTotal: total,
     headline: `${trait.label} Power +${params.starsAwarded}!`,
-    message: nextBadge
-      ? CHARACTER.becomingHero(nextBadge.name)
-      : CHARACTER.buildingSomething,
+    message: nextBadge ? CHARACTER.becomingHero(nextBadge.name) : CHARACTER.buildingSomething,
     encouragement: params.encouragement,
     parentName,
     badgesUnlocked: params.badgesUnlocked,

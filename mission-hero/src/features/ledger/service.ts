@@ -105,7 +105,8 @@ export async function awardStars(
   return write(db, 'characterStarTransaction', request);
 }
 
-export const getBalances = (db: Db, childId: string): Promise<Balances> => repo.balances(db, childId);
+export const getBalances = (db: Db, childId: string): Promise<Balances> =>
+  repo.balances(db, childId);
 export const getXpBalance = repo.xpBalance;
 export const getPointsBalance = repo.pointsBalance;
 export const getStarBalance = repo.starBalance;

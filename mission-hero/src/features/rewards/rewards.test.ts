@@ -19,7 +19,10 @@ beforeEach(async () => {
 
 describe('redemption (BR-41, BR-42)', () => {
   it('debits the points atomically and records the redemption', async () => {
-    const reward = await createRewardFixture(fixture, { pointsCost: 50, requiresParentApproval: false });
+    const reward = await createRewardFixture(fixture, {
+      pointsCost: 50,
+      requiresParentApproval: false,
+    });
     await givePoints(fixture.familyId, fixture.childId, 120);
 
     const result = await rewards.redeem(fixture.childActor, { rewardId: reward.id });
@@ -38,9 +41,9 @@ describe('redemption (BR-41, BR-42)', () => {
     const reward = await createRewardFixture(fixture, { pointsCost: 100 });
     await givePoints(fixture.familyId, fixture.childId, 40);
 
-    await expect(
-      rewards.redeem(fixture.childActor, { rewardId: reward.id }),
-    ).rejects.toMatchObject({ code: 'INSUFFICIENT_POINTS' });
+    await expect(rewards.redeem(fixture.childActor, { rewardId: reward.id })).rejects.toMatchObject(
+      { code: 'INSUFFICIENT_POINTS' },
+    );
 
     expect(await prisma.rewardRedemption.count()).toBe(0);
     expect(await ledger.getPointsBalance(prisma, fixture.childId)).toBe(40);
@@ -59,9 +62,9 @@ describe('redemption (BR-41, BR-42)', () => {
       (await prisma.reward.findUniqueOrThrow({ where: { id: reward.id } })).inventoryQuantity,
     ).toBe(0);
 
-    await expect(
-      rewards.redeem(fixture.childActor, { rewardId: reward.id }),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(rewards.redeem(fixture.childActor, { rewardId: reward.id })).rejects.toMatchObject(
+      { code: 'CONFLICT' },
+    );
   });
 
   it('two children cannot both claim the last one', async () => {
@@ -84,32 +87,38 @@ describe('redemption (BR-41, BR-42)', () => {
     expect(await prisma.rewardRedemption.count()).toBe(1);
   });
 
-  it('a child cannot redeem another family\'s reward', async () => {
+  it("a child cannot redeem another family's reward", async () => {
     const other = await createFamilyFixture();
     const reward = await createRewardFixture(other, { pointsCost: 0 });
 
-    await expect(
-      rewards.redeem(fixture.childActor, { rewardId: reward.id }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(rewards.redeem(fixture.childActor, { rewardId: reward.id })).rejects.toMatchObject(
+      { code: 'NOT_FOUND' },
+    );
   });
 });
 
 describe('approval and refund (BR-43)', () => {
   it('debits at request time so a child cannot over-queue', async () => {
-    const reward = await createRewardFixture(fixture, { pointsCost: 60, requiresParentApproval: true });
+    const reward = await createRewardFixture(fixture, {
+      pointsCost: 60,
+      requiresParentApproval: true,
+    });
     await givePoints(fixture.familyId, fixture.childId, 100);
 
     const first = await rewards.redeem(fixture.childActor, { rewardId: reward.id });
     expect(first.redemption.status).toBe('PENDING');
     expect(await ledger.getPointsBalance(prisma, fixture.childId)).toBe(40);
 
-    await expect(
-      rewards.redeem(fixture.childActor, { rewardId: reward.id }),
-    ).rejects.toMatchObject({ code: 'INSUFFICIENT_POINTS' });
+    await expect(rewards.redeem(fixture.childActor, { rewardId: reward.id })).rejects.toMatchObject(
+      { code: 'INSUFFICIENT_POINTS' },
+    );
   });
 
   it('returns the points when a parent declines', async () => {
-    const reward = await createRewardFixture(fixture, { pointsCost: 60, requiresParentApproval: true });
+    const reward = await createRewardFixture(fixture, {
+      pointsCost: 60,
+      requiresParentApproval: true,
+    });
     await givePoints(fixture.familyId, fixture.childId, 100);
     const { redemption } = await rewards.redeem(fixture.childActor, { rewardId: reward.id });
 
@@ -127,19 +136,33 @@ describe('approval and refund (BR-43)', () => {
   });
 
   it('does not refund twice if the parent taps decline twice', async () => {
-    const reward = await createRewardFixture(fixture, { pointsCost: 60, requiresParentApproval: true });
+    const reward = await createRewardFixture(fixture, {
+      pointsCost: 60,
+      requiresParentApproval: true,
+    });
     await givePoints(fixture.familyId, fixture.childId, 100);
     const { redemption } = await rewards.redeem(fixture.childActor, { rewardId: reward.id });
 
-    await rewards.resolveRedemption(fixture.parentActor, { redemptionId: redemption.id, approve: false });
-    await rewards.resolveRedemption(fixture.parentActor, { redemptionId: redemption.id, approve: false });
+    await rewards.resolveRedemption(fixture.parentActor, {
+      redemptionId: redemption.id,
+      approve: false,
+    });
+    await rewards.resolveRedemption(fixture.parentActor, {
+      redemptionId: redemption.id,
+      approve: false,
+    });
 
     expect(await ledger.getPointsBalance(prisma, fixture.childId)).toBe(100);
-    expect(await prisma.rewardPointsTransaction.count({ where: { sourceType: 'REDEMPTION_REFUND' } })).toBe(1);
+    expect(
+      await prisma.rewardPointsTransaction.count({ where: { sourceType: 'REDEMPTION_REFUND' } }),
+    ).toBe(1);
   });
 
   it('keeps the points when a parent fulfils the reward', async () => {
-    const reward = await createRewardFixture(fixture, { pointsCost: 60, requiresParentApproval: true });
+    const reward = await createRewardFixture(fixture, {
+      pointsCost: 60,
+      requiresParentApproval: true,
+    });
     await givePoints(fixture.familyId, fixture.childId, 100);
     const { redemption } = await rewards.redeem(fixture.childActor, { rewardId: reward.id });
 
@@ -152,13 +175,19 @@ describe('approval and refund (BR-43)', () => {
     expect(await ledger.getPointsBalance(prisma, fixture.childId)).toBe(40);
   });
 
-  it('a parent cannot resolve another family\'s redemption', async () => {
+  it("a parent cannot resolve another family's redemption", async () => {
     const other = await createFamilyFixture();
-    const reward = await createRewardFixture(other, { pointsCost: 0, requiresParentApproval: true });
+    const reward = await createRewardFixture(other, {
+      pointsCost: 0,
+      requiresParentApproval: true,
+    });
     const { redemption } = await rewards.redeem(other.childActor, { rewardId: reward.id });
 
     await expect(
-      rewards.resolveRedemption(fixture.parentActor, { redemptionId: redemption.id, approve: true }),
+      rewards.resolveRedemption(fixture.parentActor, {
+        redemptionId: redemption.id,
+        approve: true,
+      }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
@@ -178,7 +207,7 @@ describe('the store as a child sees it', () => {
     expect(movie?.pointsNeeded).toBe(100);
   });
 
-  it('refuses to list another child\'s store (BR-57)', async () => {
+  it("refuses to list another child's store (BR-57)", async () => {
     await expect(
       rewards.listRewardsForChild(fixture.childActor, fixture.secondChildId),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });

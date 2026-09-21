@@ -22,7 +22,17 @@ export const createRewardSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(300).optional(),
   type: z
-    .enum(['EXPERIENCE', 'PHYSICAL', 'PRIVILEGE', 'SCREEN_TIME', 'POCKET_MONEY', 'FOOD', 'PARENT_TIME', 'DIGITAL', 'CUSTOM'])
+    .enum([
+      'EXPERIENCE',
+      'PHYSICAL',
+      'PRIVILEGE',
+      'SCREEN_TIME',
+      'POCKET_MONEY',
+      'FOOD',
+      'PARENT_TIME',
+      'DIGITAL',
+      'CUSTOM',
+    ])
     .default('CUSTOM'),
   pointsCost: z.number().int().min(0).max(100_000),
   inventoryQuantity: z.number().int().min(0).max(10_000).nullable().optional(),
@@ -70,10 +80,7 @@ export interface RewardCard {
   requiresParentApproval: boolean;
 }
 
-export async function listRewardsForChild(
-  actor: Actor,
-  childId: string,
-): Promise<RewardCard[]> {
+export async function listRewardsForChild(actor: Actor, childId: string): Promise<RewardCard[]> {
   assertSelfChild(childId, actor);
 
   const [rewards, balance] = await Promise.all([
@@ -243,7 +250,7 @@ export async function resolveRedemption(
       title: redemption.reward.name,
       body: input.approve
         ? 'Your reward is ready!'
-        : input.note ?? 'Your points have been returned.',
+        : (input.note ?? 'Your points have been returned.'),
       deepLink: '/kids/rewards',
     });
 

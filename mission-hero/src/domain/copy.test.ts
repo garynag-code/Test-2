@@ -44,8 +44,12 @@ describe('positive reset language (BR-40, BR-61)', () => {
 
   it('frames a low trait total as growth, never as a deficiency (BR-34)', () => {
     expect(CHARACTER.growThisOne).toBe("Let's grow this one.");
-    expect(CHARACTER.momentsToBadge(3, 'Kindness')).toBe('3 more kindness moments to your next badge.');
-    expect(CHARACTER.momentsToBadge(1, 'Honesty')).toBe('1 more honesty moment to your next badge.');
+    expect(CHARACTER.momentsToBadge(3, 'Kindness')).toBe(
+      '3 more kindness moments to your next badge.',
+    );
+    expect(CHARACTER.momentsToBadge(1, 'Honesty')).toBe(
+      '1 more honesty moment to your next badge.',
+    );
   });
 
   it('offers parents ready-made encouragement', () => {

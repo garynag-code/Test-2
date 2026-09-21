@@ -155,7 +155,8 @@ export async function approveTaskCompletion(
     const newXp = await ledger.getXpBalance(tx, child.id);
     const levels = await loadLevels(tx, completion.familyId);
     const leveledUp =
-      resolveLevel(newXp, levels).level.levelNumber > resolveLevel(previousXp, levels).level.levelNumber;
+      resolveLevel(newXp, levels).level.levelNumber >
+      resolveLevel(previousXp, levels).level.levelNumber;
 
     // --- tell everyone -----------------------------------------------------
     await notifications.notifyChild(tx, {
@@ -212,7 +213,11 @@ export async function rejectTaskCompletion(actor: Actor, input: RejectCompletion
 
   return prisma.$transaction(async (tx) => {
     await taskRepo.lockCompletion(tx, parsed.completionId);
-    const completion = await taskRepo.findCompletionForFamily(tx, parsed.completionId, actor.familyId);
+    const completion = await taskRepo.findCompletionForFamily(
+      tx,
+      parsed.completionId,
+      actor.familyId,
+    );
     if (!completion) throw notFound('That mission was not found.');
     if (completion.status !== 'PENDING') return completion;
 
@@ -240,8 +245,8 @@ export async function rejectTaskCompletion(actor: Actor, input: RejectCompletion
         completionId: completion.id,
         parentUserId: actor.type === 'parent' ? actor.userId : null,
         decision: parsed.decision,
-        encouragementMessage: parsed.decision === 'ASK_QUESTION' ? null : parsed.message ?? null,
-        question: parsed.decision === 'ASK_QUESTION' ? parsed.message ?? null : null,
+        encouragementMessage: parsed.decision === 'ASK_QUESTION' ? null : (parsed.message ?? null),
+        question: parsed.decision === 'ASK_QUESTION' ? (parsed.message ?? null) : null,
         xpAwarded: 0,
         pointsAwarded: 0,
         starsAwarded: 0,
@@ -402,12 +407,12 @@ async function buildCelebration(
   ]);
 
   const parentName = approval?.parentUserId
-    ? (
+    ? ((
         await db.parentProfile.findUnique({
           where: { familyId_userId: { familyId: params.familyId, userId: approval.parentUserId } },
           select: { displayName: true },
         })
-      )?.displayName ?? null
+      )?.displayName ?? null)
     : null;
 
   const progress = resolveLevel(balances.lifetimeXp, levels);

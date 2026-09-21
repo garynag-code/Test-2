@@ -39,7 +39,11 @@ export async function createMission(actor: Actor, input: z.infer<typeof createMi
 
   return prisma.$transaction(async (tx) => {
     const mission = await tx.secretMission.create({
-      data: { familyId: actor.familyId, ...parsed, characterTraitId: parsed.characterTraitId ?? null },
+      data: {
+        familyId: actor.familyId,
+        ...parsed,
+        characterTraitId: parsed.characterTraitId ?? null,
+      },
     });
     await audit.record(tx, {
       actor,
@@ -91,8 +95,7 @@ export async function getHiddenObject(
 
   const placement = placeHiddenObject(params.childId, params.today);
   // The same seed picks the mission, so the hint is stable for the day.
-  const index =
-    Math.abs(hashCode(`${params.childId}:${params.today}`)) % candidates.length;
+  const index = Math.abs(hashCode(`${params.childId}:${params.today}`)) % candidates.length;
   const mission = candidates[index]!;
 
   return {
@@ -104,10 +107,7 @@ export async function getHiddenObject(
 }
 
 /** BR-53: discovery reveals the mission and awards nothing. */
-export async function discover(
-  actor: Actor,
-  input: { missionId: string; surfaceKey: string },
-) {
+export async function discover(actor: Actor, input: { missionId: string; surfaceKey: string }) {
   if (actor.type !== 'child') throw notFound();
 
   const mission = await prisma.secretMission.findFirst({

@@ -18,10 +18,7 @@ interface BaseInput {
   payload?: Record<string, unknown>;
 }
 
-export async function notifyChild(
-  db: Db,
-  input: BaseInput & { childId: string },
-): Promise<void> {
+export async function notifyChild(db: Db, input: BaseInput & { childId: string }): Promise<void> {
   await db.notification.create({
     data: {
       familyId: input.familyId,

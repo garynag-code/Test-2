@@ -9,7 +9,10 @@ const schema = z.object({
   TEST_DATABASE_URL: z.string().url().optional(),
   AUTH_SECRET: z
     .string()
-    .min(32, 'AUTH_SECRET must be at least 32 characters — generate with `openssl rand -base64 48`'),
+    .min(
+      32,
+      'AUTH_SECRET must be at least 32 characters — generate with `openssl rand -base64 48`',
+    ),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_URL: z.string().url().default('http://localhost:3000'),
   MEDIA_UPLOADS_ENABLED: z

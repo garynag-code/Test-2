@@ -24,8 +24,23 @@ describe('character badge tiers (BR-35)', () => {
   });
 
   it('describes progress toward the next tier without shaming a low count', () => {
-    expect(badgeProgress(3)).toEqual({ currentTier: null, nextTier: 'BRONZE', count: 3, remaining: 2 });
-    expect(badgeProgress(27)).toEqual({ currentTier: 'SILVER', nextTier: 'GOLD', count: 27, remaining: 3 });
-    expect(badgeProgress(80)).toEqual({ currentTier: 'DIAMOND', nextTier: null, count: 80, remaining: 0 });
+    expect(badgeProgress(3)).toEqual({
+      currentTier: null,
+      nextTier: 'BRONZE',
+      count: 3,
+      remaining: 2,
+    });
+    expect(badgeProgress(27)).toEqual({
+      currentTier: 'SILVER',
+      nextTier: 'GOLD',
+      count: 27,
+      remaining: 3,
+    });
+    expect(badgeProgress(80)).toEqual({
+      currentTier: 'DIAMOND',
+      nextTier: null,
+      count: 80,
+      remaining: 0,
+    });
   });
 });

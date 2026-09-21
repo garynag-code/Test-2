@@ -33,7 +33,8 @@ export function toLocalDate(instant: Date, timezone: string): LocalDate {
     month: '2-digit',
     day: '2-digit',
   }).formatToParts(instant);
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
@@ -59,7 +60,9 @@ export function addDays(date: LocalDate, days: number): LocalDate {
 /** Whole days from `a` to `b`; negative when `b` precedes `a`. */
 export function daysBetween(a: LocalDate, b: LocalDate): number {
   const MS_PER_DAY = 86_400_000;
-  return Math.round((localDateToUtcDate(b).getTime() - localDateToUtcDate(a).getTime()) / MS_PER_DAY);
+  return Math.round(
+    (localDateToUtcDate(b).getTime() - localDateToUtcDate(a).getTime()) / MS_PER_DAY,
+  );
 }
 
 /** 0 = Sunday … 6 = Saturday (BR-19). */

@@ -49,9 +49,9 @@ describe('drawSegment (BR-45)', () => {
   });
 
   it('throws when nothing is eligible instead of silently picking', () => {
-    expect(() => drawSegment([{ id: 'x', label: 'x', weight: 0, segmentIndex: 0 }], () => 0)).toThrow(
-      /at least one segment/,
-    );
+    expect(() =>
+      drawSegment([{ id: 'x', label: 'x', weight: 0, segmentIndex: 0 }], () => 0),
+    ).toThrow(/at least one segment/);
   });
 
   it('rejects an RNG that returns an out-of-range value', () => {
@@ -130,13 +130,23 @@ describe('evaluateEligibility (BR-44)', () => {
   });
 
   it('requires enough points to pay when a spin costs more than the threshold', () => {
-    const result = evaluateEligibility({ ...base, pointThreshold: 50, pointsCost: 200, balance: 120 });
+    const result = evaluateEligibility({
+      ...base,
+      pointThreshold: 50,
+      pointsCost: 200,
+      balance: 120,
+    });
     expect(result.reason).toBe('INSUFFICIENT_POINTS');
     expect(result.pointsNeeded).toBe(80);
   });
 
   it('ignores the cost entirely when the wheel does not deduct points', () => {
-    const result = evaluateEligibility({ ...base, deductPoints: false, pointsCost: 500, balance: 100 });
+    const result = evaluateEligibility({
+      ...base,
+      deductPoints: false,
+      pointsCost: 500,
+      balance: 100,
+    });
     expect(result.eligible).toBe(true);
   });
 });

@@ -1,7 +1,12 @@
 import type { StreakKind } from '@prisma/client';
 import type { Db } from '@/server/db/prisma';
 import { type LocalDate, localDateToUtcDate, utcDateToLocalDate } from '@/domain/dates';
-import { EMPTY_STREAK, effectiveStreakCount, recordStreakActivity, type StreakOutcome } from '@/domain/streaks';
+import {
+  EMPTY_STREAK,
+  effectiveStreakCount,
+  recordStreakActivity,
+  type StreakOutcome,
+} from '@/domain/streaks';
 
 /**
  * Streak persistence (BR-38 … BR-40).
@@ -41,7 +46,9 @@ export async function recordActivity(
   const data = {
     currentCount: outcome.currentCount,
     longestCount: outcome.longestCount,
-    lastActivityDate: outcome.lastActivityDate ? localDateToUtcDate(outcome.lastActivityDate) : null,
+    lastActivityDate: outcome.lastActivityDate
+      ? localDateToUtcDate(outcome.lastActivityDate)
+      : null,
     startedDate: outcome.startedDate ? localDateToUtcDate(outcome.startedDate) : null,
   };
 
@@ -60,7 +67,9 @@ export async function currentCount(
   params: { childId: string; kind: StreakKind; key?: string; today: LocalDate },
 ): Promise<number> {
   const row = await db.streak.findUnique({
-    where: { childId_kind_key: { childId: params.childId, kind: params.kind, key: params.key ?? '' } },
+    where: {
+      childId_kind_key: { childId: params.childId, kind: params.kind, key: params.key ?? '' },
+    },
   });
   if (!row) return 0;
   return effectiveStreakCount(

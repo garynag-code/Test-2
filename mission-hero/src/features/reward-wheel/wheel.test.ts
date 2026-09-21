@@ -153,7 +153,11 @@ describe('spinning (BR-45, BR-46, BR-47)', () => {
 
 describe('limits and abuse (BR-44, docs/03 §8)', () => {
   it('enforces one spin per day', async () => {
-    const row = await createWheelFixture(fixture, { spinsPerDay: 1, deductPoints: false, pointThreshold: 0 });
+    const row = await createWheelFixture(fixture, {
+      spinsPerDay: 1,
+      deductPoints: false,
+      pointThreshold: 0,
+    });
 
     await wheel.spin(fixture.childActor, { wheelId: row.id, today: TODAY });
     await expect(
@@ -219,7 +223,7 @@ describe('limits and abuse (BR-44, docs/03 §8)', () => {
 });
 
 describe('authorization', () => {
-  it('a parent cannot spin on a child\'s behalf', async () => {
+  it("a parent cannot spin on a child's behalf", async () => {
     const row = await createWheelFixture(fixture, { pointThreshold: 0, deductPoints: false });
 
     await expect(
@@ -227,7 +231,7 @@ describe('authorization', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('a child cannot spin another family\'s wheel', async () => {
+  it("a child cannot spin another family's wheel", async () => {
     const other = await createFamilyFixture();
     const row = await createWheelFixture(other, { pointThreshold: 0, deductPoints: false });
 
@@ -237,13 +241,13 @@ describe('authorization', () => {
     expect(await prisma.rewardSpin.count()).toBe(0);
   });
 
-  it('a child cannot replay another child\'s spin (BR-57)', async () => {
+  it("a child cannot replay another child's spin (BR-57)", async () => {
     const row = await createWheelFixture(fixture, { pointThreshold: 0, deductPoints: false });
     const result = await wheel.spin(fixture.childActor, { wheelId: row.id, today: TODAY });
 
-    await expect(
-      wheel.getSpin(fixture.secondChildActor, result.spinId),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(wheel.getSpin(fixture.secondChildActor, result.spinId)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 });
 

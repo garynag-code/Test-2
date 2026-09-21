@@ -104,8 +104,8 @@ features/approvals/
 
 Rules:
 
-- `actions.ts` files are the *only* files with `'use server'`.
-- `repo.ts` is the *only* place `@prisma/client` is imported (plus `server/db`).
+- `actions.ts` files are the _only_ files with `'use server'`.
+- `repo.ts` is the _only_ place `@prisma/client` is imported (plus `server/db`).
 - `service.ts` never touches cookies, headers or `revalidatePath` — it takes an `Actor`
   and returns data, which makes it trivially testable.
 - `types.ts` DTOs are hand-written so a Prisma model change cannot silently widen what

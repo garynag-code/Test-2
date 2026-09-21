@@ -1,3 +1,14 @@
+# Mission Hero
+
+> **Big Goals. Small Wins. Awesome Kids.**
+
+A production-quality family app that turns real-world responsibility and
+character growth into an adventure — children see a game, parents get a calm,
+auditable system. Lives in [`mission-hero/`](./mission-hero/README.md); start
+with its [architecture set](./mission-hero/docs/README.md).
+
+---
+
 # ChatGPT → Claude exporter
 
 Extract **all** your ChatGPT conversations — including chats inside **Projects**

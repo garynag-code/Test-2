@@ -1,19 +1,19 @@
 # Mission Hero — Internal Architecture Review
 
 A self-review of the proposal in `01`–`09` against the five lenses the brief names,
-carried out *before* implementation. Findings that changed the design are marked
+carried out _before_ implementation. Findings that changed the design are marked
 **[changed]**.
 
 ## 1. Security
 
-| Question | Finding |
-| --- | --- |
+| Question                         | Finding                                                                                                                                                                                                                       |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Can a child forge a value award? | No. Amounts live on server-owned rows; mutation schemas have no amount field. **[changed]** — the first draft let the approval action accept an `xpOverride`; removed, replaced with a separate audited "award bonus" action. |
-| Can a child reach parent routes? | No. Separate cookie, separate JWT type, middleware gate, guard in every layout and action. |
-| Can family A read family B? | Only if a repository looks a row up by id alone. **[changed]** — added the "no bare `findUnique` on family-scoped models" rule and made the repositories expose family-scoped finders. |
-| Is the wheel cheatable? | No. Draw and persist happen server-side before the response; the client is told only where to stop. |
-| Brute force? | Rate limits + row-level PIN lockout that survives cookie clearing. |
-| Residual risk | Media storage. v1 keeps evidence behind an authenticated route with a MIME allow-list; a misconfigured object store in production would be the weakest link. Called out in Sprint 8. |
+| Can a child reach parent routes? | No. Separate cookie, separate JWT type, middleware gate, guard in every layout and action.                                                                                                                                    |
+| Can family A read family B?      | Only if a repository looks a row up by id alone. **[changed]** — added the "no bare `findUnique` on family-scoped models" rule and made the repositories expose family-scoped finders.                                        |
+| Is the wheel cheatable?          | No. Draw and persist happen server-side before the response; the client is told only where to stop.                                                                                                                           |
+| Brute force?                     | Rate limits + row-level PIN lockout that survives cookie clearing.                                                                                                                                                            |
+| Residual risk                    | Media storage. v1 keeps evidence behind an authenticated route with a MIME allow-list; a misconfigured object store in production would be the weakest link. Called out in Sprint 8.                                          |
 
 ## 2. Scalability
 
@@ -45,7 +45,7 @@ carried out *before* implementation. Findings that changed the design are marked
   per-child-per-day hash, so refreshing achieves nothing; this is both an anti-farming
   and an anti-compulsion measure.
 - **[changed]** — character traits were originally going to display a percentage
-  completion toward the next badge for *every* trait, which reads as a report card for
+  completion toward the next badge for _every_ trait, which reads as a report card for
   the weak ones. Now low totals get growth copy and no percentage.
 - The banned-phrase test (BR-60) makes the tone commitment enforceable rather than
   cultural.
@@ -55,12 +55,12 @@ carried out *before* implementation. Findings that changed the design are marked
 - Three independent ledgers with `CHECK` constraints mean the product's two strongest
   promises — lifetime XP never falls, Character Stars are never spent — are guaranteed by
   PostgreSQL, not by developer discipline.
-- Idempotency keys are derived from the causing row's id, so the key is a *fact*, not a
+- Idempotency keys are derived from the causing row's id, so the key is a _fact_, not a
   client-supplied token that could be omitted.
 - Every value-moving path is `$transaction` + row lock + status guard. The three
   concurrency tests (double approve, last-item redemption, parallel spin) are the ones
   that would catch a regression here.
-- **[changed]** — redemptions originally debited on *fulfilment*, which let a child queue
+- **[changed]** — redemptions originally debited on _fulfilment_, which let a child queue
   unlimited pending redemptions. Now the debit happens at request time with an explicit,
   keyed refund if the parent rejects (BR-43).
 - Audit rows are append-only with before/after snapshots, so a disputed balance can be

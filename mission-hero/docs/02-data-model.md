@@ -67,26 +67,31 @@ Conventions applied to **every** table:
 ## 2. Identity & tenancy
 
 ### `User`
+
 Parents/guardians only. `email` (citext, unique), `passwordHash`, `displayName`,
 `emailVerifiedAt`, `lastLoginAt`, `status`.
 No `User` row is ever created for a child (ADR-003).
 
 ### `Family`
+
 `name`, `timezone` (IANA, drives every "calendar day" decision), `familyCode`
 (unique, 8 chars, unambiguous alphabet — used for device binding), `locale`,
 `currencyCode` (rewards like "R20 pocket money" are display-only strings plus an
 optional amount).
 
 ### `FamilyMember`
+
 Join table `User ↔ Family` with `role` (`OWNER | PARENT | GUARDIAN`) and `status`.
 Unique on `(familyId, userId)`. **This table is the authorization root**: a parent's
 access to anything is proven by an active `FamilyMember` row.
 
 ### `ParentProfile`
+
 Per-family display preferences for a parent (nickname the kids see, avatar, notification
 prefs). Separate from `User` so one adult in two families can present differently.
 
 ### `ChildProfile`
+
 `familyId`, `nickname` (not legal name — §40), `ageBracket` (`AGE_6_8 | AGE_9_11 |
 AGE_12_14`), `birthMonth`/`birthYear` (optional, month+year only — no full DOB),
 `avatarKey`, `themeKey`, `pinHash` (nullable), `pinRequired`, `pinFailedAttempts`,
@@ -96,6 +101,7 @@ Unique on `(familyId, nickname)`.
 ## 3. Task domain
 
 ### `Task`
+
 Template, not an instance. `familyId`, `title`, `description`, `categoryId`, `iconKey`,
 `colorKey`, `xpValue`, `rewardPointsValue`, `characterTraitId?` + `characterStarValue`,
 `difficulty` (`EASY | STANDARD | CHALLENGING | EPIC`), `evidenceType`
@@ -104,19 +110,22 @@ Template, not an instance. `familyId`, `title`, `description`, `categoryId`, `ic
 
 `CHECK (xpValue >= 0 AND rewardPointsValue >= 0 AND characterStarValue >= 0)` and
 `CHECK (xpValue + rewardPointsValue + characterStarValue > 0)` — a task must be worth
-*something*.
+_something_.
 
 ### `TaskAssignment`
+
 `taskId`, `childId`, `active`. Unique `(taskId, childId)`. A family task creates one
 assignment per participating child, so per-child progress stays independent.
 
 ### `TaskSchedule`
+
 One per task. `frequency` (`ONE_TIME | DAILY | WEEKDAYS | WEEKENDS | SELECTED_DAYS |
-WEEKLY | MONTHLY | QUARTERLY | ANNUAL | CUSTOM`), `interval` (every *n* periods),
+WEEKLY | MONTHLY | QUARTERLY | ANNUAL | CUSTOM`), `interval` (every _n_ periods),
 `weekdays` (int[] 0–6), `monthDay`, `month`, `startDate`, `endDate`, `dueTime`
 (local time-of-day), `timezone` (inherited from family unless overridden).
 
 ### `TaskOccurrence`
+
 A materialised due-date for a task/child. `taskId`, `childId`, `occurrenceDate` (a
 **date**, in family-local terms), `dueAt` (timestamptz), `status`
 (`OPEN | SUBMITTED | APPROVED | REJECTED | MISSED | SKIPPED`).
@@ -124,17 +133,20 @@ A materialised due-date for a task/child. `taskId`, `childId`, `occurrenceDate` 
 "one completion per task per day" structurally true rather than hopefully true.
 
 ### `TaskCompletion`
+
 The child's claim. `occurrenceId` (unique — one live claim per occurrence),
 `taskId`, `childId`, `submittedAt`, `status` (`PENDING | APPROVED | REJECTED |
 CANCELLED`), `childNote`, `resolvedAt`, `resolvedByUserId`.
 
 ### `TaskApproval`
+
 The parent's verdict, one row per resolution attempt (a redo creates a new completion,
 so history is preserved). `completionId`, `parentUserId`, `decision`
 (`APPROVE | REJECT | REQUEST_REDO | ASK_QUESTION`), `encouragementMessage`,
 `xpAwarded`, `pointsAwarded`, `starsAwarded`, `decidedAt`.
 
 ### `TaskEvidence`
+
 `completionId`, `type` (`PHOTO | NOTE | VOICE`), `storageKey`, `mimeType`, `byteSize`,
 `durationMs`, `textBody`, `uploadedAt`.
 Media is only accepted when `FamilySetting.mediaUploadsEnabled` is true **and** the task
@@ -144,20 +156,20 @@ asks for it. Files live behind an authenticated, family-scoped route — never a
 
 Three structurally identical tables. Using `XpTransaction` as the template:
 
-| Column | Notes |
-| --- | --- |
-| `id` | uuid |
-| `childId` | indexed |
-| `familyId` | denormalised for tenant-scoped queries |
-| `amount` | **`CHECK (amount > 0)`** for XP and Stars; signed for Reward Points |
-| `sourceType` | `TASK_COMPLETION | DAILY_CHECK_IN | MEMORY_SUBMISSION | CHARACTER_APPROVAL | SECRET_MISSION | BONUS_CHALLENGE | STREAK_MILESTONE | ACHIEVEMENT | WHEEL_SPIN | REWARD_REDEMPTION | MANUAL_ADJUSTMENT` |
-| `sourceId` | uuid of the causing row (nullable for manual) |
-| `traitId` | **Character Stars only** — which trait the star belongs to |
-| `idempotencyKey` | **unique `(childId, idempotencyKey)`** |
-| `awardedByUserId` | who caused it (parent for approvals, null for system) |
-| `reason` | required for `MANUAL_ADJUSTMENT` |
-| `description` | human-readable, shown in history |
-| `createdAt` | |
+| Column            | Notes                                                               |
+| ----------------- | ------------------------------------------------------------------- |
+| `id`              | uuid                                                                |
+| `childId`         | indexed                                                             |
+| `familyId`        | denormalised for tenant-scoped queries                              |
+| `amount`          | **`CHECK (amount > 0)`** for XP and Stars; signed for Reward Points |
+| `sourceType`      | `TASK_COMPLETION                                                    | DAILY_CHECK_IN | MEMORY_SUBMISSION | CHARACTER_APPROVAL | SECRET_MISSION | BONUS_CHALLENGE | STREAK_MILESTONE | ACHIEVEMENT | WHEEL_SPIN | REWARD_REDEMPTION | MANUAL_ADJUSTMENT` |
+| `sourceId`        | uuid of the causing row (nullable for manual)                       |
+| `traitId`         | **Character Stars only** — which trait the star belongs to          |
+| `idempotencyKey`  | **unique `(childId, idempotencyKey)`**                              |
+| `awardedByUserId` | who caused it (parent for approvals, null for system)               |
+| `reason`          | required for `MANUAL_ADJUSTMENT`                                    |
+| `description`     | human-readable, shown in history                                    |
+| `createdAt`       |                                                                     |
 
 `RewardPointsTransaction` additionally allows `amount < 0` and carries
 `CHECK (amount <> 0)`. A redemption or wheel cost writes a single negative row; there is
@@ -181,20 +193,24 @@ Indexes: `(childId, createdAt DESC)` for history, `(childId)` for the sum,
 ## 5. Character domain
 
 ### `CharacterTrait`
+
 `familyId` (nullable ⇒ platform default, cloned into a family on creation), `key`,
 `label`, `emoji`, `colorKey`, `description`, `promptText` ("I was kind today"),
 `sortOrder`, `active`, `deletedAt`. Unique `(familyId, key)`.
 
 ### `CharacterSubmission`
+
 The child's claim. `childId`, `traitId`, `localDate`, `story` (text), `mood`,
 `evidenceId?`, `status` (`PENDING | APPROVED | REJECTED | QUESTION_ASKED`),
 `submittedAt`. Index `(childId, localDate)`.
 
 ### `CharacterApproval`
+
 `submissionId` (unique), `parentUserId`, `decision`, `encouragementMessage`,
 `starsAwarded`, `xpAwarded`, `question`, `decidedAt`.
 
 ### `CharacterBadge` / `CharacterBadgeProgress`
+
 `CharacterBadge`: `familyId?`, `traitId?`, `name` ("Kindness Hero"), `tier`
 (`BRONZE | SILVER | GOLD | DIAMOND`), `threshold`, `iconKey`, `description`.
 Unique `(familyId, traitId, tier)`.
@@ -204,21 +220,25 @@ Unique `(childId, badgeId)` — unlock is idempotent.
 ## 6. Rewards
 
 ### `RewardCategory`, `Reward`
+
 `Reward`: `familyId`, `name`, `description`, `type` (`EXPERIENCE | PHYSICAL |
 PRIVILEGE | SCREEN_TIME | POCKET_MONEY | FOOD | PARENT_TIME | DIGITAL | CUSTOM`),
 `iconKey`, `imageKey`, `pointsCost`, `inventoryQuantity` (null = unlimited),
 `requiresParentApproval`, `active`, `expiresAt`, `deletedAt`.
 
 ### `RewardEligibility`
+
 `rewardId`, `childId` — absence of rows means "all children".
 
 ### `RewardRedemption`
+
 `rewardId`, `childId`, `pointsSpent`, `status` (`PENDING | FULFILLED | REJECTED |
 CANCELLED`), `requestedAt`, `resolvedAt`, `resolvedByUserId`, `note`.
 The points debit and the inventory decrement happen in **one** transaction with
 `SELECT … FOR UPDATE` on the reward row, so two children cannot claim the last one.
 
 ### `RewardWheel`, `RewardWheelItem`, `RewardSpin`
+
 `RewardWheel`: `familyId`, `name`, `pointThreshold`, `deductPoints`, `pointsCost`,
 `spinsPerDay`, `spinsPerWeek`, `cooldownMinutes`, `active`.
 `RewardWheelItem`: `wheelId`, `label`, `rewardId?`, `weight` (**int ≥ 1**), `iconKey`,
@@ -234,7 +254,7 @@ animation is told to land on.
   `xpAwarded`, `pointsAwarded`. **Unique `(childId, localDate)`** — this single
   constraint is the whole defence against farming XP by reopening the app.
 - **`MemoryChallenge`** — `familyId`, `title`, `category` (`BIBLE_VERSE | QUOTE |
-  AFFIRMATION | FAMILY_SAYING | VOCABULARY | SCHOOL_FACT | CUSTOM`), `reference`,
+AFFIRMATION | FAMILY_SAYING | VOCABULARY | SCHOOL_FACT | CUSTOM`), `reference`,
   `bodyText`, `xpValue`, `rewardPointsValue`, `verificationType`
   (`TYPED | PARENT_CONFIRM | VOICE`), `startDate`, `endDate`, `active`.
   `MemoryChallengeAssignment` scopes it to children.
@@ -242,7 +262,7 @@ animation is told to land on.
   Unique partial index on `(challengeId, childId)` where `status = 'APPROVED'` ⇒ a
   challenge pays out at most once per child.
 - **`SecretMission`** — `familyId`, `title`, `instructions`, `rarity` (`COMMON | RARE |
-  EPIC | LEGENDARY`), rewards, `hiddenObjectKey`, `availableFrom/To`, `active`.
+EPIC | LEGENDARY`), rewards, `hiddenObjectKey`, `availableFrom/To`, `active`.
 - **`SecretMissionDiscovery`** — `childId`, `missionId`, `discoveredAt`,
   `hiddenObjectKey`, `surfaceKey` (where it was hidden). Unique `(childId, missionId)`.
 - **`SecretMissionSubmission`** — claim + approval, mirroring tasks.
@@ -252,7 +272,7 @@ animation is told to land on.
 - **`Level`** — `familyId?`, `levelNumber`, `name` ("Explorer"), `minLifetimeXp`,
   `iconKey`, `unlocksCollectibleId?`. Unique `(familyId, levelNumber)`.
 - **`Streak`** — `childId`, `kind` (`DAILY_CHECK_IN | ALL_DAILY_TASKS | TASK_GROUP |
-  CHARACTER | MEMORY | CUSTOM`), `key`, `currentCount`, `longestCount`,
+CHARACTER | MEMORY | CUSTOM`), `key`, `currentCount`, `longestCount`,
   `lastActivityDate`, `startedDate`. Unique `(childId, kind, key)`.
 - **`Achievement`** / **`AchievementUnlock`** — `Achievement` carries a
   `ruleType` + `ruleConfig` (jsonb) evaluated by a registry of pure predicate functions.
@@ -262,7 +282,7 @@ animation is told to land on.
   `unlockRule` (jsonb): by level, achievement, star count, streak or secret mission —
   deliberately **not** only by spendable points (§20).
 - **`Avatar`, `AvatarItem`, `ChildAvatarItem`** — slot-based (`HAT | CAPE | CROWN |
-  HELMET | GLASSES | PET | BACKGROUND | TRAIL`), `equipped` boolean.
+HELMET | GLASSES | PET | BACKGROUND | TRAIL`), `equipped` boolean.
   Partial unique index on `(childId, slot)` where `equipped` ⇒ one item per slot.
 - **`Theme`** — `key`, `label`, palette + decor manifest; a child picks one.
 
@@ -286,20 +306,20 @@ animation is told to land on.
 
 ## 10. Constraint summary — the invariants the database itself enforces
 
-| Invariant | Mechanism |
-| --- | --- |
-| XP never decreases | `CHECK (amount > 0)` on `XpTransaction` |
-| Character Stars never spent | `CHECK (amount > 0)` on `CharacterStarTransaction` |
-| No double award | unique `(childId, idempotencyKey)` on all three ledgers |
-| One check-in per day | unique `(childId, localDate)` on `DailyCheckIn` |
-| One completion per occurrence | unique `occurrenceId` on `TaskCompletion` |
-| One occurrence per task/child/day | unique `(taskId, childId, occurrenceDate)` |
-| Memory challenge pays once | partial unique `(challengeId, childId) WHERE status='APPROVED'` |
-| One approval per submission | unique `submissionId` on `CharacterApproval` / `MemoryApproval` |
-| Badge unlocked once | unique `(childId, badgeId)` |
-| One equipped item per slot | partial unique `(childId, slot) WHERE equipped` |
-| Wheel weights are sane | `CHECK (weight >= 1)` |
-| Family code collisions | unique on `Family.familyCode` |
+| Invariant                         | Mechanism                                                       |
+| --------------------------------- | --------------------------------------------------------------- |
+| XP never decreases                | `CHECK (amount > 0)` on `XpTransaction`                         |
+| Character Stars never spent       | `CHECK (amount > 0)` on `CharacterStarTransaction`              |
+| No double award                   | unique `(childId, idempotencyKey)` on all three ledgers         |
+| One check-in per day              | unique `(childId, localDate)` on `DailyCheckIn`                 |
+| One completion per occurrence     | unique `occurrenceId` on `TaskCompletion`                       |
+| One occurrence per task/child/day | unique `(taskId, childId, occurrenceDate)`                      |
+| Memory challenge pays once        | partial unique `(challengeId, childId) WHERE status='APPROVED'` |
+| One approval per submission       | unique `submissionId` on `CharacterApproval` / `MemoryApproval` |
+| Badge unlocked once               | unique `(childId, badgeId)`                                     |
+| One equipped item per slot        | partial unique `(childId, slot) WHERE equipped`                 |
+| Wheel weights are sane            | `CHECK (weight >= 1)`                                           |
+| Family code collisions            | unique on `Family.familyCode`                                   |
 
-Every one of these is also covered by an automated test that asserts the *behaviour*,
+Every one of these is also covered by an automated test that asserts the _behaviour_,
 not just the constraint — see `docs/08-test-strategy.md`.

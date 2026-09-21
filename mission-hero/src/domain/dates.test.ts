@@ -46,8 +46,12 @@ describe('toLocalDate (BR-18)', () => {
   it('is stable across a DST transition', () => {
     // US DST begins 2026-03-08. Local midnight-ish on either side must land on
     // the correct calendar day.
-    expect(toLocalDate(new Date('2026-03-08T06:30:00.000Z'), 'America/New_York')).toBe('2026-03-08');
-    expect(toLocalDate(new Date('2026-03-09T03:30:00.000Z'), 'America/New_York')).toBe('2026-03-08');
+    expect(toLocalDate(new Date('2026-03-08T06:30:00.000Z'), 'America/New_York')).toBe(
+      '2026-03-08',
+    );
+    expect(toLocalDate(new Date('2026-03-09T03:30:00.000Z'), 'America/New_York')).toBe(
+      '2026-03-08',
+    );
   });
 });
 

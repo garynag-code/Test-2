@@ -4,7 +4,7 @@ Sprints are vertical, not horizontal. Each ends with something a family could ac
 use, and with green tests. **No sprint starts while a previous sprint's critical tests
 are red** (§55 of the brief).
 
-## Sprint 0 — Foundations *(this deliverable)*
+## Sprint 0 — Foundations _(this deliverable)_
 
 - Architecture docs (this set), reviewed against security / scalability / child safety /
   data integrity / maintainability.
@@ -19,7 +19,7 @@ are red** (§55 of the brief).
 
 **Exit:** `lint`, `typecheck`, `test:unit` green; `db:reset && db:seed` works.
 
-## Sprint 1 — Vertical Slice 1: task → approval → ledger *(§47)*
+## Sprint 1 — Vertical Slice 1: task → approval → ledger _(§47)_
 
 - Parent register / login / logout; family + child creation.
 - Task creation with schedule; assignment to children.
@@ -34,7 +34,7 @@ are red** (§55 of the brief).
 **Exit:** the §47 journey passes end to end in Playwright; all §46 tests covering
 slice 1 pass, including double-approval, child-cannot-approve and cross-family blocks.
 
-## Sprint 2 — Vertical Slice 2: character system *(§48)*
+## Sprint 2 — Vertical Slice 2: character system _(§48)_
 
 - Traits (platform defaults cloned per family + custom traits).
 - Character check-in UI with animated trait cards and a story.
@@ -45,7 +45,7 @@ slice 1 pass, including double-approval, child-cannot-approve and cross-family b
 **Exit:** §48 journey green end to end; "approval awards exactly one star" and
 "submission awards nothing" pass.
 
-## Sprint 3 — Vertical Slice 3: reward wheel *(§49)*
+## Sprint 3 — Vertical Slice 3: reward wheel _(§49)_
 
 - Wheel configuration (segments, weights, threshold, cooldown, spins per period).
 - Server-side weighted draw, persisted before response.

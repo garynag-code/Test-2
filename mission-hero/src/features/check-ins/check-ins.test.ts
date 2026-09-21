@@ -13,7 +13,7 @@ beforeEach(async () => {
 });
 
 describe('daily check-in (BR-25)', () => {
-  it('awards the family\'s configured XP once', async () => {
+  it("awards the family's configured XP once", async () => {
     const result = await checkIns.checkIn(fixture.childActor, {
       localDate: '2026-09-21',
       mood: '🙂',
@@ -93,7 +93,7 @@ describe('daily check-in (BR-25)', () => {
     expect(await ledger.getXpBalance(prisma, fixture.secondChildId)).toBe(5);
   });
 
-  it('a parent cannot check in on a child\'s behalf', async () => {
+  it("a parent cannot check in on a child's behalf", async () => {
     await expect(
       checkIns.checkIn(fixture.parentActor, { localDate: '2026-09-21' }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });

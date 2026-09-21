@@ -23,7 +23,16 @@ import * as notifications from '@/features/notifications/service';
 export const createChallengeSchema = z.object({
   title: z.string().trim().min(1).max(120),
   category: z
-    .enum(['BIBLE_VERSE', 'QUOTE', 'AFFIRMATION', 'FAMILY_SAYING', 'SLOGAN', 'VOCABULARY', 'SCHOOL_FACT', 'CUSTOM'])
+    .enum([
+      'BIBLE_VERSE',
+      'QUOTE',
+      'AFFIRMATION',
+      'FAMILY_SAYING',
+      'SLOGAN',
+      'VOCABULARY',
+      'SCHOOL_FACT',
+      'CUSTOM',
+    ])
     .default('CUSTOM'),
   reference: z.string().trim().max(120).optional(),
   bodyText: z.string().trim().min(1).max(2000),

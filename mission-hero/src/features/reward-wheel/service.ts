@@ -136,7 +136,10 @@ export async function spin(
       segmentCount: wheel.items.length,
     });
     if (!eligibility.eligible) {
-      throw notEligible(eligibility.reason ?? 'NOT_ELIGIBLE', ineligibleMessage(eligibility.reason));
+      throw notEligible(
+        eligibility.reason ?? 'NOT_ELIGIBLE',
+        ineligibleMessage(eligibility.reason),
+      );
     }
 
     // BR-48: a segment a child has already won its maximum of drops out of the

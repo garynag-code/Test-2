@@ -143,7 +143,10 @@ function within(date: LocalDate, from: LocalDate, to: LocalDate): boolean {
 }
 
 /** Falls back to the start date's own weekday, so a WEEKLY task always recurs. */
-function normaliseWeekdays(weekdays: readonly number[] | undefined, startDate: LocalDate): number[] {
+function normaliseWeekdays(
+  weekdays: readonly number[] | undefined,
+  startDate: LocalDate,
+): number[] {
   const provided = (weekdays ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
   if (provided.length > 0) return [...new Set(provided)].sort((a, b) => a - b);
   return [weekdayOf(startDate)];

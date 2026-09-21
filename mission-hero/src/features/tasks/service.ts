@@ -37,7 +37,8 @@ export async function createTask(actor: Actor, input: CreateTaskInput) {
       where: { id: { in: parsed.childIds }, familyId: actor.familyId, deletedAt: null },
       select: { id: true },
     });
-    if (children.length !== parsed.childIds.length) throw notFound('One of those heroes was not found.');
+    if (children.length !== parsed.childIds.length)
+      throw notFound('One of those heroes was not found.');
 
     if (parsed.characterTraitId) {
       const trait = await tx.characterTrait.findFirst({
@@ -48,12 +49,12 @@ export async function createTask(actor: Actor, input: CreateTaskInput) {
     }
 
     const categoryId = parsed.categoryKey
-      ? (
+      ? ((
           await tx.taskCategory.findUnique({
             where: { familyId_key: { familyId: actor.familyId, key: parsed.categoryKey } },
             select: { id: true },
           })
-        )?.id ?? null
+        )?.id ?? null)
       : null;
 
     const task = await tx.task.create({
@@ -99,7 +100,11 @@ export async function createTask(actor: Actor, input: CreateTaskInput) {
       action: 'TASK_CREATED',
       entityType: 'Task',
       entityId: task.id,
-      after: { title: task.title, xpValue: task.xpValue, rewardPointsValue: task.rewardPointsValue },
+      after: {
+        title: task.title,
+        xpValue: task.xpValue,
+        rewardPointsValue: task.rewardPointsValue,
+      },
     });
 
     return task;

@@ -30,7 +30,7 @@ Rules are numbered so tests and code comments can cite them (`// BR-14`).
 - **BR-14** `REQUEST_REDO` reopens the occurrence and clears the completion, preserving
   the original as history.
 - **BR-15** If `Task.approvalRequired` is false, submission auto-approves through the
-  *same* service path — including ledger, streak, achievement and audit writes. There is
+  _same_ service path — including ledger, streak, achievement and audit writes. There is
   no second, shortcut code path.
 - **BR-16** Evidence is required at submission when the task demands it, and only if the
   family permits that media type.

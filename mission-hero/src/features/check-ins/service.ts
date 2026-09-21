@@ -127,9 +127,17 @@ export async function checkIn(
   });
 }
 
-export async function getTodaysCheckIn(actor: Actor, params: { childId: string; localDate: LocalDate }) {
+export async function getTodaysCheckIn(
+  actor: Actor,
+  params: { childId: string; localDate: LocalDate },
+) {
   if (actor.type === 'child' && actor.childId !== params.childId) throw notFound();
   return prisma.dailyCheckIn.findUnique({
-    where: { childId_localDate: { childId: params.childId, localDate: localDateToUtcDate(params.localDate) } },
+    where: {
+      childId_localDate: {
+        childId: params.childId,
+        localDate: localDateToUtcDate(params.localDate),
+      },
+    },
   });
 }

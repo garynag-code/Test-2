@@ -35,11 +35,19 @@ describe('expandSchedule — DAILY', () => {
 
   it('never emits before the start date (BR-21)', () => {
     const spec: ScheduleSpec = { frequency: 'DAILY', startDate: '2026-09-10' };
-    expect(expandSchedule(spec, '2026-09-01', '2026-09-12')).toEqual(['2026-09-10', '2026-09-11', '2026-09-12']);
+    expect(expandSchedule(spec, '2026-09-01', '2026-09-12')).toEqual([
+      '2026-09-10',
+      '2026-09-11',
+      '2026-09-12',
+    ]);
   });
 
   it('never emits after the end date (BR-21)', () => {
-    const spec: ScheduleSpec = { frequency: 'DAILY', startDate: '2026-09-01', endDate: '2026-09-03' };
+    const spec: ScheduleSpec = {
+      frequency: 'DAILY',
+      startDate: '2026-09-01',
+      endDate: '2026-09-03',
+    };
     expect(expandSchedule(spec, '2026-09-01', '2026-09-30')).toEqual([
       '2026-09-01',
       '2026-09-02',
@@ -131,7 +139,12 @@ describe('expandSchedule — MONTHLY (BR-22)', () => {
   });
 
   it('supports every-other-month', () => {
-    const spec: ScheduleSpec = { frequency: 'MONTHLY', startDate: '2026-01-10', monthDay: 10, interval: 2 };
+    const spec: ScheduleSpec = {
+      frequency: 'MONTHLY',
+      startDate: '2026-01-10',
+      monthDay: 10,
+      interval: 2,
+    };
     expect(expandSchedule(spec, '2026-01-01', '2026-06-30')).toEqual([
       '2026-01-10',
       '2026-03-10',
@@ -152,7 +165,12 @@ describe('expandSchedule — QUARTERLY and ANNUAL', () => {
   });
 
   it('ANNUAL repeats on the same month and day', () => {
-    const spec: ScheduleSpec = { frequency: 'ANNUAL', startDate: '2026-06-01', month: 6, monthDay: 1 };
+    const spec: ScheduleSpec = {
+      frequency: 'ANNUAL',
+      startDate: '2026-06-01',
+      month: 6,
+      monthDay: 1,
+    };
     expect(expandSchedule(spec, '2026-01-01', '2028-12-31')).toEqual([
       '2026-06-01',
       '2027-06-01',
@@ -182,7 +200,11 @@ describe('expandSchedule — invariants', () => {
   });
 
   it('agrees with isDueOn for every emitted and skipped day', () => {
-    const spec: ScheduleSpec = { frequency: 'SELECTED_DAYS', startDate: '2026-09-01', weekdays: [2, 4] };
+    const spec: ScheduleSpec = {
+      frequency: 'SELECTED_DAYS',
+      startDate: '2026-09-01',
+      weekdays: [2, 4],
+    };
     const due = new Set(expandSchedule(spec, '2026-09-01', '2026-09-30'));
     for (let day = 1; day <= 30; day += 1) {
       const date = `2026-09-${String(day).padStart(2, '0')}`;
@@ -191,7 +213,9 @@ describe('expandSchedule — invariants', () => {
   });
 
   it('returns nothing when the window is inverted', () => {
-    expect(expandSchedule({ frequency: 'DAILY', startDate: '2026-01-01' }, '2026-02-01', '2026-01-01')).toEqual([]);
+    expect(
+      expandSchedule({ frequency: 'DAILY', startDate: '2026-01-01' }, '2026-02-01', '2026-01-01'),
+    ).toEqual([]);
   });
 
   it('refuses an absurdly large range rather than hanging', () => {
@@ -208,12 +232,20 @@ describe('expandSchedule — invariants', () => {
 
 describe('nextDueDate', () => {
   it('finds the next occurrence strictly after the given day', () => {
-    const spec: ScheduleSpec = { frequency: 'SELECTED_DAYS', startDate: '2026-09-01', weekdays: [1] };
+    const spec: ScheduleSpec = {
+      frequency: 'SELECTED_DAYS',
+      startDate: '2026-09-01',
+      weekdays: [1],
+    };
     expect(nextDueDate(spec, '2026-09-21')).toBe('2026-09-28');
   });
 
   it('returns null once the schedule has ended', () => {
-    const spec: ScheduleSpec = { frequency: 'DAILY', startDate: '2026-09-01', endDate: '2026-09-05' };
+    const spec: ScheduleSpec = {
+      frequency: 'DAILY',
+      startDate: '2026-09-01',
+      endDate: '2026-09-05',
+    };
     expect(nextDueDate(spec, '2026-09-05')).toBeNull();
   });
 });

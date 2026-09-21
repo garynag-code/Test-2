@@ -1,7 +1,17 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.PORT ?? 3100);
 const baseURL = `http://127.0.0.1:${PORT}`;
+
+/**
+ * Some CI images ship a Chromium build that does not match the version
+ * Playwright would download. `PLAYWRIGHT_CHROMIUM_PATH` (or the conventional
+ * /opt/pw-browsers location) lets the suite use it instead of failing on a
+ * missing browser.
+ */
+const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
+const launchOptions = existsSync(chromiumPath) ? { executablePath: chromiumPath } : {};
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,6 +26,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     // Phones are the primary target (brief §52).
     ...devices['Pixel 7'],
+    launchOptions,
   },
   webServer: {
     command: `npm run build && npx next start -p ${PORT}`,

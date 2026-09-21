@@ -57,6 +57,10 @@ export function placeHiddenObject(
  * a surprise rather than a daily chore, and the same seed means the answer does
  * not change on refresh.
  */
-export function isHiddenObjectAvailable(childId: string, localDate: LocalDate, salt = 'mission-hero'): boolean {
+export function isHiddenObjectAvailable(
+  childId: string,
+  localDate: LocalDate,
+  salt = 'mission-hero',
+): boolean {
   return stableHash(`avail:${salt}:${childId}:${localDate}`) % 3 === 0;
 }

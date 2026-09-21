@@ -31,7 +31,10 @@ const config: Config = {
         lift: '0 2px 0 0 rgb(0 0 0 / 0.12)',
       },
       keyframes: {
-        'pop-in': { '0%': { transform: 'scale(0.9)', opacity: '0' }, '100%': { transform: 'scale(1)', opacity: '1' } },
+        'pop-in': {
+          '0%': { transform: 'scale(0.9)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
         'pulse-soft': { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.65' } },
       },
       animation: {

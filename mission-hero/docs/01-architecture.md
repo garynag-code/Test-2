@@ -13,8 +13,8 @@ deviation is recorded in [§12 Decisions](#12-architecture-decisions-adrs).
 Mission Hero is a family-scoped, multi-tenant web application. A **family** is the
 tenant boundary. Inside a family there are **parents** (full administrative control)
 and **children** (a deliberately narrow, high-energy game surface). Children generate
-*claims* — "I did my reading", "I was kind today", "I can recite this verse". Parents
-*adjudicate* those claims. Only an adjudicated claim moves value: XP, Reward Points and
+_claims_ — "I did my reading", "I was kind today", "I can recite this verse". Parents
+_adjudicate_ those claims. Only an adjudicated claim moves value: XP, Reward Points and
 Character Stars are all written as **immutable ledger entries** by the server, inside a
 database transaction, exactly once.
 
@@ -74,15 +74,15 @@ The single most important architectural invariant:
 
 ## 4. Layering rules (enforced, not aspirational)
 
-| Layer | May import | May **not** import |
-| --- | --- | --- |
-| `app/**` (pages, actions) | features' service API, schemas, UI components | `@prisma/client`, repositories |
-| `src/features/*/service` | repositories, domain, other services, `src/server/*` | React, `next/*` UI |
-| `src/features/*/repo` | `@prisma/client`, domain types | services |
-| `src/domain/**` | nothing but types/constants | everything else |
-| `src/components/**` | UI primitives, feature *types* | services, Prisma |
+| Layer                     | May import                                           | May **not** import             |
+| ------------------------- | ---------------------------------------------------- | ------------------------------ |
+| `app/**` (pages, actions) | features' service API, schemas, UI components        | `@prisma/client`, repositories |
+| `src/features/*/service`  | repositories, domain, other services, `src/server/*` | React, `next/*` UI             |
+| `src/features/*/repo`     | `@prisma/client`, domain types                       | services                       |
+| `src/domain/**`           | nothing but types/constants                          | everything else                |
+| `src/components/**`       | UI primitives, feature _types_                       | services, Prisma               |
 
-`src/domain` is deliberately dependency-free: it holds the *rules* (level curve, badge
+`src/domain` is deliberately dependency-free: it holds the _rules_ (level curve, badge
 thresholds, streak arithmetic, wheel weighting) as pure functions that can be unit
 tested in microseconds with no database.
 
@@ -93,18 +93,18 @@ Practical consequence: **a page never computes XP**. It calls
 
 Three independent ledgers, never merged, never mutated:
 
-| System | Table | Spendable? | Can decrease? | Purpose |
-| --- | --- | --- | --- | --- |
-| **XP** | `XpTransaction` | No | No (`amount > 0` enforced) | Progress & levels |
-| **Reward Points** | `RewardPointsTransaction` | Yes | Yes (negative entries) | Redemption & wheel |
-| **Character Stars** | `CharacterStarTransaction` | **No** | No (`amount > 0` enforced) | Recognition of character |
+| System              | Table                      | Spendable? | Can decrease?              | Purpose                  |
+| ------------------- | -------------------------- | ---------- | -------------------------- | ------------------------ |
+| **XP**              | `XpTransaction`            | No         | No (`amount > 0` enforced) | Progress & levels        |
+| **Reward Points**   | `RewardPointsTransaction`  | Yes        | Yes (negative entries)     | Redemption & wheel       |
+| **Character Stars** | `CharacterStarTransaction` | **No**     | No (`amount > 0` enforced) | Recognition of character |
 
 Balances are always **derived** (`SUM(amount)`), never stored as an editable column.
-A `ChildBalanceSnapshot` may later be added as a *cache* — it is never the source of
+A `ChildBalanceSnapshot` may later be added as a _cache_ — it is never the source of
 truth, and it is rebuilt from the ledger.
 
 Lifetime XP = `SUM(XpTransaction.amount)` and, because XP entries may not be negative,
-lifetime XP is monotonically non-decreasing by construction. This is a *database*
+lifetime XP is monotonically non-decreasing by construction. This is a _database_
 guarantee (`CHECK (amount > 0)`), not a code convention.
 
 ## 6. Idempotency — how "award exactly once" is guaranteed
@@ -169,7 +169,7 @@ flow:
 
 1. **Device binding (once per device):** an adult enters the family's `Family Code`.
    This sets `mh_device`, a long-lived signed cookie carrying only `familyId`. It
-   confers *no* authority — it only says "this device may show this family's profile
+   confers _no_ authority — it only says "this device may show this family's profile
    picker".
 2. **Profile + PIN:** the child taps their avatar; if `pinRequired`, a 4–6 digit PIN is
    verified (bcrypt, rate-limited, lockout after 5 failures). Success issues `mh_child`,
@@ -192,7 +192,7 @@ path in the system:
   inside the transaction, deducts points if configured, draws a winner using
   `crypto.randomInt` over the cumulative weights, and **persists the `RewardSpin` row
   before returning**.
-- The response contains the *index* of the winning segment. The animation is instructed
+- The response contains the _index_ of the winning segment. The animation is instructed
   to land there. The client cannot re-roll: a refresh mid-animation shows the persisted
   result, because the spin is already committed.
 - Weights are integers; the draw is `randomInt(0, totalWeight)` and a running-sum scan,
@@ -204,7 +204,7 @@ Tasks are defined once with a `TaskSchedule` (RRULE-like but explicit columns:
 `frequency`, `weekdays[]`, `monthDay`, `interval`, `startDate`, `endDate`, `dueTime`).
 **Occurrences are not pre-materialised for all time.** Instead:
 
-- `taskScheduleService.occurrencesFor(task, dateRange, timezone)` is a *pure function*
+- `taskScheduleService.occurrencesFor(task, dateRange, timezone)` is a _pure function_
   that expands a schedule into dates. It is exhaustively unit tested.
 - A `TaskOccurrence` row is materialised lazily the first time a given
   `(taskId, occurrenceDate)` is viewed or acted on, under a unique constraint. This keeps
@@ -215,14 +215,14 @@ browser's. "One check-in per calendar day" means one per family-local day.
 
 ## 11. Non-functional targets
 
-| Concern | Target | How |
-| --- | --- | --- |
-| First contentful paint (child dashboard, 4G) | < 1.5 s | Server Components, no client-side data waterfall, route-level streaming |
-| Interaction feedback | < 100 ms | Optimistic *animation only*; value shown after server confirms |
-| Correctness of balances | Exact, always | Derived from ledger; property-tested |
-| Tenant isolation | Absolute | Every repo query filtered by `familyId` from the session |
-| Accessibility | WCAG 2.1 AA | Semantic HTML, 44px targets, `prefers-reduced-motion`, non-colour status |
-| Test signal | Critical paths green before new features | §8 test strategy |
+| Concern                                      | Target                                   | How                                                                      |
+| -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| First contentful paint (child dashboard, 4G) | < 1.5 s                                  | Server Components, no client-side data waterfall, route-level streaming  |
+| Interaction feedback                         | < 100 ms                                 | Optimistic _animation only_; value shown after server confirms           |
+| Correctness of balances                      | Exact, always                            | Derived from ledger; property-tested                                     |
+| Tenant isolation                             | Absolute                                 | Every repo query filtered by `familyId` from the session                 |
+| Accessibility                                | WCAG 2.1 AA                              | Semantic HTML, 44px targets, `prefers-reduced-motion`, non-colour status |
+| Test signal                                  | Critical paths green before new features | §8 test strategy                                                         |
 
 ## 12. Architecture decisions (ADRs)
 
@@ -238,7 +238,7 @@ unrecoverable. Ledgers make them visible, auditable and repairable. Cost: a `SUM
 read, mitigated by a covering index on `(childId)` and, if ever needed, a snapshot cache.
 
 **ADR-003 — Custom child session rather than Auth.js for children.**
-Accepted. Auth.js models *users with credentials*. Children deliberately have no email,
+Accepted. Auth.js models _users with credentials_. Children deliberately have no email,
 no recoverable password and a device-bound trust model. Forcing them into Auth.js would
 mean creating shadow `User` rows for children, which increases the blast radius of an
 auth bug and stores more child data than we want. Parents use the standard

@@ -46,7 +46,10 @@ describe('hidden objects (BR-51)', () => {
 
   it('offers nothing once every mission has been found', async () => {
     const mission = await createMission();
-    await missions.discover(fixture.childActor, { missionId: mission.id, surfaceKey: 'home-stats' });
+    await missions.discover(fixture.childActor, {
+      missionId: mission.id,
+      surfaceKey: 'home-stats',
+    });
 
     const hint = await missions.getHiddenObject(fixture.childActor, {
       childId: fixture.childId,
@@ -63,11 +66,14 @@ describe('hidden objects (BR-51)', () => {
     });
 
     expect(
-      await missions.getHiddenObject(fixture.childActor, { childId: fixture.childId, today: TODAY }),
+      await missions.getHiddenObject(fixture.childActor, {
+        childId: fixture.childId,
+        today: TODAY,
+      }),
     ).toBeNull();
   });
 
-  it('will not reveal another child\'s hunt (BR-57)', async () => {
+  it("will not reveal another child's hunt (BR-57)", async () => {
     await createMission();
     await expect(
       missions.getHiddenObject(fixture.childActor, {
@@ -113,7 +119,10 @@ describe('discovery (BR-52, BR-53)', () => {
 describe('completion (BR-53)', () => {
   it('awards XP and points on parent approval', async () => {
     const mission = await createMission({ xpValue: 20, rewardPointsValue: 10 });
-    await missions.discover(fixture.childActor, { missionId: mission.id, surfaceKey: 'home-stats' });
+    await missions.discover(fixture.childActor, {
+      missionId: mission.id,
+      surfaceKey: 'home-stats',
+    });
     const submission = await missions.submit(fixture.childActor, {
       missionId: mission.id,
       note: 'I tidied the lounge.',
@@ -149,7 +158,7 @@ describe('completion (BR-53)', () => {
     expect(await prisma.xpTransaction.count()).toBe(0);
   });
 
-  it('a child cannot discover another family\'s mission', async () => {
+  it("a child cannot discover another family's mission", async () => {
     const other = await createFamilyFixture();
     const mission = await missions.createMission(other.parentActor, {
       title: 'Other family mission',

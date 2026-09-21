@@ -242,14 +242,14 @@ near-miss easing, no slot-machine sound, no coin rain (§42).
 
 ## Design tokens
 
-| Token | Child surface | Parent surface |
-| --- | --- | --- |
-| Radius | 24px cards, 999px buttons | 12px |
-| Type | Bold display for numbers, 18px body min | 15px body |
-| Motion | spring, 250–400ms, confetti on award | 120ms fades only |
-| Palette | per-theme gradient duo + white cards | neutral slate + one accent |
-| Touch target | ≥ 56px | ≥ 44px |
-| Status | icon + shape + colour (never colour alone) | same |
+| Token        | Child surface                              | Parent surface             |
+| ------------ | ------------------------------------------ | -------------------------- |
+| Radius       | 24px cards, 999px buttons                  | 12px                       |
+| Type         | Bold display for numbers, 18px body min    | 15px body                  |
+| Motion       | spring, 250–400ms, confetti on award       | 120ms fades only           |
+| Palette      | per-theme gradient duo + white cards       | neutral slate + one accent |
+| Touch target | ≥ 56px                                     | ≥ 44px                     |
+| Status       | icon + shape + colour (never colour alone) | same                       |
 
 Accessibility constants that override everything: minimum 4.5:1 text contrast,
 `prefers-reduced-motion` honoured, all icon-only controls carry `aria-label`,

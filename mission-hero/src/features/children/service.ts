@@ -102,7 +102,13 @@ export async function verifyChildPin(
 ): Promise<PinVerification> {
   const child = await prisma.childProfile.findFirst({
     where: { id: childId, familyId, deletedAt: null, status: 'ACTIVE' },
-    select: { id: true, pinHash: true, pinRequired: true, pinFailedAttempts: true, pinLockedUntil: true },
+    select: {
+      id: true,
+      pinHash: true,
+      pinRequired: true,
+      pinFailedAttempts: true,
+      pinLockedUntil: true,
+    },
   });
 
   if (!child) {
@@ -171,8 +177,15 @@ export async function getSummary(
 
   const [balances, levelRows, streakDays] = await Promise.all([
     ledger.getBalances(prisma, child.id),
-    prisma.level.findMany({ where: { familyId: child.familyId }, orderBy: { minLifetimeXp: 'asc' } }),
-    streaks.currentCount(prisma, { childId: child.id, kind: 'ALL_DAILY_TASKS', today: params.today }),
+    prisma.level.findMany({
+      where: { familyId: child.familyId },
+      orderBy: { minLifetimeXp: 'asc' },
+    }),
+    streaks.currentCount(prisma, {
+      childId: child.id,
+      kind: 'ALL_DAILY_TASKS',
+      today: params.today,
+    }),
   ]);
 
   const levels: LevelDefinition[] = levelRows.map((row) => ({
