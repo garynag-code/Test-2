@@ -354,7 +354,38 @@ async function main(): Promise<void> {
   }
 
   // --- secret missions -----------------------------------------------------
-  const missionDefs = [
+  const missionDefs: Array<{
+    title: string;
+    instructions: string;
+    rarity: 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+    xp: number;
+    points: number;
+    trait: string | null;
+    object: string;
+    discover?: boolean;
+  }> = [
+    // Bonus challenges are the same model with discovery switched off, so they
+    // are listed openly rather than hidden (Sprint 5).
+    {
+      title: 'Read 10 Extra Pages',
+      instructions: 'Read ten more pages than usual today.',
+      rarity: 'COMMON' as const,
+      xp: 20,
+      points: 10,
+      trait: 'perseverance',
+      object: 'none',
+      discover: false,
+    },
+    {
+      title: 'Tidy One Thing',
+      instructions: 'Tidy one area nobody asked you to.',
+      rarity: 'COMMON' as const,
+      xp: 15,
+      points: 5,
+      trait: 'responsibility',
+      object: 'none',
+      discover: false,
+    },
     {
       title: 'Secret Kindness Mission',
       instructions: 'Do something helpful without being asked.',
@@ -413,6 +444,7 @@ async function main(): Promise<void> {
         rewardPointsValue: def.points,
         characterTraitId: def.trait ? traitId(def.trait) : null,
         starValue: def.trait ? 1 : 0,
+        requiresDiscovery: def.discover ?? true,
         hiddenObjectKey: def.object,
       },
     });

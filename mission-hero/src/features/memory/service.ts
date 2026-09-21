@@ -47,7 +47,7 @@ export const reciteSchema = z.object({
   recitedText: z.string().trim().max(2000).optional(),
 });
 
-export async function createChallenge(actor: Actor, input: z.infer<typeof createChallengeSchema>) {
+export async function createChallenge(actor: Actor, input: z.input<typeof createChallengeSchema>) {
   if (actor.type !== 'parent') throw notFound();
   const parsed = createChallengeSchema.parse(input);
 
@@ -138,6 +138,12 @@ export async function recite(actor: Actor, input: z.infer<typeof reciteSchema>) 
       where: { challengeId: challenge.id, childId: actor.childId, status: 'APPROVED' },
     });
     if (alreadyApproved) throw conflict('You have already mastered this one!');
+
+    // A previous attempt that is still waiting is replaced rather than stacked,
+    // so a parent never sees the same recitation twice in their queue.
+    await tx.memorySubmission.deleteMany({
+      where: { challengeId: challenge.id, childId: actor.childId, status: 'PENDING' },
+    });
 
     const submission = await tx.memorySubmission.create({
       data: {
@@ -271,6 +277,63 @@ export async function approve(
       entityId: submission.id,
       before: { status: 'PENDING' },
       after: { status: 'APPROVED', xp: submission.challenge.xpValue },
+      familyId: submission.familyId,
+    });
+
+    return submission;
+  });
+}
+
+/**
+ * "Not quite yet" — awards nothing, and the child may recite again.
+ *
+ * The submission is marked REJECTED rather than deleted, so the history shows
+ * the attempt; the partial unique index only constrains approved rows, which
+ * is what leaves a retry possible.
+ */
+export async function decline(actor: Actor, input: { submissionId: string; message?: string }) {
+  assertCanApprove(actor);
+
+  return prisma.$transaction(async (tx) => {
+    const submission = await tx.memorySubmission.findFirst({
+      where: { id: input.submissionId, familyId: actor.familyId },
+      include: { challenge: { select: { title: true } } },
+    });
+    if (!submission) throw notFound();
+    if (submission.status !== 'PENDING') return submission;
+
+    await tx.memorySubmission.update({
+      where: { id: submission.id },
+      data: { status: 'REJECTED' },
+    });
+
+    await tx.memoryApproval.create({
+      data: {
+        submissionId: submission.id,
+        parentUserId: actor.type === 'parent' ? actor.userId : null,
+        decision: 'REQUEST_REDO',
+        encouragementMessage: input.message ?? null,
+        xpAwarded: 0,
+        pointsAwarded: 0,
+      },
+    });
+
+    await notifications.notifyChild(tx, {
+      familyId: submission.familyId,
+      childId: submission.childId,
+      kind: 'ENCOURAGEMENT',
+      title: submission.challenge.title,
+      body: input.message ?? 'Nearly! Give it one more practice and try again.',
+      deepLink: '/kids/memory',
+    });
+
+    await audit.record(tx, {
+      actor,
+      action: 'MEMORY_REJECTED',
+      entityType: 'MemorySubmission',
+      entityId: submission.id,
+      before: { status: 'PENDING' },
+      after: { status: 'REJECTED', xp: 0 },
       familyId: submission.familyId,
     });
 

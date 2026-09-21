@@ -1,18 +1,23 @@
 import Link from 'next/link';
 import { requireParent } from '@/server/auth/guards';
-import { Card, CardTitle, EmptyState } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/card';
 import { EMPTY_STATES } from '@/domain/copy';
 import { cn } from '@/lib/utils';
 import * as approvals from '@/features/approvals/service';
 import * as characterService from '@/features/character/service';
 import * as memoryService from '@/features/memory/service';
+import * as questService from '@/features/secret-missions/service';
 import { ApprovalRow } from '@/components/parent/approval-row';
 import { CharacterApprovalRow } from '@/components/parent/character-approval-row';
+import { MemoryApprovalRow } from '@/components/parent/memory-approval-row';
+import { QuestApprovalRow } from '@/components/parent/quest-approval-row';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Approvals' };
 
-type Tab = 'missions' | 'character' | 'memory';
+type Tab = 'missions' | 'character' | 'memory' | 'quests';
+
+const TABS: Tab[] = ['missions', 'character', 'memory', 'quests'];
 
 export default async function ApprovalsPage({
   searchParams,
@@ -21,18 +26,20 @@ export default async function ApprovalsPage({
 }) {
   const actor = await requireParent();
   const { tab } = await searchParams;
-  const active: Tab = tab === 'character' || tab === 'memory' ? tab : 'missions';
+  const active: Tab = TABS.includes(tab as Tab) ? (tab as Tab) : 'missions';
 
-  const [missions, characterMoments, memory] = await Promise.all([
+  const [missions, characterMoments, memory, quests] = await Promise.all([
     approvals.listPendingApprovals(actor),
     characterService.listPendingSubmissions(actor),
     memoryService.listPending(actor),
+    questService.listPendingQuests(actor),
   ]);
 
   const tabs: Array<{ key: Tab; label: string; count: number }> = [
     { key: 'missions', label: 'Missions', count: missions.length },
     { key: 'character', label: 'Character', count: characterMoments.length },
     { key: 'memory', label: 'Memory', count: memory.length },
+    { key: 'quests', label: 'Quests', count: quests.length },
   ];
 
   return (
@@ -97,19 +104,32 @@ export default async function ApprovalsPage({
         ) : (
           <ul className="space-y-3">
             {memory.map((item) => (
-              <li key={item.id}>
-                <Card className="space-y-2">
-                  <CardTitle>
-                    {item.child.nickname} · {item.challenge.title}
-                  </CardTitle>
-                  <p className="rounded-xl2 bg-surface p-3 text-sm text-muted">
-                    <span className="font-bold text-ink">They said:</span> {item.recitedText ?? '—'}
-                  </p>
-                  <p className="rounded-xl2 bg-brand-soft p-3 text-sm text-brand">
-                    <span className="font-bold">The original:</span> {item.challenge.bodyText}
-                  </p>
-                </Card>
-              </li>
+              <MemoryApprovalRow
+                key={item.id}
+                submission={{
+                  submissionId: item.id,
+                  childNickname: item.child.nickname,
+                  challengeTitle: item.challenge.title,
+                  reference: item.challenge.reference,
+                  original: item.challenge.bodyText,
+                  recited: item.recitedText,
+                  submittedAt: item.submittedAt,
+                  xpValue: item.challenge.xpValue,
+                  rewardPointsValue: item.challenge.rewardPointsValue,
+                }}
+              />
+            ))}
+          </ul>
+        )
+      ) : null}
+
+      {active === 'quests' ? (
+        quests.length === 0 ? (
+          <EmptyState icon="🗝️" title="No quests waiting." />
+        ) : (
+          <ul className="space-y-3">
+            {quests.map((item) => (
+              <QuestApprovalRow key={item.submissionId} submission={item} />
             ))}
           </ul>
         )

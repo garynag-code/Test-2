@@ -60,6 +60,9 @@ The seed prints what you need to log in:
 4. **The daily loop.** Check in as Josh (once — reopening the app won't pay
    again), redeem ice cream from the store, then decline it as Mom and watch
    every point come back.
+5. **Learning and discovery.** Recite a verse from memory (the text hides the
+   moment you start), and take on a bonus challenge from **Quests** — no
+   hunting required, unlike the secret missions hidden around the app.
 
 ## Commands
 
@@ -119,8 +122,8 @@ Zod · Vitest · Playwright.
 | Tier                | Count | What it proves                                                                                                            |
 | ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
 | Domain unit         | 100   | Pure rules, including a seeded 60k-trial check that the wheel's odds match its configuration                              |
-| Service integration | 184   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked |
-| End-to-end          | 15    | The three vertical slices, the daily loop and the threat model, in a real browser at phone width                          |
+| Service integration | 202   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked |
+| End-to-end          | 19    | The three vertical slices, the daily loop, learning and discovery, and the threat model, in a real browser at phone width |
 
 The integration tier is deliberately the heaviest. The risky question in this
 product is "did exactly one ledger row get written under concurrency", and a
@@ -156,12 +159,12 @@ These are treated as engineering constraints, not copy decisions:
 
 ## Status
 
-Sprints 0–4 of [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
-foundations, the three vertical slices, and the daily loop — check-in, reward
-store, weekly progress and notifications — all working end to end with green
-tests. A parent can now take a brand-new family from nothing to a child
-completing a mission without touching the seed.
+Sprints 0–5 of [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
+foundations, the three vertical slices, the daily loop, and learning and
+discovery — memory challenges, secret missions and bonus challenges — all
+working end to end with green tests. A parent can take a brand-new family from
+nothing to a child completing a mission, learning a verse by heart and taking on
+a bonus challenge, without touching the seed.
 
-Sprints 5–8 (memory and secret-mission screens, progression depth, the adventure
-map, collectibles, parent settings and production hardening) build on top of
-this without changing its shape.
+Sprints 6–8 (progression depth, the adventure map, collectibles, parent settings
+and production hardening) build on top of this without changing its shape.

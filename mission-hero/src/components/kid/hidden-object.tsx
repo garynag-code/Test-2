@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { discoverSecretMissionAction } from '@/features/secret-missions/actions';
 import { CELEBRATION } from '@/domain/copy';
@@ -42,6 +43,12 @@ export function HiddenObject({ surface, hidden }: HiddenObjectProps) {
         <p className="text-sm font-black uppercase tracking-wide">{CELEBRATION.secretFound}</p>
         <p className="mt-1 text-lg font-extrabold text-ink">{found.title}</p>
         <p className="text-sm text-ink">{found.instructions}</p>
+        <Link
+          href="/kids/quests"
+          className="mh-tap mt-3 flex items-center justify-center rounded-full bg-brand px-4 font-extrabold text-white"
+        >
+          Go to Quests →
+        </Link>
       </div>
     );
   }

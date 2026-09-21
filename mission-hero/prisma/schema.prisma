@@ -704,6 +704,7 @@ model CharacterTrait {
   starTransactions CharacterStarTransaction[]
   badges           CharacterBadge[]
   tasks            Task[]
+  secretMissions   SecretMission[]
 
   @@unique([familyId, key])
   @@index([familyId, active])
@@ -1026,12 +1027,17 @@ model MemoryApproval {
   submission MemorySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 }
 
+/// Secret missions and bonus challenges are the same thing with one difference:
+/// whether the child has to find it first. Sharing the model keeps a single
+/// submission and approval path rather than two that must stay in step.
 model SecretMission {
   id                String    @id @default(uuid())
   familyId          String
   title             String
   instructions      String
   rarity            Rarity    @default(COMMON)
+  /// false = a bonus challenge, listed openly rather than hidden.
+  requiresDiscovery Boolean   @default(true)
   xpValue           Int       @default(0)
   rewardPointsValue Int       @default(0)
   characterTraitId  String?
@@ -1046,6 +1052,7 @@ model SecretMission {
   deletedAt         DateTime?
 
   family      Family                    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  trait       CharacterTrait?           @relation(fields: [characterTraitId], references: [id], onDelete: SetNull)
   discoveries SecretMissionDiscovery[]
   submissions SecretMissionSubmission[]
 

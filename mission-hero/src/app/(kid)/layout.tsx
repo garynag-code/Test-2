@@ -30,10 +30,10 @@ export default async function KidLayout({ children }: { children: React.ReactNod
 const TABS = [
   { href: '/kids/home', label: 'Home', icon: '🏠' },
   { href: '/kids/character', label: 'Character', icon: '❤️' },
-  { href: '/kids/wheel', label: 'Wheel', icon: '🎡' },
+  { href: '/kids/memory', label: 'Learn', icon: '📜' },
+  { href: '/kids/quests', label: 'Quests', icon: '🗝️' },
   { href: '/kids/rewards', label: 'Rewards', icon: '🎁' },
   { href: '/kids/news', label: 'News', icon: '🔔' },
-  { href: '/kids/me', label: 'Me', icon: '🦸' },
 ];
 
 function TabBar({ unread }: { unread: number }) {

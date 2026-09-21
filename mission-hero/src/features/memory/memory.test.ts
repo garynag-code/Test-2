@@ -147,3 +147,87 @@ describe('approval awards once, ever (BR-49)', () => {
     expect(await prisma.xpTransaction.count()).toBe(0);
   });
 });
+
+describe('declining a recitation (Sprint 5)', () => {
+  it('awards nothing and lets the child try again', async () => {
+    const challenge = await createChallenge();
+    const first = await memory.recite(fixture.childActor, {
+      challengeId: challenge.id,
+      recitedText: 'I can do all the things maybe',
+    });
+
+    await memory.decline(fixture.parentActor, {
+      submissionId: first.id,
+      message: 'Nearly! Give it one more practice.',
+    });
+
+    expect(await ledger.getXpBalance(prisma, fixture.childId)).toBe(0);
+    expect(await memory.listPending(fixture.parentActor)).toHaveLength(0);
+
+    const second = await memory.recite(fixture.childActor, {
+      challengeId: challenge.id,
+      recitedText: 'I can do all things through Christ who strengthens me.',
+    });
+    await memory.approve(fixture.parentActor, { submissionId: second.id });
+
+    expect(await ledger.getXpBalance(prisma, fixture.childId)).toBe(10);
+  });
+
+  it('keeps the earlier attempt in the history', async () => {
+    const challenge = await createChallenge();
+    const first = await memory.recite(fixture.childActor, { challengeId: challenge.id });
+    await memory.decline(fixture.parentActor, { submissionId: first.id });
+
+    const stored = await prisma.memorySubmission.findUniqueOrThrow({ where: { id: first.id } });
+    expect(stored.status).toBe('REJECTED');
+    expect(await prisma.memoryApproval.count({ where: { submissionId: first.id } })).toBe(1);
+  });
+
+  it('uses encouraging language', async () => {
+    const challenge = await createChallenge();
+    const submission = await memory.recite(fixture.childActor, { challengeId: challenge.id });
+    await memory.decline(fixture.parentActor, { submissionId: submission.id });
+
+    const notification = await prisma.notification.findFirstOrThrow({
+      where: { recipientChildId: fixture.childId, kind: 'ENCOURAGEMENT' },
+    });
+    expect(notification.body).toBe('Nearly! Give it one more practice and try again.');
+    expect(notification.body.toLowerCase()).not.toMatch(/wrong|failed|incorrect/);
+  });
+
+  it('a child cannot decline their own recitation', async () => {
+    const challenge = await createChallenge();
+    const submission = await memory.recite(fixture.childActor, { challengeId: challenge.id });
+
+    await expect(
+      memory.decline(fixture.childActor, { submissionId: submission.id }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('reciting twice before a parent looks (Sprint 5)', () => {
+  it('replaces the waiting attempt rather than stacking two in the queue', async () => {
+    const challenge = await createChallenge();
+    await memory.recite(fixture.childActor, { challengeId: challenge.id, recitedText: 'First go' });
+    const second = await memory.recite(fixture.childActor, {
+      challengeId: challenge.id,
+      recitedText: 'Second go',
+    });
+
+    const pending = await memory.listPending(fixture.parentActor);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.id).toBe(second.id);
+    expect(pending[0]!.recitedText).toBe('Second go');
+  });
+
+  it('still pays out only once after several attempts', async () => {
+    const challenge = await createChallenge({ xpValue: 10 });
+    await memory.recite(fixture.childActor, { challengeId: challenge.id });
+    const latest = await memory.recite(fixture.childActor, { challengeId: challenge.id });
+    await memory.approve(fixture.parentActor, { submissionId: latest.id });
+
+    expect(await prisma.xpTransaction.count({ where: { sourceType: 'MEMORY_SUBMISSION' } })).toBe(
+      1,
+    );
+  });
+});

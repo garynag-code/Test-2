@@ -125,6 +125,17 @@ Rules are numbered so tests and code comments can cite them (`// BR-14`).
 
 ## Secret missions & hidden objects
 
+- **BR-65** A bonus challenge is a secret mission with `requiresDiscovery` off:
+  listed openly, claimable without a discovery row, and awarded under the
+  `BONUS_CHALLENGE` ledger source. One model, one submission path, one approval
+  path.
+- **BR-66** Declining a quest deletes the submission rather than marking it
+  rejected, because `unique(childId, missionId)` would otherwise make a second
+  attempt impossible. Declining a _recitation_ marks it rejected instead, since
+  its uniqueness constraint only covers approved rows.
+- **BR-67** Reciting again while an attempt is still waiting replaces it, so a
+  parent never sees the same challenge twice in one queue.
+
 - **BR-51** A hidden object's position is derived from
   `hash(childId, localDate, salt) % eligibleSurfaces` — it moves between days but is
   stable within a day, so it can't be farmed by refreshing.

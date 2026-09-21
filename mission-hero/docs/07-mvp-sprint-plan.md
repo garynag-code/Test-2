@@ -76,11 +76,28 @@ Two things were pulled in because the loop is not usable without them:
 
 **Exit:** lint, typecheck, 100 unit, 184 integration, build and 15 E2E green.
 
-## Sprint 5 — Learning & discovery
+## Sprint 5 — Learning & discovery _(complete)_
 
-- Memory challenges (create, assign, recite, approve, award-once).
-- Secret missions + hidden objects with per-day placement.
-- Bonus challenges.
+- Memory challenges end to end: a parent writes one, the child reads it, chooses
+  **Ready to recite** (which hides the text), types it from memory, and the
+  parent compares the two side by side. "Nearly there" awards nothing and
+  reopens it; approval pays out once per child, ever.
+- Secret missions gained the half they were missing: a found mission can now be
+  claimed, and a parent can approve or reopen it.
+- **Bonus challenges** share the `SecretMission` model with a
+  `requiresDiscovery` flag rather than getting a near-duplicate table — the
+  fields, the submission and the approval are identical, and the only real
+  difference is whether the child has to find it first. They award under the
+  `BONUS_CHALLENGE` ledger source so a child's history reads truthfully.
+
+Two gaps closed along the way:
+
+- The memory queue rendered submissions with **no approve button**, so a
+  recitation could be seen but never paid out.
+- Neither memory nor quests had a decline path, which meant a parent's only
+  options were to approve or to leave the item in the queue forever.
+
+**Exit:** lint, typecheck, 100 unit, 202 integration, build and 19 E2E green.
 
 ## Sprint 6 — Progression & delight
 
