@@ -9,6 +9,7 @@ import { isHiddenObjectAvailable, placeHiddenObject } from '@/domain/hidden-obje
 import { CELEBRATION } from '@/domain/copy';
 import * as ledger from '@/features/ledger/service';
 import * as achievements from '@/features/achievements/service';
+import * as collectibles from '@/features/collectibles/service';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
 
@@ -335,6 +336,10 @@ export async function approve(actor: Actor, input: { submissionId: string }) {
     }
 
     await achievements.evaluateForChild(tx, {
+      childId: submission.childId,
+      familyId: submission.familyId,
+    });
+    await collectibles.evaluateForChild(tx, {
       childId: submission.childId,
       familyId: submission.familyId,
     });

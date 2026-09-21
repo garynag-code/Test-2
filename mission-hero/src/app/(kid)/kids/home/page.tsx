@@ -8,6 +8,7 @@ import { StatChip } from '@/components/kid/stat-chip';
 import { LevelRing } from '@/components/kid/level-ring';
 import { MissionList } from '@/components/kid/mission-list';
 import { HiddenObject } from '@/components/kid/hidden-object';
+import { LevelUpBanner } from '@/components/kid/level-up-banner';
 import * as childrenService from '@/features/children/service';
 import * as tasksService from '@/features/tasks/service';
 import * as wheelService from '@/features/reward-wheel/service';
@@ -71,6 +72,8 @@ export default async function KidHomePage() {
       </header>
 
       <div className="mx-auto max-w-md space-y-6 px-5 py-6">
+        <LevelUpBanner levelNumber={summary.levelNumber} levelName={summary.levelName} />
+
         {checkIn ? null : (
           <Link
             href="/kids/check-in"

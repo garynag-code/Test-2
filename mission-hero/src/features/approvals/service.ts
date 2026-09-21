@@ -9,6 +9,7 @@ import { CELEBRATION, REDO } from '@/domain/copy';
 import * as ledger from '@/features/ledger/service';
 import * as streaks from '@/features/streaks/service';
 import * as achievements from '@/features/achievements/service';
+import * as collectibles from '@/features/collectibles/service';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
 import * as taskRepo from '@/features/tasks/repo';
@@ -65,6 +66,7 @@ export async function approveTaskCompletion(
         leveledUp: false,
         streakMilestone: null,
         achievements: [],
+        unlocks: [],
       });
     }
 
@@ -151,6 +153,10 @@ export async function approveTaskCompletion(
       childId: child.id,
       familyId: completion.familyId,
     });
+    const unlockedItems = await collectibles.evaluateForChild(tx, {
+      childId: child.id,
+      familyId: completion.familyId,
+    });
 
     const newXp = await ledger.getXpBalance(tx, child.id);
     const levels = await loadLevels(tx, completion.familyId);
@@ -168,6 +174,18 @@ export async function approveTaskCompletion(
       deepLink: '/kids/home',
       payload: { completionId: completion.id },
     });
+
+    if (leveledUp) {
+      const reached = resolveLevel(newXp, levels).level;
+      await notifications.notifyChild(tx, {
+        familyId: completion.familyId,
+        childId: child.id,
+        kind: 'LEVEL_UP',
+        title: `LEVEL ${reached.levelNumber}!`,
+        body: `You're a ${reached.name} now.`,
+        deepLink: '/kids/me',
+      });
+    }
 
     await audit.record(tx, {
       actor,
@@ -198,6 +216,12 @@ export async function approveTaskCompletion(
         name: a.name,
         description: a.description,
         iconKey: a.iconKey,
+      })),
+      unlocks: unlockedItems.map((item) => ({
+        key: item.key,
+        name: item.name,
+        iconKey: item.iconKey,
+        rarity: item.rarity,
       })),
     });
   });
@@ -390,6 +414,7 @@ async function buildCelebration(
     leveledUp: boolean;
     streakMilestone: number | null;
     achievements: CelebrationPayload['achievements'];
+    unlocks: CelebrationPayload['unlocks'];
   },
 ): Promise<CelebrationPayload> {
   const approval = await db.taskApproval.findFirst({
@@ -438,6 +463,7 @@ async function buildCelebration(
     streakDays: streak?.currentCount ?? 0,
     streakMilestone: params.streakMilestone,
     achievements: params.achievements,
+    unlocks: params.unlocks,
   };
 }
 

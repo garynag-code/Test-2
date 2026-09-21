@@ -9,6 +9,7 @@ import { ledgerKeys } from '@/domain/idempotency';
 import { type LocalDate, localDateToUtcDate, startOfWeek } from '@/domain/dates';
 import * as ledger from '@/features/ledger/service';
 import * as achievements from '@/features/achievements/service';
+import * as collectibles from '@/features/collectibles/service';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
 import type { SpinResult, WheelView } from './types';
@@ -197,6 +198,7 @@ export async function spin(
     }
 
     await achievements.evaluateForChild(tx, { childId, familyId: actor.familyId });
+    await collectibles.evaluateForChild(tx, { childId, familyId: actor.familyId });
 
     await notifications.notifyParents(tx, {
       familyId: actor.familyId,

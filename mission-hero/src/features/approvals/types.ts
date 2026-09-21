@@ -12,6 +12,13 @@ export interface UnlockSummary {
   iconKey: string;
 }
 
+export interface CollectibleUnlock {
+  key: string;
+  name: string;
+  iconKey: string;
+  rarity: string;
+}
+
 /**
  * What the child's celebration screen replays. Every number here came from the
  * server transaction — the client never computes an award (BR-1).
@@ -32,4 +39,6 @@ export interface CelebrationPayload {
   streakDays: number;
   streakMilestone: number | null;
   achievements: UnlockSummary[];
+  /** Pets, effects and avatar items earned by this award (brief §20). */
+  unlocks: CollectibleUnlock[];
 }

@@ -8,6 +8,7 @@ import { ledgerKeys } from '@/domain/idempotency';
 import * as ledger from '@/features/ledger/service';
 import * as streaks from '@/features/streaks/service';
 import * as achievements from '@/features/achievements/service';
+import * as collectibles from '@/features/collectibles/service';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
 
@@ -257,6 +258,10 @@ export async function approve(
     });
 
     await achievements.evaluateForChild(tx, {
+      childId: submission.childId,
+      familyId: submission.familyId,
+    });
+    await collectibles.evaluateForChild(tx, {
       childId: submission.childId,
       familyId: submission.familyId,
     });

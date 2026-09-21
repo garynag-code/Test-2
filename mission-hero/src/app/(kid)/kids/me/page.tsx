@@ -8,6 +8,8 @@ import { formatNumber } from '@/lib/utils';
 import { childLogoutAction } from '@/features/auth/actions';
 import * as childrenService from '@/features/children/service';
 import * as characterService from '@/features/character/service';
+import * as collectiblesService from '@/features/collectibles/service';
+import { Collection } from '@/components/kid/collection';
 import { badgeProgress } from '@/domain/badges';
 
 export const dynamic = 'force-dynamic';
@@ -22,13 +24,20 @@ export default async function MePage() {
   });
   const today = toLocalDate(new Date(), family.timezone);
 
-  const [summary, traits, badges] = await Promise.all([
+  const [summary, traits, badges, collection, equipped, achievements] = await Promise.all([
     childrenService.getSummary(actor, { childId: actor.childId, today }),
     characterService.getCharacterProfile(actor, actor.childId),
     prisma.characterBadgeProgress.findMany({
       where: { childId: actor.childId, unlockedAt: { not: null } },
       include: { badge: { select: { name: true, tier: true } } },
       orderBy: { unlockedAt: 'desc' },
+    }),
+    collectiblesService.getCollection(actor, actor.childId),
+    collectiblesService.getEquipped(actor.childId),
+    prisma.achievement.findMany({
+      where: { familyId: actor.familyId, active: true },
+      include: { unlocks: { where: { childId: actor.childId }, select: { unlockedAt: true } } },
+      orderBy: { createdAt: 'asc' },
     }),
   ]);
 
@@ -46,6 +55,15 @@ export default async function MePage() {
             <span aria-hidden>⚡</span> {formatNumber(summary.lifetimeXp)} XP ·{' '}
             <span aria-hidden>❤️</span> {formatNumber(summary.characterStars)} stars
           </p>
+          {equipped.length > 0 ? (
+            <p className="mt-3 flex items-center gap-2 text-3xl" aria-label="What you're wearing">
+              {equipped.map((row) => (
+                <span key={row.id} title={row.item.name}>
+                  {row.item.iconKey}
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -90,6 +108,39 @@ export default async function MePage() {
               ))}
             </ul>
           )}
+        </section>
+
+        <section aria-labelledby="my-achievements" className="space-y-3">
+          <h2 id="my-achievements" className="text-sm font-bold uppercase tracking-wide text-muted">
+            Achievements
+          </h2>
+          <ul className="space-y-2">
+            {achievements.map((achievement) => {
+              const unlockedAt = achievement.unlocks[0]?.unlockedAt ?? null;
+              return (
+                <li
+                  key={achievement.id}
+                  className={
+                    unlockedAt
+                      ? 'rounded-xl2 border-2 border-success/40 bg-success/5 p-3'
+                      : 'rounded-xl2 border-2 border-dashed border-border p-3'
+                  }
+                >
+                  <p className="font-extrabold text-ink">
+                    <span aria-hidden>{unlockedAt ? '🏆' : '🔒'}</span> {achievement.name}
+                  </p>
+                  <p className="text-sm text-muted">{achievement.description}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <section aria-labelledby="my-stuff" className="space-y-3">
+          <h2 id="my-stuff" className="text-sm font-bold uppercase tracking-wide text-muted">
+            My Collection
+          </h2>
+          <Collection collectibles={collection.collectibles} avatarItems={collection.avatarItems} />
         </section>
 
         <form action={childLogoutAction}>

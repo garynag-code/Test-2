@@ -7,6 +7,7 @@ import { ledgerKeys } from '@/domain/idempotency';
 import * as ledger from '@/features/ledger/service';
 import * as streaks from '@/features/streaks/service';
 import * as achievements from '@/features/achievements/service';
+import * as collectibles from '@/features/collectibles/service';
 import * as audit from '@/features/audit/service';
 
 /**
@@ -109,6 +110,7 @@ export async function checkIn(
     });
 
     await achievements.evaluateForChild(tx, { childId, familyId: actor.familyId });
+    await collectibles.evaluateForChild(tx, { childId, familyId: actor.familyId });
 
     await audit.record(tx, {
       actor,

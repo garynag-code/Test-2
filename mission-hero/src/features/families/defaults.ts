@@ -3,6 +3,7 @@ import { DEFAULT_TRAITS } from '@/domain/traits';
 import { DEFAULT_LEVELS } from '@/domain/levels';
 import { DEFAULT_ACHIEVEMENTS } from '@/domain/achievements';
 import { BADGE_TIERS, DEFAULT_CHARACTER_BADGE_NAMES, thresholdFor } from '@/domain/badges';
+import { DEFAULT_AVATAR_ITEMS, DEFAULT_COLLECTIBLES } from '@/domain/collectibles';
 
 /**
  * Platform defaults are *cloned* into each family rather than shared.
@@ -84,6 +85,32 @@ export async function seedFamilyDefaults(db: Db, familyId: string): Promise<void
       ruleType: achievement.ruleType,
       ruleConfig: achievement.ruleConfig as object,
       xpValue: achievement.xpValue,
+    })),
+    skipDuplicates: true,
+  });
+
+  await db.digitalCollectible.createMany({
+    data: DEFAULT_COLLECTIBLES.map((collectible) => ({
+      familyId,
+      key: collectible.key,
+      name: collectible.name,
+      type: collectible.type,
+      iconKey: collectible.iconKey,
+      rarity: collectible.rarity,
+      unlockRule: collectible.unlockRule as object,
+    })),
+    skipDuplicates: true,
+  });
+
+  await db.avatarItem.createMany({
+    data: DEFAULT_AVATAR_ITEMS.map((item) => ({
+      familyId,
+      key: item.key,
+      name: item.name,
+      slot: item.slot,
+      iconKey: item.iconKey,
+      rarity: item.rarity,
+      unlockRule: item.unlockRule as object,
     })),
     skipDuplicates: true,
   });
