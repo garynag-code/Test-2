@@ -18,6 +18,9 @@ const NAV = [
   { href: '/parent/rewards', label: 'Rewards' },
   { href: '/parent/learning', label: 'Learning' },
   { href: '/parent/children', label: 'Children' },
+  { href: '/parent/progress', label: 'Progress' },
+  { href: '/parent/settings', label: 'Settings' },
+  { href: '/parent/audit', label: 'History' },
 ];
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {

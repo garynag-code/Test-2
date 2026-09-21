@@ -342,6 +342,7 @@ model Family {
   xpTransactions     XpTransaction[]
   pointsTransactions RewardPointsTransaction[]
   starTransactions   CharacterStarTransaction[]
+  familyInvites      FamilyInvite[]
 }
 
 model FamilyMember {
@@ -360,6 +361,27 @@ model FamilyMember {
 
   @@unique([familyId, userId])
   @@index([userId, status])
+}
+
+/// An invitation for a second adult. Kept separate from FamilyMember because a
+/// FamilyMember needs a User, and an invited adult has no account yet.
+model FamilyInvite {
+  id              String     @id @default(uuid())
+  familyId        String
+  email           String
+  role            FamilyRole @default(PARENT)
+  /// Random, single-use, and the only thing the invitee needs to present.
+  token           String     @unique
+  invitedByUserId String?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime   @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, email])
+  @@index([familyId, acceptedAt])
 }
 
 model ParentProfile {
