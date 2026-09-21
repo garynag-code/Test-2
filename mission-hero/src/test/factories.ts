@@ -187,3 +187,70 @@ export async function givePoints(
     },
   });
 }
+
+export interface WheelFixtureOptions {
+  pointThreshold?: number;
+  pointsCost?: number;
+  deductPoints?: boolean;
+  spinsPerDay?: number;
+  spinsPerWeek?: number;
+  cooldownMinutes?: number;
+  segments?: Array<{ label: string; weight: number; maxWinsPerChild?: number | null }>;
+}
+
+export async function createWheelFixture(
+  fixture: FamilyFixture,
+  options: WheelFixtureOptions = {},
+) {
+  const segments = options.segments ?? [
+    { label: 'Choose movie', weight: 1 },
+    { label: 'Ice cream', weight: 1 },
+    { label: 'Extra gaming', weight: 1 },
+    { label: 'Mystery reward', weight: 1 },
+  ];
+
+  return prisma.rewardWheel.create({
+    data: {
+      familyId: fixture.familyId,
+      name: 'Reward Wheel',
+      pointThreshold: options.pointThreshold ?? 100,
+      deductPoints: options.deductPoints ?? true,
+      pointsCost: options.pointsCost ?? 100,
+      spinsPerDay: options.spinsPerDay ?? 1,
+      spinsPerWeek: options.spinsPerWeek ?? 3,
+      cooldownMinutes: options.cooldownMinutes ?? 0,
+      items: {
+        createMany: {
+          data: segments.map((segment, index) => ({
+            label: segment.label,
+            weight: segment.weight,
+            segmentIndex: index,
+            maxWinsPerChild: segment.maxWinsPerChild ?? null,
+          })),
+        },
+      },
+    },
+    include: { items: { orderBy: { segmentIndex: 'asc' } } },
+  });
+}
+
+export async function createRewardFixture(
+  fixture: FamilyFixture,
+  options: {
+    name?: string;
+    pointsCost?: number;
+    inventoryQuantity?: number | null;
+    requiresParentApproval?: boolean;
+  } = {},
+) {
+  return prisma.reward.create({
+    data: {
+      familyId: fixture.familyId,
+      name: options.name ?? 'Ice cream',
+      type: 'FOOD',
+      pointsCost: options.pointsCost ?? 50,
+      inventoryQuantity: options.inventoryQuantity ?? null,
+      requiresParentApproval: options.requiresParentApproval ?? false,
+    },
+  });
+}

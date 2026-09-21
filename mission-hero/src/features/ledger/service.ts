@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { Db } from '@/server/db/prisma';
-import { insufficientPoints, isUniqueViolation } from '@/server/errors';
+import { insufficientPoints } from '@/server/errors';
 import * as repo from './repo';
 import type { AwardRequest, AwardResult, Balances } from './types';
 
@@ -34,25 +34,27 @@ async function write(
     ...(request.traitId ? { traitId: request.traitId } : {}),
   } as Prisma.XpTransactionUncheckedCreateInput;
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- one code path for three structurally identical ledgers
-    const created = await (db[model] as any).create({ data, select: { id: true, amount: true } });
-    return { created: true, transactionId: created.id, amount: created.amount };
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
-    const existing = await (db[model] as any).findUnique({
-      where: {
-        childId_idempotencyKey: {
-          childId: request.childId,
-          idempotencyKey: request.idempotencyKey,
-        },
+  // `createMany` with skipDuplicates compiles to ON CONFLICT DO NOTHING, which
+  // is the only form of "insert or ignore" that leaves an enclosing
+  // transaction usable. A plain create that raises a unique violation aborts
+  // the whole Postgres transaction (SQLSTATE 25P02), so the duplicate could not
+  // be handled from inside the very transaction that needs to survive it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- one code path for three structurally identical ledgers
+  const delegate = db[model] as any;
+  const { count } = await delegate.createMany({ data: [data], skipDuplicates: true });
+
+  const row = await delegate.findUnique({
+    where: {
+      childId_idempotencyKey: {
+        childId: request.childId,
+        idempotencyKey: request.idempotencyKey,
       },
-      select: { id: true, amount: true },
-    });
-    if (!existing) throw error;
-    return { created: false, transactionId: existing.id, amount: existing.amount };
-  }
+    },
+    select: { id: true, amount: true },
+  });
+  if (!row) throw new Error(`Ledger write vanished for key ${request.idempotencyKey}`);
+
+  return { created: count === 1, transactionId: row.id, amount: row.amount };
 }
 
 /** XP. Refuses a non-positive amount before the database has to (BR-3). */

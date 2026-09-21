@@ -121,14 +121,13 @@ export async function evaluateForChild(
   for (const achievement of candidates) {
     if (!evaluateAchievement(achievement.ruleType, achievement.ruleConfig, snapshot)) continue;
 
-    try {
-      await db.achievementUnlock.create({
-        data: { childId: params.childId, achievementId: achievement.id },
-      });
-    } catch {
-      // A concurrent transaction unlocked it first; nothing more to do.
-      continue;
-    }
+    // ON CONFLICT DO NOTHING: a concurrent transaction may have unlocked this
+    // first, and a raised unique violation would abort our transaction.
+    const { count } = await db.achievementUnlock.createMany({
+      data: [{ childId: params.childId, achievementId: achievement.id }],
+      skipDuplicates: true,
+    });
+    if (count === 0) continue;
 
     if (achievement.xpValue > 0) {
       await ledger.awardXp(db, {
