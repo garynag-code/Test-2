@@ -1,0 +1,1357 @@
+// Mission Hero — data model.
+// See docs/02-data-model.md for the ERD and the invariant table.
+//
+// Constraints that Prisma cannot express (CHECK constraints, partial unique
+// indexes) live in migrations/*/constraints.sql and are applied by the same
+// migration. They are the last line of defence behind the service layer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum FamilyRole {
+  OWNER
+  PARENT
+  GUARDIAN
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+  REMOVED
+}
+
+enum AgeBracket {
+  AGE_6_8
+  AGE_9_11
+  AGE_12_14
+}
+
+enum ChildStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ActorType {
+  PARENT
+  CHILD
+  SYSTEM
+}
+
+enum TaskDifficulty {
+  EASY
+  STANDARD
+  CHALLENGING
+  EPIC
+}
+
+enum EvidenceType {
+  NONE
+  PHOTO
+  NOTE
+  VOICE
+  PARENT_CONFIRM
+}
+
+enum RecurrenceFrequency {
+  ONE_TIME
+  DAILY
+  WEEKDAYS
+  WEEKENDS
+  SELECTED_DAYS
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+}
+
+enum OccurrenceStatus {
+  OPEN
+  SUBMITTED
+  APPROVED
+  REJECTED
+  MISSED
+  SKIPPED
+}
+
+enum CompletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalDecision {
+  APPROVE
+  REJECT
+  REQUEST_REDO
+  ASK_QUESTION
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  QUESTION_ASKED
+}
+
+/// Where a ledger entry came from. Used together with sourceId to answer
+/// "what did this approval pay out?".
+enum LedgerSourceType {
+  TASK_COMPLETION
+  DAILY_CHECK_IN
+  MEMORY_SUBMISSION
+  CHARACTER_APPROVAL
+  SECRET_MISSION
+  BONUS_CHALLENGE
+  STREAK_MILESTONE
+  ACHIEVEMENT
+  BADGE
+  LEVEL_UP
+  WHEEL_SPIN
+  REWARD_REDEMPTION
+  REDEMPTION_REFUND
+  MANUAL_ADJUSTMENT
+}
+
+enum BadgeTier {
+  BRONZE
+  SILVER
+  GOLD
+  DIAMOND
+}
+
+enum RewardType {
+  EXPERIENCE
+  PHYSICAL
+  PRIVILEGE
+  SCREEN_TIME
+  POCKET_MONEY
+  FOOD
+  PARENT_TIME
+  DIGITAL
+  CUSTOM
+}
+
+enum RedemptionStatus {
+  PENDING
+  FULFILLED
+  REJECTED
+  CANCELLED
+}
+
+enum StreakKind {
+  DAILY_CHECK_IN
+  ALL_DAILY_TASKS
+  TASK_GROUP
+  CHARACTER
+  MEMORY
+  CUSTOM
+}
+
+enum MemoryCategory {
+  BIBLE_VERSE
+  QUOTE
+  AFFIRMATION
+  FAMILY_SAYING
+  SLOGAN
+  VOCABULARY
+  SCHOOL_FACT
+  CUSTOM
+}
+
+enum MemoryVerificationType {
+  TYPED
+  PARENT_CONFIRM
+  VOICE
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum CollectibleType {
+  PET
+  BACKGROUND
+  ROOM_ITEM
+  EFFECT
+  EMOTE
+  MAP_DECOR
+}
+
+enum AvatarSlot {
+  BASE
+  HAT
+  CAPE
+  CROWN
+  HELMET
+  GLASSES
+  PET
+  BACKGROUND
+  TRAIL
+}
+
+enum NotificationRecipientType {
+  PARENT
+  CHILD
+}
+
+enum NotificationKind {
+  TASK_SUBMITTED
+  TASK_APPROVED
+  TASK_REJECTED
+  CHARACTER_SUBMITTED
+  CHARACTER_CONFIRMED
+  MEMORY_SUBMITTED
+  MEMORY_APPROVED
+  WHEEL_UNLOCKED
+  WHEEL_SPUN
+  REWARD_REQUESTED
+  REWARD_FULFILLED
+  BADGE_UNLOCKED
+  ACHIEVEMENT_UNLOCKED
+  LEVEL_UP
+  STREAK_MILESTONE
+  SECRET_MISSION_FOUND
+  ENCOURAGEMENT
+}
+
+enum AuditAction {
+  FAMILY_CREATED
+  FAMILY_SETTINGS_CHANGED
+  CHILD_CREATED
+  CHILD_UPDATED
+  CHILD_ARCHIVED
+  PARENT_INVITED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  COMPLETION_SUBMITTED
+  COMPLETION_APPROVED
+  COMPLETION_REJECTED
+  COMPLETION_REDO_REQUESTED
+  CHECK_IN_RECORDED
+  CHARACTER_TRAIT_CREATED
+  CHARACTER_TRAIT_UPDATED
+  CHARACTER_SUBMITTED
+  CHARACTER_APPROVED
+  CHARACTER_REJECTED
+  MEMORY_CHALLENGE_CREATED
+  MEMORY_SUBMITTED
+  MEMORY_APPROVED
+  MEMORY_REJECTED
+  SECRET_MISSION_CREATED
+  SECRET_MISSION_DISCOVERED
+  SECRET_MISSION_APPROVED
+  REWARD_CREATED
+  REWARD_UPDATED
+  REWARD_REDEEMED
+  REDEMPTION_RESOLVED
+  WHEEL_CONFIGURED
+  WHEEL_SPUN
+  POINTS_AWARDED
+  POINTS_DEDUCTED
+  MANUAL_ADJUSTMENT
+  BADGE_UNLOCKED
+  ACHIEVEMENT_UNLOCKED
+  PROFILE_CHANGED
+  SETTINGS_CHANGED
+  PIN_CHANGED
+  PIN_LOCKED
+  LOGIN_SUCCEEDED
+  LOGIN_FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & tenancy
+// ---------------------------------------------------------------------------
+
+/// Adults only. Children never get a User row (ADR-003).
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  passwordHash    String
+  displayName     String
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  memberships    FamilyMember[]
+  parentProfiles ParentProfile[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+
+  @@index([status])
+}
+
+model Family {
+  id           String   @id @default(uuid())
+  name         String
+  /// IANA timezone. Every "calendar day" decision in the product uses this.
+  timezone     String   @default("UTC")
+  locale       String   @default("en")
+  currencyCode String   @default("ZAR")
+  /// Short code an adult types once on a child's device to bind it (docs/03 §5).
+  familyCode   String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members            FamilyMember[]
+  parentProfiles     ParentProfile[]
+  children           ChildProfile[]
+  tasks              Task[]
+  taskCategories     TaskCategory[]
+  traits             CharacterTrait[]
+  characterBadges    CharacterBadge[]
+  rewards            Reward[]
+  rewardCategories   RewardCategory[]
+  wheels             RewardWheel[]
+  memoryChallenges   MemoryChallenge[]
+  secretMissions     SecretMission[]
+  achievements       Achievement[]
+  badges             Badge[]
+  levels             Level[]
+  collectibles       DigitalCollectible[]
+  avatarItems        AvatarItem[]
+  setting            FamilySetting?
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  xpTransactions     XpTransaction[]
+  pointsTransactions RewardPointsTransaction[]
+  starTransactions   CharacterStarTransaction[]
+}
+
+model FamilyMember {
+  id        String       @id @default(uuid())
+  familyId  String
+  userId    String
+  role      FamilyRole   @default(PARENT)
+  status    MemberStatus @default(ACTIVE)
+  invitedAt DateTime     @default(now())
+  joinedAt  DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@index([userId, status])
+}
+
+model ParentProfile {
+  id                   String   @id @default(uuid())
+  familyId             String
+  userId               String
+  /// What the children see ("Mom", "Dad", "Gran").
+  displayName          String
+  avatarKey            String   @default("parent-1")
+  notificationsEnabled Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+}
+
+/// Deliberately minimal: nickname only, no email, no phone, no full DOB (brief §40).
+model ChildProfile {
+  id                String      @id @default(uuid())
+  familyId          String
+  nickname          String
+  ageBracket        AgeBracket  @default(AGE_9_11)
+  birthMonth        Int?
+  birthYear         Int?
+  avatarKey         String      @default("hero-1")
+  themeKey          String      @default("space")
+  pinHash           String?
+  pinRequired       Boolean     @default(false)
+  pinFailedAttempts Int         @default(0)
+  pinLockedUntil    DateTime?
+  status            ChildStatus @default(ACTIVE)
+  sortOrder         Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  setting              ChildSetting?
+  taskAssignments      TaskAssignment[]
+  occurrences          TaskOccurrence[]
+  completions          TaskCompletion[]
+  xpTransactions       XpTransaction[]
+  pointsTransactions   RewardPointsTransaction[]
+  starTransactions     CharacterStarTransaction[]
+  characterSubmissions CharacterSubmission[]
+  badgeProgress        CharacterBadgeProgress[]
+  checkIns             DailyCheckIn[]
+  memoryAssignments    MemoryChallengeAssignment[]
+  memorySubmissions    MemorySubmission[]
+  discoveries          SecretMissionDiscovery[]
+  missionSubmissions   SecretMissionSubmission[]
+  redemptions          RewardRedemption[]
+  rewardEligibility    RewardEligibility[]
+  spins                RewardSpin[]
+  streaks              Streak[]
+  achievementUnlocks   AchievementUnlock[]
+  badgeUnlocks         BadgeUnlock[]
+  collectibles         ChildCollectible[]
+  avatarItems          ChildAvatarItem[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+
+  @@unique([familyId, nickname])
+  @@index([familyId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+model TaskCategory {
+  id        String   @id @default(uuid())
+  familyId  String
+  key       String
+  label     String
+  iconKey   String   @default("star")
+  colorKey  String   @default("brand")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@unique([familyId, key])
+}
+
+model Task {
+  id                 String         @id @default(uuid())
+  familyId           String
+  title              String
+  description        String?
+  categoryId         String?
+  iconKey            String         @default("target")
+  colorKey           String         @default("brand")
+  xpValue            Int            @default(0)
+  rewardPointsValue  Int            @default(0)
+  /// Optional character trait this task also builds (e.g. "Pray" → Gratitude).
+  characterTraitId   String?
+  characterStarValue Int            @default(0)
+  difficulty         TaskDifficulty @default(STANDARD)
+  evidenceType       EvidenceType   @default(NONE)
+  approvalRequired   Boolean        @default(true)
+  streakEligible     Boolean        @default(true)
+  isFamilyTask       Boolean        @default(false)
+  active             Boolean        @default(true)
+  notes              String?
+  createdByUserId    String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  deletedAt          DateTime?
+
+  family      Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category    TaskCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  trait       CharacterTrait?  @relation(fields: [characterTraitId], references: [id], onDelete: SetNull)
+  schedule    TaskSchedule?
+  assignments TaskAssignment[]
+  occurrences TaskOccurrence[]
+  completions TaskCompletion[]
+
+  @@index([familyId, active])
+}
+
+model TaskAssignment {
+  id        String   @id @default(uuid())
+  taskId    String
+  childId   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task  Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, childId])
+  @@index([childId, active])
+}
+
+model TaskSchedule {
+  id        String              @id @default(uuid())
+  taskId    String              @unique
+  frequency RecurrenceFrequency @default(DAILY)
+  /// Repeat every N periods (every 2 weeks, every 3 months...).
+  interval  Int                 @default(1)
+  /// ISO-ish weekday numbers, 0 = Sunday .. 6 = Saturday (BR-19).
+  weekdays  Int[]               @default([])
+  monthDay  Int?
+  month     Int?
+  startDate DateTime            @db.Date
+  endDate   DateTime?           @db.Date
+  /// Local time-of-day the task is due, as "HH:mm".
+  dueTime   String?
+  timezone  String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+/// A materialised due-date. Created lazily (BR-23) so the unique constraint can
+/// guarantee "one completion per task per child per day".
+model TaskOccurrence {
+  id             String           @id @default(uuid())
+  taskId         String
+  childId        String
+  familyId       String
+  occurrenceDate DateTime         @db.Date
+  dueAt          DateTime?
+  status         OccurrenceStatus @default(OPEN)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  child       ChildProfile     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  completions TaskCompletion[]
+
+  @@unique([taskId, childId, occurrenceDate])
+  @@index([childId, occurrenceDate])
+  @@index([familyId, status])
+}
+
+model TaskCompletion {
+  id               String           @id @default(uuid())
+  occurrenceId     String
+  taskId           String
+  childId          String
+  familyId         String
+  status           CompletionStatus @default(PENDING)
+  childNote        String?
+  submittedAt      DateTime         @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  occurrence TaskOccurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  task       Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  child      ChildProfile   @relation(fields: [childId], references: [id], onDelete: Cascade)
+  approvals  TaskApproval[]
+  evidence   TaskEvidence[]
+
+  @@index([familyId, status, submittedAt])
+  @@index([childId, status])
+}
+
+model TaskApproval {
+  id                   String           @id @default(uuid())
+  completionId         String
+  parentUserId         String?
+  decision             ApprovalDecision
+  encouragementMessage String?
+  question             String?
+  xpAwarded            Int              @default(0)
+  pointsAwarded        Int              @default(0)
+  starsAwarded         Int              @default(0)
+  decidedAt            DateTime         @default(now())
+  createdAt            DateTime         @default(now())
+
+  completion TaskCompletion @relation(fields: [completionId], references: [id], onDelete: Cascade)
+
+  @@index([completionId])
+}
+
+model TaskEvidence {
+  id           String       @id @default(uuid())
+  completionId String
+  familyId     String
+  type         EvidenceType
+  storageKey   String?
+  mimeType     String?
+  byteSize     Int?
+  durationMs   Int?
+  textBody     String?
+  uploadedAt   DateTime     @default(now())
+
+  completion TaskCompletion @relation(fields: [completionId], references: [id], onDelete: Cascade)
+
+  @@index([completionId])
+  @@index([familyId])
+}
+
+// ---------------------------------------------------------------------------
+// Ledgers — append-only. Balances are SUM(amount) (ADR-002, BR-2).
+// ---------------------------------------------------------------------------
+
+/// XP. CHECK (amount > 0) means lifetime XP can never fall (BR-3).
+model XpTransaction {
+  id              String           @id @default(uuid())
+  childId         String
+  familyId        String
+  amount          Int
+  sourceType      LedgerSourceType
+  sourceId        String?
+  /// Unique per child — this is what makes "award exactly once" structural (BR-6).
+  idempotencyKey  String
+  awardedByUserId String?
+  reason          String?
+  description     String
+  createdAt       DateTime         @default(now())
+
+  child  ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  family Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, idempotencyKey])
+  @@index([childId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+/// Spendable. May be negative; the service refuses a debit that would go below zero (BR-4).
+model RewardPointsTransaction {
+  id              String           @id @default(uuid())
+  childId         String
+  familyId        String
+  amount          Int
+  sourceType      LedgerSourceType
+  sourceId        String?
+  idempotencyKey  String
+  awardedByUserId String?
+  reason          String?
+  description     String
+  createdAt       DateTime         @default(now())
+
+  child  ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  family Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, idempotencyKey])
+  @@index([childId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+/// Character Stars. Never spendable — CHECK (amount > 0) and no debit path (BR-5, ADR-004).
+model CharacterStarTransaction {
+  id              String           @id @default(uuid())
+  childId         String
+  familyId        String
+  traitId         String
+  amount          Int
+  sourceType      LedgerSourceType
+  sourceId        String?
+  idempotencyKey  String
+  awardedByUserId String?
+  reason          String?
+  description     String
+  createdAt       DateTime         @default(now())
+
+  child  ChildProfile   @relation(fields: [childId], references: [id], onDelete: Cascade)
+  family Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  trait  CharacterTrait @relation(fields: [traitId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, idempotencyKey])
+  @@index([childId, traitId])
+  @@index([childId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Character
+// ---------------------------------------------------------------------------
+
+model CharacterTrait {
+  id          String    @id @default(uuid())
+  familyId    String
+  key         String
+  label       String
+  emoji       String    @default("⭐")
+  colorKey    String    @default("star")
+  description String?
+  /// The card the child taps: "I was kind today".
+  promptText  String
+  sortOrder   Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  submissions      CharacterSubmission[]
+  starTransactions CharacterStarTransaction[]
+  badges           CharacterBadge[]
+  tasks            Task[]
+
+  @@unique([familyId, key])
+  @@index([familyId, active])
+}
+
+/// A claim. Awards nothing on its own (BR-28).
+model CharacterSubmission {
+  id          String           @id @default(uuid())
+  childId     String
+  familyId    String
+  traitId     String
+  localDate   DateTime         @db.Date
+  story       String
+  mood        String?
+  status      SubmissionStatus @default(PENDING)
+  submittedAt DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  child    ChildProfile       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  trait    CharacterTrait     @relation(fields: [traitId], references: [id], onDelete: Cascade)
+  approval CharacterApproval?
+
+  @@index([familyId, status, submittedAt])
+  @@index([childId, localDate])
+}
+
+model CharacterApproval {
+  id                   String           @id @default(uuid())
+  submissionId         String           @unique
+  parentUserId         String?
+  decision             ApprovalDecision
+  encouragementMessage String?
+  question             String?
+  starsAwarded         Int              @default(0)
+  xpAwarded            Int              @default(0)
+  decidedAt            DateTime         @default(now())
+  createdAt            DateTime         @default(now())
+
+  submission CharacterSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model CharacterBadge {
+  id          String    @id @default(uuid())
+  familyId    String
+  traitId     String?
+  name        String
+  tier        BadgeTier
+  threshold   Int
+  iconKey     String    @default("medal")
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  family   Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  trait    CharacterTrait?          @relation(fields: [traitId], references: [id], onDelete: Cascade)
+  progress CharacterBadgeProgress[]
+
+  @@unique([familyId, traitId, tier])
+  @@index([familyId, active])
+}
+
+model CharacterBadgeProgress {
+  id           String    @id @default(uuid())
+  childId      String
+  badgeId      String
+  currentCount Int       @default(0)
+  unlockedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  child ChildProfile   @relation(fields: [childId], references: [id], onDelete: Cascade)
+  badge CharacterBadge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, badgeId])
+}
+
+// ---------------------------------------------------------------------------
+// Rewards
+// ---------------------------------------------------------------------------
+
+model RewardCategory {
+  id        String   @id @default(uuid())
+  familyId  String
+  key       String
+  label     String
+  iconKey   String   @default("gift")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family  Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  rewards Reward[]
+
+  @@unique([familyId, key])
+}
+
+model Reward {
+  id                     String     @id @default(uuid())
+  familyId               String
+  categoryId             String?
+  name                   String
+  description            String?
+  type                   RewardType @default(CUSTOM)
+  iconKey                String     @default("gift")
+  imageKey               String?
+  pointsCost             Int
+  /// null means unlimited.
+  inventoryQuantity      Int?
+  requiresParentApproval Boolean    @default(true)
+  active                 Boolean    @default(true)
+  expiresAt              DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  deletedAt              DateTime?
+
+  family      Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  category    RewardCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  eligibility RewardEligibility[]
+  redemptions RewardRedemption[]
+  wheelItems  RewardWheelItem[]
+
+  @@index([familyId, active])
+}
+
+/// No rows for a reward means "every child in the family is eligible".
+model RewardEligibility {
+  id        String   @id @default(uuid())
+  rewardId  String
+  childId   String
+  createdAt DateTime @default(now())
+
+  reward Reward       @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  child  ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([rewardId, childId])
+}
+
+model RewardRedemption {
+  id               String           @id @default(uuid())
+  rewardId         String
+  childId          String
+  familyId         String
+  pointsSpent      Int
+  status           RedemptionStatus @default(PENDING)
+  note             String?
+  requestedAt      DateTime         @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  reward Reward       @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  child  ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, status])
+  @@index([childId, requestedAt])
+}
+
+model RewardWheel {
+  id              String   @id @default(uuid())
+  familyId        String
+  name            String   @default("Reward Wheel")
+  pointThreshold  Int      @default(100)
+  /// Whether a spin costs points, and how many.
+  deductPoints    Boolean  @default(true)
+  pointsCost      Int      @default(100)
+  spinsPerDay     Int      @default(1)
+  spinsPerWeek    Int      @default(3)
+  cooldownMinutes Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  family Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  items  RewardWheelItem[]
+  spins  RewardSpin[]
+
+  @@index([familyId, active])
+}
+
+model RewardWheelItem {
+  id              String   @id @default(uuid())
+  wheelId         String
+  rewardId        String?
+  label           String
+  /// Integer weight ≥ 1. The draw is uniform over the cumulative weights (BR-45).
+  weight          Int      @default(1)
+  iconKey         String   @default("gift")
+  colorKey        String   @default("brand")
+  segmentIndex    Int
+  maxWinsPerChild Int?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  wheel  RewardWheel  @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  reward Reward?      @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  spins  RewardSpin[]
+
+  @@unique([wheelId, segmentIndex])
+  @@index([wheelId, active])
+}
+
+/// Written before the client is told anything (BR-45/46). The animation is a
+/// replay of this row, not a decision.
+model RewardSpin {
+  id               String    @id @default(uuid())
+  wheelId          String
+  childId          String
+  familyId         String
+  wheelItemId      String
+  segmentIndex     Int
+  pointsSpent      Int       @default(0)
+  localDate        DateTime  @db.Date
+  resultRevealedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  wheel RewardWheel     @relation(fields: [wheelId], references: [id], onDelete: Cascade)
+  child ChildProfile    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  item  RewardWheelItem @relation(fields: [wheelItemId], references: [id], onDelete: Cascade)
+
+  @@index([childId, createdAt])
+  @@index([childId, localDate])
+  @@index([familyId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement
+// ---------------------------------------------------------------------------
+
+/// Unique on (childId, localDate) — the whole defence against farming XP by
+/// reopening the app (BR-25).
+model DailyCheckIn {
+  id            String   @id @default(uuid())
+  childId       String
+  familyId      String
+  localDate     DateTime @db.Date
+  mood          String?
+  goalText      String?
+  gratitudeText String?
+  xpAwarded     Int      @default(0)
+  pointsAwarded Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, localDate])
+  @@index([familyId, localDate])
+}
+
+model MemoryChallenge {
+  id                String                 @id @default(uuid())
+  familyId          String
+  title             String
+  category          MemoryCategory         @default(CUSTOM)
+  reference         String?
+  bodyText          String
+  xpValue           Int                    @default(0)
+  rewardPointsValue Int                    @default(0)
+  verificationType  MemoryVerificationType @default(TYPED)
+  startDate         DateTime?              @db.Date
+  endDate           DateTime?              @db.Date
+  active            Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  deletedAt         DateTime?
+
+  family      Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  assignments MemoryChallengeAssignment[]
+  submissions MemorySubmission[]
+
+  @@index([familyId, active])
+}
+
+model MemoryChallengeAssignment {
+  id          String   @id @default(uuid())
+  challengeId String
+  childId     String
+  createdAt   DateTime @default(now())
+
+  challenge MemoryChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  child     ChildProfile    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, childId])
+}
+
+model MemorySubmission {
+  id          String           @id @default(uuid())
+  challengeId String
+  childId     String
+  familyId    String
+  /// What the child typed from memory; the parent compares it themselves (BR-50).
+  recitedText String?
+  status      SubmissionStatus @default(PENDING)
+  submittedAt DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  challenge MemoryChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  child     ChildProfile    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  approval  MemoryApproval?
+
+  @@index([familyId, status])
+  @@index([childId, challengeId])
+}
+
+model MemoryApproval {
+  id                   String           @id @default(uuid())
+  submissionId         String           @unique
+  parentUserId         String?
+  decision             ApprovalDecision
+  encouragementMessage String?
+  xpAwarded            Int              @default(0)
+  pointsAwarded        Int              @default(0)
+  decidedAt            DateTime         @default(now())
+  createdAt            DateTime         @default(now())
+
+  submission MemorySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model SecretMission {
+  id                String    @id @default(uuid())
+  familyId          String
+  title             String
+  instructions      String
+  rarity            Rarity    @default(COMMON)
+  xpValue           Int       @default(0)
+  rewardPointsValue Int       @default(0)
+  characterTraitId  String?
+  starValue         Int       @default(0)
+  grantsWheelSpin   Boolean   @default(false)
+  hiddenObjectKey   String    @default("chest")
+  availableFrom     DateTime? @db.Date
+  availableTo       DateTime? @db.Date
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  family      Family                    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  discoveries SecretMissionDiscovery[]
+  submissions SecretMissionSubmission[]
+
+  @@index([familyId, active])
+}
+
+model SecretMissionDiscovery {
+  id              String   @id @default(uuid())
+  missionId       String
+  childId         String
+  familyId        String
+  hiddenObjectKey String
+  /// Which UI surface the object was hidden on when it was found.
+  surfaceKey      String
+  discoveredAt    DateTime @default(now())
+
+  mission SecretMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  child   ChildProfile  @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, missionId])
+  @@index([childId, discoveredAt])
+}
+
+model SecretMissionSubmission {
+  id                   String           @id @default(uuid())
+  missionId            String
+  childId              String
+  familyId             String
+  childNote            String?
+  status               SubmissionStatus @default(PENDING)
+  parentUserId         String?
+  encouragementMessage String?
+  submittedAt          DateTime         @default(now())
+  resolvedAt           DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  mission SecretMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  child   ChildProfile  @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, missionId])
+  @@index([familyId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Progression
+// ---------------------------------------------------------------------------
+
+model Level {
+  id            String   @id @default(uuid())
+  familyId      String
+  levelNumber   Int
+  name          String
+  minLifetimeXp Int
+  iconKey       String   @default("star")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, levelNumber])
+  @@index([familyId, minLifetimeXp])
+}
+
+model Streak {
+  id               String     @id @default(uuid())
+  childId          String
+  familyId         String
+  kind             StreakKind
+  /// Discriminator within a kind (e.g. a task group key). "" for singletons.
+  key              String     @default("")
+  currentCount     Int        @default(0)
+  longestCount     Int        @default(0)
+  lastActivityDate DateTime?  @db.Date
+  startedDate      DateTime?  @db.Date
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, kind, key])
+  @@index([familyId, kind])
+}
+
+model Achievement {
+  id                String   @id @default(uuid())
+  familyId          String
+  key               String
+  name              String
+  description       String
+  iconKey           String   @default("trophy")
+  /// Evaluated by a registry of pure predicates (src/domain/achievements.ts).
+  ruleType          String
+  ruleConfig        Json     @default("{}")
+  xpValue           Int      @default(0)
+  rewardPointsValue Int      @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  family  Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  unlocks AchievementUnlock[]
+
+  @@unique([familyId, key])
+  @@index([familyId, active])
+}
+
+model AchievementUnlock {
+  id            String   @id @default(uuid())
+  childId       String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  child       ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  achievement Achievement  @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, achievementId])
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  familyId    String
+  key         String
+  name        String
+  description String?
+  iconKey     String   @default("medal")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  family  Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  unlocks BadgeUnlock[]
+
+  @@unique([familyId, key])
+}
+
+model BadgeUnlock {
+  id         String   @id @default(uuid())
+  childId    String
+  badgeId    String
+  unlockedAt DateTime @default(now())
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  badge Badge        @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, badgeId])
+}
+
+model DigitalCollectible {
+  id         String          @id @default(uuid())
+  familyId   String
+  key        String
+  name       String
+  type       CollectibleType @default(PET)
+  iconKey    String          @default("sparkles")
+  rarity     Rarity          @default(COMMON)
+  /// Unlock condition: by level, achievement, star count, streak or mission.
+  /// Deliberately not only by spendable points (brief §20).
+  unlockRule Json            @default("{}")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  family Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  owned  ChildCollectible[]
+
+  @@unique([familyId, key])
+}
+
+model ChildCollectible {
+  id            String   @id @default(uuid())
+  childId       String
+  collectibleId String
+  unlockedAt    DateTime @default(now())
+
+  child       ChildProfile       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  collectible DigitalCollectible @relation(fields: [collectibleId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, collectibleId])
+}
+
+model AvatarItem {
+  id         String     @id @default(uuid())
+  familyId   String
+  key        String
+  name       String
+  slot       AvatarSlot
+  iconKey    String     @default("hat")
+  rarity     Rarity     @default(COMMON)
+  unlockRule Json       @default("{}")
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  family Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  owned  ChildAvatarItem[]
+
+  @@unique([familyId, key])
+}
+
+model ChildAvatarItem {
+  id           String     @id @default(uuid())
+  childId      String
+  avatarItemId String
+  slot         AvatarSlot
+  equipped     Boolean    @default(false)
+  unlockedAt   DateTime   @default(now())
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  item  AvatarItem   @relation(fields: [avatarItemId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, avatarItemId])
+  @@index([childId, slot])
+}
+
+// ---------------------------------------------------------------------------
+// Settings, notifications, audit
+// ---------------------------------------------------------------------------
+
+model FamilySetting {
+  id                            String   @id @default(uuid())
+  familyId                      String   @unique
+  mediaUploadsEnabled           Boolean  @default(false)
+  photoEvidenceEnabled          Boolean  @default(false)
+  voiceNotesEnabled             Boolean  @default(false)
+  wheelEnabled                  Boolean  @default(true)
+  secretMissionsEnabled         Boolean  @default(true)
+  hiddenObjectsEnabled          Boolean  @default(true)
+  soundEnabled                  Boolean  @default(true)
+  characterVerificationRequired Boolean  @default(true)
+  characterXpPerStar            Int      @default(5)
+  checkInXp                     Int      @default(5)
+  checkInPoints                 Int      @default(0)
+  weeklyGoalTarget              Int      @default(25)
+  parentGateTimeoutMinutes      Int      @default(30)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+}
+
+model ChildSetting {
+  id                   String   @id @default(uuid())
+  childId              String   @unique
+  pinRequired          Boolean  @default(false)
+  reducedMotion        Boolean  @default(false)
+  characterAutoApprove Boolean  @default(false)
+  dailyTaskTarget      Int      @default(4)
+  notificationsEnabled Boolean  @default(true)
+  soundEnabled         Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+}
+
+/// Platform-level key/value. No family scope — feature flags and defaults.
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id               String                    @id @default(uuid())
+  familyId         String
+  recipientType    NotificationRecipientType
+  recipientUserId  String?
+  recipientChildId String?
+  kind             NotificationKind
+  title            String
+  body             String
+  deepLink         String?
+  payload          Json                      @default("{}")
+  readAt           DateTime?
+  createdAt        DateTime                  @default(now())
+
+  family Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  child  ChildProfile? @relation(fields: [recipientChildId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientChildId, readAt])
+  @@index([familyId, createdAt])
+}
+
+/// Append-only. No update or delete path exists in the repository (BR-59).
+model AuditLog {
+  id           String      @id @default(uuid())
+  familyId     String
+  actorType    ActorType
+  actorUserId  String?
+  actorChildId String?
+  action       AuditAction
+  entityType   String
+  entityId     String?
+  beforeValue  Json?
+  afterValue   Json?
+  reason       String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+
+  family Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  child  ChildProfile? @relation(fields: [actorChildId], references: [id], onDelete: SetNull)
+
+  @@index([familyId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+}
