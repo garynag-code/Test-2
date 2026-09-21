@@ -13,6 +13,7 @@ import * as tasksService from '@/features/tasks/service';
 import * as wheelService from '@/features/reward-wheel/service';
 import * as missionsService from '@/features/secret-missions/service';
 import * as characterService from '@/features/character/service';
+import * as checkInService from '@/features/check-ins/service';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export default async function KidHomePage() {
   });
   const today = toLocalDate(new Date(), family.timezone);
 
-  const [summary, missions, weekly, wheel, hidden, traits] = await Promise.all([
+  const [summary, missions, weekly, wheel, hidden, traits, checkIn] = await Promise.all([
     childrenService.getSummary(actor, { childId: actor.childId, today }),
     tasksService.getMissionsForDate(actor, { childId: actor.childId, date: today }),
     tasksService.getWeeklyProgress(actor, {
@@ -37,6 +38,7 @@ export default async function KidHomePage() {
     wheelService.getWheelForChild(actor, { childId: actor.childId, today }),
     missionsService.getHiddenObject(actor, { childId: actor.childId, today }),
     characterService.listTraits(actor),
+    checkInService.getTodaysCheckIn(actor, { childId: actor.childId, localDate: today }),
   ]);
 
   const remaining = missions.filter((m) => m.state === 'OPEN').length;
@@ -69,6 +71,27 @@ export default async function KidHomePage() {
       </header>
 
       <div className="mx-auto max-w-md space-y-6 px-5 py-6">
+        {checkIn ? null : (
+          <Link
+            href="/kids/check-in"
+            className="flex items-center gap-3 rounded-xl2 border-2 border-brand bg-brand-soft p-4"
+          >
+            <span aria-hidden className="text-3xl">
+              👋
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-extrabold text-ink">Daily check-in</span>
+              <span className="block text-sm text-brand">
+                How are you feeling today?
+                {(family.setting?.checkInXp ?? 0) > 0 ? ` · +${family.setting?.checkInXp} XP` : ''}
+              </span>
+            </span>
+            <span aria-hidden className="text-brand">
+              →
+            </span>
+          </Link>
+        )}
+
         <section aria-label="Your totals" className="flex gap-3">
           <StatChip kind="xp" value={summary.lifetimeXp} />
           <StatChip kind="points" value={summary.rewardPoints} />
@@ -166,6 +189,13 @@ export default async function KidHomePage() {
               caption={`${weekly.completed} / ${weekly.target}`}
             />
           </div>
+          <p className="mt-2 text-sm text-muted">
+            {weekly.remaining === 0
+              ? 'Every mission this week is done. Incredible.'
+              : weekly.onTrack
+                ? `${weekly.remaining} to go — you're on track.`
+                : `${weekly.remaining} to go this week.`}
+          </p>
           <HiddenObject surface="home-weekly" hidden={hidden} />
         </section>
       </div>

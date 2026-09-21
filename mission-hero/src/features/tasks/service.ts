@@ -12,6 +12,7 @@ import {
   utcDateToLocalDate,
 } from '@/domain/dates';
 import { expandSchedule, type ScheduleSpec } from '@/domain/recurrence';
+import { currentWeek } from '@/domain/progress';
 import { PENDING, REDO } from '@/domain/copy';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
@@ -299,14 +300,28 @@ export async function getWeeklyProgress(
 
   const [occurrences, xp, points, stars] = await Promise.all([
     repo.listOccurrencesInRange(prisma, params.childId, from, to),
-    sumSince(prisma.xpTransaction, params.childId, from),
-    sumSince(prisma.rewardPointsTransaction, params.childId, from),
-    sumSince(prisma.characterStarTransaction, params.childId, from),
+    sumEarnedSince(prisma.xpTransaction, params.childId, from),
+    sumEarnedSince(prisma.rewardPointsTransaction, params.childId, from),
+    sumEarnedSince(prisma.characterStarTransaction, params.childId, from),
   ]);
 
+  // The maths lives in src/domain/progress.ts so the "never set an unreachable
+  // target" rule is unit-testable without a database.
+  const week = currentWeek(
+    occurrences.map((occurrence) => ({
+      date: utcDateToLocalDate(occurrence.occurrenceDate),
+      status: occurrence.status,
+    })),
+    params.today,
+    params.target,
+  );
+
   return {
-    completed: occurrences.filter((o) => o.status === 'APPROVED').length,
-    target: Math.max(params.target, occurrences.length),
+    completed: week.completed,
+    target: week.target,
+    scheduled: week.scheduled,
+    remaining: week.remaining,
+    onTrack: week.onTrack,
     xpThisWeek: xp,
     pointsThisWeek: points,
     starsThisWeek: stars,
@@ -320,8 +335,12 @@ type Aggregatable = {
   }) => Promise<{ _sum: { amount: number | null } }>;
 };
 
-/** Only credits count toward "earned this week"; a redemption is not a loss. */
-async function sumSince(model: Aggregatable, childId: string, from: LocalDate): Promise<number> {
+/** Only credits count toward "earned this week"; spending is not a loss. */
+async function sumEarnedSince(
+  model: Aggregatable,
+  childId: string,
+  from: LocalDate,
+): Promise<number> {
   const result = await model.aggregate({
     where: { childId, createdAt: { gte: localDateToUtcDate(from) }, amount: { gt: 0 } },
     _sum: { amount: true },

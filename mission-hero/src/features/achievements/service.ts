@@ -2,6 +2,8 @@ import type { Db } from '@/server/db/prisma';
 import { ledgerKeys } from '@/domain/idempotency';
 import { evaluateAchievement, type AchievementSnapshot } from '@/domain/achievements';
 import { resolveLevel, type LevelDefinition } from '@/domain/levels';
+import { countPerfectWeeks, type OccurrenceSummary } from '@/domain/progress';
+import { toLocalDate, utcDateToLocalDate, type LocalDate } from '@/domain/dates';
 import * as ledger from '@/features/ledger/service';
 import * as streaks from '@/features/streaks/service';
 
@@ -26,6 +28,9 @@ export async function buildSnapshot(
   db: Db,
   childId: string,
   levels: readonly LevelDefinition[],
+  timezone = 'UTC',
+  /** Family-local today. Injected so date-dependent rules are testable. */
+  today: LocalDate = toLocalDate(new Date(), timezone),
 ): Promise<AchievementSnapshot> {
   const [balances, starRows, approvedTasks, memoryCount, missionCount, spinCount, longestStreak] =
     await Promise.all([
@@ -44,6 +49,15 @@ export async function buildSnapshot(
       db.rewardSpin.count({ where: { childId } }),
       streaks.longestForChild(db, childId),
     ]);
+
+  const occurrenceRows = await db.taskOccurrence.findMany({
+    where: { childId },
+    select: { occurrenceDate: true, status: true },
+  });
+  const occurrences: OccurrenceSummary[] = occurrenceRows.map((row) => ({
+    date: utcDateToLocalDate(row.occurrenceDate),
+    status: row.status,
+  }));
 
   const traits = await db.characterTrait.findMany({
     where: { id: { in: starRows.map((r) => r.traitId) } },
@@ -76,9 +90,7 @@ export async function buildSnapshot(
     memoryApprovedCount: memoryCount,
     secretMissionsCompleted: missionCount,
     wheelSpins: spinCount,
-    // Perfect weeks are computed by the progress feature; achievements that
-    // depend on them are evaluated when that number is recomputed.
-    perfectWeeks: 0,
+    perfectWeeks: countPerfectWeeks(occurrences, today),
   };
 }
 
@@ -92,10 +104,13 @@ export async function evaluateForChild(
   db: Db,
   params: { childId: string; familyId: string },
 ): Promise<UnlockedAchievement[]> {
-  const levels = await db.level.findMany({
-    where: { familyId: params.familyId },
-    orderBy: { minLifetimeXp: 'asc' },
-  });
+  const [levels, family] = await Promise.all([
+    db.level.findMany({
+      where: { familyId: params.familyId },
+      orderBy: { minLifetimeXp: 'asc' },
+    }),
+    db.family.findUnique({ where: { id: params.familyId }, select: { timezone: true } }),
+  ]);
   const levelDefs: LevelDefinition[] = levels.map((l) => ({
     levelNumber: l.levelNumber,
     name: l.name,
@@ -115,7 +130,7 @@ export async function evaluateForChild(
   const candidates = achievements.filter((a) => !alreadyUnlocked.has(a.id));
   if (candidates.length === 0) return [];
 
-  const snapshot = await buildSnapshot(db, params.childId, levelDefs);
+  const snapshot = await buildSnapshot(db, params.childId, levelDefs, family?.timezone ?? 'UTC');
   const unlocked: UnlockedAchievement[] = [];
 
   for (const achievement of candidates) {

@@ -55,12 +55,26 @@ slice 1 pass, including double-approval, child-cannot-approve and cross-family b
 **Exit:** §49 journey green; "locked below threshold", "unlocked above",
 "result persisted", "points deducted", "replay does not re-roll" all pass.
 
-## Sprint 4 — Daily loop completeness
+## Sprint 4 — Daily loop completeness _(complete)_
 
-- Daily check-in (mood, goal, gratitude) with once-per-day constraint.
-- Reward store + redemption (atomic, with refund-on-reject).
-- Weekly goal widget and progress maths.
-- Notifications (in-app inbox for both roles).
+- Daily check-in (mood, goal, gratitude) with the once-per-day constraint, and
+  a prompt on the child home that disappears once today's is done.
+- Reward store: the child-facing catalogue, and the parent side — creating
+  rewards, and resolving requests with an automatic refund on a decline.
+- Weekly goal widget and progress maths, moved into `src/domain/progress.ts`.
+- Notifications: an in-app inbox for both roles, with unread badges.
+
+Two things were pulled in because the loop is not usable without them:
+
+- **Parent screens for children and missions.** Sprint 1 built the services but
+  not the forms, which left the seed as the only way to create either. A parent
+  can now add a hero and a mission from an empty family.
+- **Perfect weeks.** `AchievementSnapshot.perfectWeeks` was hard-coded to 0, so
+  the Perfect Week achievement could never unlock. It is now computed from the
+  occurrence history, and the snapshot takes an injectable "today" so the rule
+  is testable without waiting a week.
+
+**Exit:** lint, typecheck, 100 unit, 184 integration, build and 15 E2E green.
 
 ## Sprint 5 — Learning & discovery
 

@@ -71,6 +71,18 @@ Rules are numbered so tests and code comments can cite them (`// BR-14`).
 - **BR-34** Character trait totals are never rendered as a mark, grade, or deficiency.
   Copy for a low total is "Let's grow this one."
 
+## Weekly progress
+
+- **BR-62** The weekly quest target is what is actually scheduled that week, not
+  the family's goal. A bar a child cannot fill however hard they work is
+  demotivating; the family goal is an aspiration for _configuring_ tasks, and is
+  used only as a fallback when nothing is scheduled.
+- **BR-63** A week counts as _perfect_ only once it has ended with every
+  occurrence approved. Awarding "Perfect Week" mid-week would be unexplainable
+  to the child who received it.
+- **BR-64** "On track" is pro-rated against the days already finished, so Monday
+  morning never reads as being behind.
+
 ## Badges, levels, achievements, streaks
 
 - **BR-35** A badge tier unlocks the first time `confirmedCount >= threshold`; unlock is

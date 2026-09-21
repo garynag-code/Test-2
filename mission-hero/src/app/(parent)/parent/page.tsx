@@ -103,13 +103,46 @@ export default async function ParentDashboard() {
                 max={weekly.target}
                 caption={`${weekly.completed} / ${weekly.target}`}
               />
+              {weekly.scheduled === 0 ? (
+                <p className="text-sm text-muted">
+                  No missions scheduled this week.{' '}
+                  <Link href="/parent/tasks" className="font-bold text-brand underline">
+                    Add one
+                  </Link>
+                </p>
+              ) : null}
             </Card>
           ))
         )}
       </section>
 
+      <section aria-labelledby="quick-actions" className="space-y-2">
+        <CardTitle>
+          <span id="quick-actions">Quick actions</span>
+        </CardTitle>
+        <ul className="flex flex-wrap gap-2">
+          {[
+            { href: '/parent/tasks', label: '+ Mission' },
+            { href: '/parent/rewards', label: '+ Reward' },
+            { href: '/parent/children', label: '+ Hero' },
+            { href: '/parent/approvals', label: 'Approve' },
+          ].map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="mh-tap-sm flex items-center rounded-full bg-brand-soft px-4 text-sm font-bold text-brand"
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section aria-labelledby="family-code">
-        <CardTitle>Family code</CardTitle>
+        <CardTitle>
+          <span id="family-code">Family code</span>
+        </CardTitle>
         <Card className="mt-2">
           <p className="text-sm text-muted">Type this once on your child&apos;s device.</p>
           <p className="mt-2 font-mono text-3xl font-black tracking-[0.3em] text-brand">

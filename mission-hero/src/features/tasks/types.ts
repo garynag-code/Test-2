@@ -28,7 +28,12 @@ export interface MissionCard {
 
 export interface WeeklyProgress {
   completed: number;
+  /** What the bar fills to — always reachable (see src/domain/progress.ts). */
   target: number;
+  /** Occurrences actually scheduled this week. */
+  scheduled: number;
+  remaining: number;
+  onTrack: boolean;
   xpThisWeek: number;
   pointsThisWeek: number;
   starsThisWeek: number;

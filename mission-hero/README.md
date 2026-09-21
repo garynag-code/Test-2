@@ -57,6 +57,9 @@ The seed prints what you need to log in:
 3. **Reward wheel.** Josh starts with 120 points and the wheel needs 100. Spin
    it, then reload mid-celebration: the result is already committed, so it
    cannot be re-rolled.
+4. **The daily loop.** Check in as Josh (once — reopening the app won't pay
+   again), redeem ice cream from the store, then decline it as Mom and watch
+   every point come back.
 
 ## Commands
 
@@ -115,9 +118,9 @@ Zod · Vitest · Playwright.
 
 | Tier                | Count | What it proves                                                                                                            |
 | ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
-| Domain unit         | 86    | Pure rules, including a seeded 60k-trial check that the wheel's odds match its configuration                              |
-| Service integration | 143   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked |
-| End-to-end          | 11    | The three vertical slices and the threat model, in a real browser at phone width                                          |
+| Domain unit         | 100   | Pure rules, including a seeded 60k-trial check that the wheel's odds match its configuration                              |
+| Service integration | 184   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked |
+| End-to-end          | 15    | The three vertical slices, the daily loop and the threat model, in a real browser at phone width                          |
 
 The integration tier is deliberately the heaviest. The risky question in this
 product is "did exactly one ledger row get written under concurrency", and a
@@ -153,7 +156,12 @@ These are treated as engineering constraints, not copy decisions:
 
 ## Status
 
-Sprints 0–3 of [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
-foundations, and the three vertical slices, working end to end with green tests.
-Sprints 4–8 (progression depth, adventure map, collectibles, parent settings and
-production hardening) build on top of this without changing its shape.
+Sprints 0–4 of [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
+foundations, the three vertical slices, and the daily loop — check-in, reward
+store, weekly progress and notifications — all working end to end with green
+tests. A parent can now take a brand-new family from nothing to a child
+completing a mission without touching the seed.
+
+Sprints 5–8 (memory and secret-mission screens, progression depth, the adventure
+map, collectibles, parent settings and production hardening) build on top of
+this without changing its shape.
