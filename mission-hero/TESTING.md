@@ -2,12 +2,39 @@
 
 Everything below runs against the seeded **Adventure Family**.
 
+## Starting it up
+
+You need [Node.js 20 or newer](https://nodejs.org) and
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) — Docker only
+to run PostgreSQL, so you do not have to install a database by hand.
+
 ```bash
-npm install
-npm run db:migrate
-npm run db:seed
-npm run dev          # http://localhost:3000
+cp .env.example .env
 ```
+
+Open the new `.env` and replace the `AUTH_SECRET` line. It signs the session
+cookies, so it must be at least 32 characters — any long string will do for
+local testing:
+
+```
+AUTH_SECRET="local-testing-only-not-a-real-secret-0123456789"
+```
+
+Leave `DATABASE_URL` alone: it already matches the database the next command
+starts. Then, from this folder:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on port 5432
+npm install                                      # ~2 minutes, once
+npm run db:migrate                               # creates the schema
+npm run db:seed                                  # the Adventure Family demo
+npm run dev                                      # http://localhost:3000
+```
+
+Leave that last command running — it is the app. Stop it with `Ctrl+C`, and
+stop the database with
+`docker compose -f docker-compose.dev.yml down`. Your data survives both;
+`npm run db:reset` is what wipes it back to the seed.
 
 The seed prints the credentials. In short:
 

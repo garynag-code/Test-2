@@ -1,0 +1,33 @@
+# PostgreSQL for local development and testing, and nothing else.
+#
+# docker-compose.yml runs the whole product (app + database) the way a server
+# would, with the database deliberately unreachable from outside. That is the
+# right shape for deployment and the wrong one for `npm run dev`, which runs
+# the app on your machine and needs to reach the database on localhost.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# The credentials match .env.example, so a copied .env needs no editing.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mission_hero
+    ports:
+      - '5432:5432'
+    volumes:
+      - mission-hero-dev-db:/var/lib/postgresql/data
+      # Creates the second database the integration tests use. Runs once, when
+      # the volume is first created.
+      - ./docker/dev-initdb.sql:/docker-entrypoint-initdb.d/dev-initdb.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d mission_hero']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mission-hero-dev-db:
