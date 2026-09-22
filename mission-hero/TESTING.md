@@ -64,7 +64,8 @@ Everything below happens in the phone's browser.
 6. Open that address on the phone. Sign in as a parent with
    `mom@adventure.family` and the password from step 4, or tap through to the
    child side with the family code **ADVENTUR**.
-7. Chrome menu → **Add to Home screen**, so it opens with one tap.
+7. Chrome menu → **Add to Home screen**. It installs as a real app: its own
+   icon in the launcher, and it opens full screen without browser chrome.
 
 ### What the free tier costs you
 
@@ -132,6 +133,11 @@ If the phone cannot load the page at all:
 Two things are expected and harmless: code changes will not hot-reload on the
 phone (refresh the page yourself), and the browser console shows an aborted
 `_rsc` request or two, which is Next discarding a prefetch it no longer needs.
+
+One thing is neither. Occasionally a **Create** button sticks on "Creating…"
+and the new mission does not appear. It **was** saved — reload the page and it
+is there. Do not create it a second time. This is a known open bug, written up
+in [docs/08 §10](./docs/08-test-strategy.md).
 
 ---
 

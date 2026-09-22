@@ -42,6 +42,26 @@ export async function waitForInteractive(page: Page): Promise<void> {
 export async function clickWhenHydrated(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
 
+  /*
+   * Wait for the document to finish loading before looking at React at all.
+   *
+   * React hydrates selectively: an island's effects can run while the root is
+   * still suspended on streamed content, so a control can be mounted, enabled
+   * and visibly ready while a server action dispatched from it cannot yet
+   * complete. Measured on /parent/tasks: clicking ~500ms after navigation left
+   * the submit stuck on "Creating…" indefinitely — the action ran and the row
+   * was written, but the client never applied the response. Waiting for the
+   * load event first made the same click succeed.
+   */
+  await locator.page().waitForLoadState('load');
+  // ...and for the router's own prefetches to settle. They are in flight for
+  // roughly a second after a navigation, and an action dispatched while they
+  // are outstanding is the case that hangs.
+  await locator
+    .page()
+    .waitForLoadState('networkidle', { timeout: 5_000 })
+    .catch(() => undefined);
+
   // Best-effort: React's internal keys are the clearest evidence that this
   // element is wired up, but they are an implementation detail. If they never
   // appear, settle briefly and click anyway rather than failing on the probe.

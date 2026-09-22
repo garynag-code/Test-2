@@ -8,6 +8,20 @@ export const metadata: Metadata = {
   applicationName: APP_NAME,
   // Nothing in this product is meant to be indexed or shared publicly (§40).
   robots: { index: false, follow: false },
+  /*
+   * Installable on a phone. "Add to Home screen" then gives a launcher icon
+   * and opens without browser chrome, which is the difference between a
+   * bookmark and something a child will actually open every morning.
+   */
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: 'default' },
 };
 
 /*

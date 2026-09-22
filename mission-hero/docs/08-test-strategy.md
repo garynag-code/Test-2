@@ -113,61 +113,52 @@ lint → typecheck → unit → integration (with postgres service) → build �
 Any red step blocks the merge. Flaky-by-design tests (statistical, concurrency) use
 fixed seeds and explicit synchronisation so a red result always means a real defect.
 
-## 10. A weakness this document blamed on contention (superseded by §11)
+## 10. One test that fails about once a run
 
-The integration tier and the end-to-end tier share a single PostgreSQL server.
-Both are green, and the e2e suite has passed several consecutive full runs — but
-twice, on a run started immediately after the ~3-minute integration tier, two
-`sprint-4` specs failed with a server action that had not responded inside the
-15-second assertion budget (the submit button still reading "Creating…", the
-row never written). Each passed on its own straight afterwards, and neither
-failure has reproduced on a run started from an idle database.
+Earlier versions of this section blamed database contention, then a CSP bug.
+The first was wrong. The second was real and is fixed. Something else remains.
 
-So the symptom is contention, not a defect: the same database has just had tens
-of thousands of rows churned across fifty tables, and autovacuum is still
-working through them. It is recorded here rather than dismissed, because a
-suite that is green only from a cold start is green on a technicality.
+### Fixed: every script on the page was refused
 
-The fix is isolation, not a longer timeout: give the e2e tier its own database
-(`E2E_DATABASE_URL`, migrated and seeded like `TEST_DATABASE_URL` already is)
-and point `playwright.config.ts`'s `webServer.env` and `reseed()` at it. CI runs
-the tiers in one job on one container, so it is exposed to exactly this.
+Four routes were statically prerendered — `/`, `/parent/register`,
+`/_not-found` and, worst of all, `/parent/login` — while the CSP carries a
+per-request nonce and `'strict-dynamic'`. A prerendered page's script tags hold
+a nonce from build time that no longer matches the response header, and
+`'strict-dynamic'` makes a browser ignore `'self'`, so every script was
+refused. The page rendered, looked right, and did nothing.
 
-Until then: if a `sprint-4` spec fails on a run that followed the integration
-tier, re-run that file before believing it.
+`export const dynamic = 'force-dynamic'` on the root layout ends it. Nothing in
+this product is static; every page belongs to one family. Measured with it
+removed again: three failures per run instead of one, and a full suite taking
+5.3 minutes instead of 1.1 — the app falls back to server round trips for
+everything. It stays.
 
-## 11. An open bug the suite keeps catching
+### Open: a server action that completes but is never applied
 
-Replacing §10, which blamed contention. It was not contention.
+About once per full run, a create leaves the submit button reading "Creating…"
+indefinitely. What was established by measurement:
 
-Two causes were found underneath it. The first is fixed: every page carried a
-per-request CSP nonce while four routes — including `/parent/login` — were
-statically prerendered, so their script tags held a nonce from build time that
-no longer matched the response header. With `'strict-dynamic'` a browser then
-ignores `'self'` and refuses **every** script on the page. The app rendered,
-looked correct, and did nothing: forms fell back to plain posts the server does
-not recognise as actions, so a hero or a mission was simply never written, with
-no error anywhere. `export const dynamic = 'force-dynamic'` on the root layout
-ends it; measured across many runs, CSP refusals went from routine to zero, and
-the suite got a minute faster.
+- The row **is written**, exactly once. Data integrity is not affected.
+- The POST returns **200** with a 19KB payload that contains both the action's
+  `{"ok":true}` and the re-rendered list including the new mission.
+- The server logs the re-render. The client never applies it.
+- The page is hydrated at the moment of the click: the submit button is
+  enabled, and it is only enabled once React has mounted it.
 
-The second is still open. After a successful create, the list on the page does
-not repaint promptly:
+Things tried that did **not** fix it, each measured over three or four runs
+rather than assumed: `router.refresh()` on success; replacing
+`revalidatePath` + `{ ok: true }` with a `redirect()` back to the list;
+removing `form.reset()` from the success effect; disabling `<Link>`
+prefetching on the parent nav; waiting for `load`, then for `networkidle`,
+before clicking. Waiting four seconds after navigation before clicking helped
+but did not eliminate it, which rules out a pure hydration race.
 
-```
-list 3s after "Create mission"  = []                            (4 runs of 4)
-list after a manual reload      = ["Water the plants ..."]
-```
+So it is not a stale timeout to widen, and it is not the test being hasty. The
+next person should start from the fact that the response is correct and
+delivered, and work out why React does not settle the transition — a React
+19 / Next 15.5 interaction with `useActionState`, most likely around streamed
+metadata, is the leading suspect.
 
-The row is written correctly every time. The page renders in about 90ms when
-requested directly, so this is not a slow server — the client router is not
-refetching after the action's `revalidatePath`. It usually resolves inside the
-15-second assertion window, which is why the suite passes roughly two runs in
-three rather than failing outright.
-
-It matters more to a parent than to the suite: they create a mission, the list
-does not change, and the reasonable conclusion is that it did not work — so
-they make it again. `router.refresh()` in the form's success effect was the
-obvious fix and did **not** change the measurement, so it was reverted rather
-than committed as an unverified guess. The next step is to find out why the
-refetch does not happen, not to widen the timeout.
+It matters more to a parent than to the suite: they tap Create, nothing
+visibly happens, and the reasonable response is to tap again. The row is
+already saved, so they end up with two.
