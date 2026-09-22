@@ -1,26 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useActionState, useEffect } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { bindDeviceAction } from '@/features/auth/actions';
 import { FAMILY_CODE_LENGTH } from '@/domain/constants';
 
 export function FamilyCodeForm() {
   const [state, action] = useActionState(bindDeviceAction, undefined);
-  const router = useRouter();
-
-  /*
-   * Refreshes explicitly once the device is bound.
-   *
-   * The action sets a cookie and relies on this page re-rendering to swap the
-   * form for the profile picker. Asking for the refresh here rather than
-   * leaving it to the action's own revalidation makes that deterministic —
-   * the cookie is in the jar by the time the request goes out.
-   */
-  useEffect(() => {
-    if (state?.ok) router.refresh();
-  }, [state?.ok, router]);
 
   return (
     <form action={action} className="mt-6 space-y-4">

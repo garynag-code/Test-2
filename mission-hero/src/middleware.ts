@@ -53,7 +53,13 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith('/kids/') && !request.cookies.get(COOKIE_CHILD_SESSION)) {
+  // `/kids/who` is the profile picker: reachable with a device cookie and no
+  // child session, which is the whole point of it.
+  if (
+    pathname.startsWith('/kids/') &&
+    pathname !== '/kids/who' &&
+    !request.cookies.get(COOKIE_CHILD_SESSION)
+  ) {
     return redirectTo(request, '/kids');
   }
 

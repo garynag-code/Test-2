@@ -119,7 +119,7 @@ Two gaps closed along the way:
   transaction that grants membership.
 - Data export as JSON and permanent family deletion.
 
-## Sprint 8 — Production hardening _(complete, with one caveat)_
+## Sprint 8 — Production hardening _(complete)_
 
 - Failure-only rate limiting: correct answers never spend a token, so a family
   signing in or binding several devices is never throttled.
@@ -177,15 +177,30 @@ turned up three more defects, all of which only exist once JavaScript runs:
    server's stdout is piped so a server-side error stops reading as "nothing
    happened".
 
-The suite currently passes **22 to 24 of its 27 tests** on any given run, with
-the failures moving between runs rather than settling on particular tests.
-Every spec passes when run on its own. What remains is a shared-server timing
-problem in the harness, not a set of reproducible product defects — but it is
-not green, so it is marked non-blocking in CI rather than being presented as
-passing.
+Three more went the same way once the harness stopped lying about what it was
+testing:
 
-The next step is to finish rewriting the specs around hydrated behaviour —
-waiting on content rather than navigation, and not re-seeding a whole family
-between tests that do not need it. That is a bounded piece of work on the
-harness; the product behaviour underneath it is covered by the 130 unit and
-244 integration tests, which are green and which do not depend on a browser.
+9. **A picker that only sometimes appeared.** Fixing (3) by redirecting to the
+   same route swapped a dead button for an intermittent one: roughly a quarter
+   of binds still landed back on the code form, because the client router
+   served `/kids` from its cache. Measured at 15 of 20. The profile picker now
+   lives on its own route, `/kids/who`, so the redirect crosses a route
+   boundary and there is nothing to serve from cache. 20 of 20 after.
+10. **Approval rows stayed on screen after being actioned.** The five parent
+    queues rendered from a server payload and did not re-fetch, so an approved
+    or declined row sat there looking unactioned until a manual reload. Each
+    row now hides itself once its action resolves without an error.
+11. **Assertions on flash messages rather than outcomes.** Several specs waited
+    on a transient confirmation banner or an exact unread count — both true
+    only for a moment, and the second one dependent on what earlier tests in
+    the file had sent. They now assert the durable result: the row is in the
+    list, the balance is what it should be.
+
+The suite is **green: 27 of 27**, twice consecutively, and it is blocking in
+CI alongside every other tier.
+
+A note on cost, because it was most of the sprint: (8) alone accounted for
+several hours of chasing fixes that had in fact worked. Anything that lets a
+harness test a stale build is worth eliminating outright rather than
+remembering to avoid, which is why `reuseExistingServer` is false even
+locally.

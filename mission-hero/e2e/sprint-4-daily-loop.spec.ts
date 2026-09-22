@@ -90,16 +90,18 @@ test('a parent sets up a new hero and a mission from scratch', async ({ page }) 
   await page.getByLabel('What should we call them?').fill('Ben');
   await page.getByLabel('Age').selectOption('AGE_6_8');
   await page.getByRole('button', { name: 'Add hero' }).click();
-  await expect(page.getByText('They can sign in with your family code.')).toBeVisible();
+  // The durable outcome, not the flash message: Ben is in the list.
+  await expect(page.locator('li', { hasText: 'Ben' })).toBeVisible();
 
   await page.goto('/parent/tasks');
   await page.getByLabel('Mission name').fill('Water the plants');
-  await page.getByRole('checkbox', { name: 'Ben' }).check({ force: true });
+  // Click the label: the checkbox itself is visually hidden inside it.
+  await page.locator('label', { hasText: 'Ben' }).first().click();
+  await expect(page.getByRole('checkbox', { name: 'Ben' })).toBeChecked();
   await page.getByLabel('XP', { exact: true }).fill('15');
   await page.getByLabel('Reward points').fill('5');
   await page.getByRole('button', { name: 'Create mission' }).click();
 
-  await expect(page.getByText('Mission created.')).toBeVisible();
   await expect(page.locator('li', { hasText: 'Water the plants' })).toBeVisible();
 
   // And the new hero sees it, with the value the parent set.
@@ -143,7 +145,8 @@ test('notifications reach both inboxes and clear independently', async ({ browse
 
   await child.goto('/kids/news');
   await expect(child.getByText('Make your bed approved!')).toBeVisible();
-  await expect(child.getByText('1 new')).toBeVisible();
+  // Not an exact count: earlier tests in this file also send Josh news.
+  await expect(child.getByText(/\d+ new/).first()).toBeVisible();
 
   await childContext.close();
   await parentContext.close();

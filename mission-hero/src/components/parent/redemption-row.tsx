@@ -16,14 +16,23 @@ interface Redemption {
 export function RedemptionRow({ redemption }: { redemption: Redemption }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /*
+   * Hidden as soon as the server accepts the decision. The row is only
+   * removed by a revalidation otherwise, which leaves something already
+   * resolved on screen and invites a second click on it.
+   */
+  const [resolved, setResolved] = useState(false);
 
   const resolve = (approve: boolean, note?: string) => {
     setError(null);
     startTransition(async () => {
       const result = await resolveRedemptionAction(redemption.id, approve, note);
       if (result?.error) setError(result.error);
+      else setResolved(true);
     });
   };
+
+  if (resolved) return null;
 
   return (
     <li>

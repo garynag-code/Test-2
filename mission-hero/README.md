@@ -165,22 +165,19 @@ progression and collectibles, parent depth, and production hardening. A parent
 can take a brand-new family from nothing through missions, character, rewards,
 memory, quests, settings, a second parent, a data export and deletion.
 
-**Green:** `lint`, `typecheck`, **130 unit**, **244 integration**, `build`.
+Every tier is green and every tier blocks a merge: `lint`, `typecheck`,
+`prettier`, **130 unit**, **244 integration**, `build`, and **27 end-to-end**.
 The integration tier runs against real PostgreSQL with Prisma never mocked, and
-covers every business rule, authorization boundary and concurrency case.
+covers every business rule, authorization boundary and concurrency case. The
+end-to-end tier drives a production build in Chromium at a Pixel 7 viewport.
 
-**Not green:** the end-to-end suite passes 22–24 of its 27 tests on any given
-run, with the failures moving between runs rather than settling. Every spec
-passes when run on its own.
-
-Sprint 8 fixed a CSP bug that had been blocking _all_ client-side JavaScript in
-production builds. The app had therefore been behaving as if server-rendered
-only, and the Playwright specs were written against that; chasing the fallout
-turned up three further defects that only exist once JavaScript runs. What is
-left is a shared-server timing problem in the harness rather than reproducible
-product defects, so it is marked non-blocking in CI rather than presented as
-passing. The eight bugs that sprint surfaced, and the plan for the harness, are
-in [docs/07 §Sprint 8](./docs/07-mvp-sprint-plan.md).
+Getting there was most of Sprint 8. A CSP bug had been blocking _all_
+client-side JavaScript in production builds, so the app had been behaving as if
+server-rendered only and the Playwright specs were unknowingly written against
+that. Fixing it made the client-side behaviour real for the first time and
+turned up six further defects that only exist once JavaScript runs. All eleven,
+and what each one cost, are in
+[docs/07 §Sprint 8](./docs/07-mvp-sprint-plan.md).
 
 To try it by hand, see [TESTING.md](./TESTING.md). To run or deploy it, see
 [docs/11 — Operations](./docs/11-operations.md).
