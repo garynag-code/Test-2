@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireParent } from '@/server/auth/guards';
 import { prisma } from '@/server/db/prisma';
 import { Card, CardTitle, EmptyState } from '@/components/ui/card';
@@ -97,12 +98,12 @@ function PageLink({ page, disabled, label }: { page: number; disabled: boolean; 
     );
   }
   return (
-    <a
+    <Link
       href={`/parent/audit?page=${page}`}
       className="mh-tap-sm flex items-center rounded-full border-2 border-border px-4 text-sm font-bold text-ink"
     >
       {label}
-    </a>
+    </Link>
   );
 }
 

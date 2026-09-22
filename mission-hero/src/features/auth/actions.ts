@@ -1,7 +1,10 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { LIMITS, callerKey, consume, isBlocked } from '@/server/rate-limit';
 import { isAppError } from '@/server/errors';
 import {
   bindDeviceToFamily,
@@ -22,7 +25,20 @@ import * as children from '@/features/children/service';
  * page, which is a poor experience for a parent at 7 a.m.
  */
 
-export type ActionState = { error?: string } | undefined;
+export type ActionState = { error?: string; ok?: boolean } | undefined;
+
+/**
+ * Rate limiting on the paths an attacker would actually push: sign-in,
+ * registration, PIN entry and family-code redemption (docs/03 §9).
+ *
+ * Only *failed* attempts spend a token. A family signing in correctly, or
+ * binding several devices in one sitting, is not what these limits are for.
+ */
+async function callerBucket(scope: string): Promise<string> {
+  return callerKey(await headers(), scope);
+}
+
+const TOO_MANY = 'Too many tries just now. Give it a few minutes.';
 
 const registerSchema = z.object({
   email: z.string().trim().email('Enter a valid email address'),
@@ -55,13 +71,24 @@ const loginSchema = z.object({
 });
 
 export async function loginAction(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const ipBucket = await callerBucket('login');
+  if (isBlocked(ipBucket, LIMITS.parentLogin)) return { error: TOO_MANY };
+
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check those details' };
+
+  // Also limited per email, so an attacker cannot spread guesses across many
+  // addresses — and, because only failures count, cannot lock a real user out
+  // of their own account by guessing at it from elsewhere.
+  const emailBucket = `login-email:${parsed.data.email.trim().toLowerCase()}`;
+  if (isBlocked(emailBucket, LIMITS.parentLoginByEmail)) return { error: TOO_MANY };
 
   try {
     const result = await families.loginParent(parsed.data.email, parsed.data.password);
     await startParentSession(result.userId, result.familyId);
   } catch {
+    consume(ipBucket, LIMITS.parentLogin);
+    consume(emailBucket, LIMITS.parentLoginByEmail);
     // Same message whichever half was wrong (docs/03 §9).
     return { error: 'That email and password do not match.' };
   }
@@ -70,11 +97,13 @@ export async function loginAction(_state: ActionState, formData: FormData): Prom
 
 export async function logoutAction(): Promise<void> {
   await endParentSession();
+  revalidatePath('/', 'layout');
   redirect('/');
 }
 
 export async function childLogoutAction(): Promise<void> {
   await endChildSession();
+  revalidatePath('/kids', 'layout');
   redirect('/kids');
 }
 
@@ -110,9 +139,18 @@ export async function selectChildAction(
   const pin = pinRaw === null ? '' : String(pinRaw);
   if (pin && !pinSchema.safeParse(pin).success) return { error: 'Enter your PIN.' };
 
+  // Only guess-limited when a PIN was actually submitted, and only a wrong
+  // one costs a token. Limiting every profile tap would lock a family out of a
+  // shared tablet after five switches, which is not an attack — it is Tuesday.
+  const pinBucket = `pin:${childId}`;
+  if (pin && isBlocked(pinBucket, LIMITS.childPin)) {
+    return { error: "Let's take a short break and try again in a few minutes." };
+  }
+
   const result = await children.verifyChildPin(familyId, childId, pin);
 
   if (!result.ok) {
+    if (pin) consume(pinBucket, LIMITS.childPin);
     if (result.lockedUntil) {
       return { error: "Let's take a short break and try again in a few minutes." };
     }
@@ -125,5 +163,8 @@ export async function selectChildAction(
   }
 
   await startChildSession(result.childId!, result.familyId!);
+  // No revalidation here: this redirect goes to a different route, and
+  // revalidating the layout we are currently rendering makes the router
+  // re-render `/kids` instead of following the redirect.
   redirect('/kids/home');
 }

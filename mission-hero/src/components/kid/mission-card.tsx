@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { MissionCard as Mission } from '@/features/tasks/types';
+import type { MissionCard as Mission, MissionState } from '@/features/tasks/types';
 
 interface MissionCardProps {
   mission: Mission;
@@ -20,6 +20,14 @@ export function MissionCard({ mission, onDone }: MissionCardProps) {
   const [showEvidence, setShowEvidence] = useState(false);
   const [evidence, setEvidence] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /*
+   * Seeded from the server and moved to WAITING once the submission has been
+   * accepted. This is not an optimistic award: the value still comes from the
+   * approval, and nothing here claims any XP. It reflects a claim the server
+   * confirmed it stored, rather than waiting on a router revalidation to
+   * redraw the card.
+   */
+  const [state, setState] = useState<MissionState>(mission.state);
 
   const needsEvidence = mission.evidenceType === 'NOTE' || mission.evidenceType === 'PHOTO';
 
@@ -30,6 +38,7 @@ export function MissionCard({ mission, onDone }: MissionCardProps) {
         await onDone(mission.occurrenceId, text);
         setShowEvidence(false);
         setEvidence('');
+        setState('WAITING');
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Something went wrong. Try again?');
       }
@@ -40,10 +49,10 @@ export function MissionCard({ mission, onDone }: MissionCardProps) {
     <li
       className={cn(
         'rounded-xl2 border-2 bg-card p-4 transition-colors',
-        mission.state === 'DONE' && 'border-success/40 bg-success/5',
-        mission.state === 'WAITING' && 'border-warn/40 bg-warn/5',
-        mission.state === 'REDO' && 'border-brand/40',
-        mission.state === 'OPEN' && 'border-border',
+        state === 'DONE' && 'border-success/40 bg-success/5',
+        state === 'WAITING' && 'border-warn/40 bg-warn/5',
+        state === 'REDO' && 'border-brand/40',
+        state === 'OPEN' && 'border-border',
       )}
     >
       <div className="flex items-start gap-3">
@@ -71,11 +80,11 @@ export function MissionCard({ mission, onDone }: MissionCardProps) {
         </div>
 
         <div className="shrink-0">
-          {mission.state === 'WAITING' ? (
+          {state === 'WAITING' ? (
             <span className="inline-flex animate-pulse-soft items-center gap-1 rounded-full bg-warn/15 px-3 py-2 text-xs font-bold text-warn">
               <span aria-hidden>⏳</span> Waiting
             </span>
-          ) : mission.state === 'DONE' ? (
+          ) : state === 'DONE' ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-3 py-2 text-xs font-bold text-success">
               <span aria-hidden>✓</span> Done
             </span>

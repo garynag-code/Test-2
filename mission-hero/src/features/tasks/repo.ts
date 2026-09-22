@@ -41,6 +41,9 @@ export function findOccurrenceForFamily(db: Db, occurrenceId: string, familyId: 
 
 export function listOccurrencesForDate(db: Db, childId: string, date: LocalDate) {
   return db.taskOccurrence.findMany({
+    // Ordered by when the task was created, so a child's list does not
+    // reshuffle between page loads.
+    orderBy: [{ task: { createdAt: 'asc' } }, { id: 'asc' }],
     where: { childId, occurrenceDate: localDateToUtcDate(date) },
     include: {
       task: { include: { trait: { select: { id: true, label: true } } } },

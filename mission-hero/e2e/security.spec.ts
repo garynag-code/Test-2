@@ -1,11 +1,21 @@
 import { expect, test } from '@playwright/test';
-import { reseed, signInAsChild } from './helpers';
+import { reseed, signInAsChild, waitForInteractive } from './helpers';
 
 /**
  * The threat model, exercised through the browser (docs/03).
  */
 
-test.beforeEach(() => {
+/*
+ * Seeded once per file rather than before every test.
+ *
+ * The seed deletes the family and rebuilds it, which cascades across fifty
+ * tables. Doing that between every test starves the running server's
+ * connection pool badly enough that a single indexed lookup can take longer
+ * than the assertion timeout — a failure that looks like a broken feature and
+ * is really just contention. The tests in this file touch different missions
+ * and children, so they stay independent without it.
+ */
+test.beforeAll(() => {
   reseed();
 });
 
@@ -31,6 +41,7 @@ test('a child session cannot reach parent administration', async ({ page }) => {
 
 test('the profile picker reveals nothing but nicknames', async ({ page }) => {
   await page.goto('/kids');
+  await waitForInteractive(page);
   await page.getByLabel('Family code').fill('ADVENTUR');
   await page.getByRole('button', { name: "Let's go!" }).click();
 
@@ -44,6 +55,7 @@ test('the profile picker reveals nothing but nicknames', async ({ page }) => {
 
 test('an unknown family code is refused', async ({ page }) => {
   await page.goto('/kids');
+  await waitForInteractive(page);
   await page.getByLabel('Family code').fill('ZZZZZZZZ');
   await page.getByRole('button', { name: "Let's go!" }).click();
 
@@ -60,4 +72,25 @@ test('security headers are set on the child surface', async ({ page }) => {
   expect(headers['x-content-type-options']).toBe('nosniff');
   expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
   expect(headers['content-security-policy']).toContain("object-src 'none'");
+});
+
+test("the strict CSP does not block the app's own JavaScript", async ({ page }) => {
+  // Regression: Next takes the nonce from the *request* CSP header. Set it only
+  // on the response and 'strict-dynamic' makes the browser ignore 'self', so
+  // every script is blocked — the site still renders and server actions still
+  // work, which is exactly why this is easy to ship without noticing.
+  const refusals: string[] = [];
+  page.on('console', (message) => {
+    if (/Content Security Policy|Refused to/i.test(message.text())) {
+      refusals.push(message.text().slice(0, 160));
+    }
+  });
+
+  const response = await page.goto('/kids');
+  await expect(page.getByLabel('Family code')).toBeVisible();
+
+  expect(response?.headers()['content-security-policy']).toMatch(/nonce-[a-f0-9]{32}/);
+  expect(refusals).toEqual([]);
+  // Next only emits a nonce attribute when it read one from the request.
+  expect(await page.locator('script[nonce]').count()).toBeGreaterThan(0);
 });

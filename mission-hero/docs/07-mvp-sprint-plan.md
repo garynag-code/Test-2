@@ -99,26 +99,75 @@ Two gaps closed along the way:
 
 **Exit:** lint, typecheck, 100 unit, 202 integration, build and 19 E2E green.
 
-## Sprint 6 — Progression & delight
+## Sprint 6 — Progression & delight _(complete)_
 
-- Levels + level-up celebration; adventure map.
-- Achievements catalogue + custom achievements.
-- Digital collectibles, avatar items and slots, themes.
+- Sixteen collectibles and ten pieces of avatar gear, all free, unlocking from
+  levels, achievements, stars, streaks, quests and memory — deliberately never
+  from spendable points. Evaluated in the same transaction as the award that
+  earned them.
+- Adventure map: a second reading of the weekly quest, not a second score.
+- Level-up banner and notification; achievements catalogue on the child profile.
 
-## Sprint 7 — Parent depth
+## Sprint 7 — Parent depth _(complete)_
 
-- Progress dashboards, character history, task history.
-- Audit viewer, manual adjustments with reasons.
-- Settings: media toggles, PIN policy, notifications, feature pauses, archiving.
-- Second-parent invite flow.
+- Progress dashboards over twelve weeks, character history, mission history and
+  the full ledger, so a disputed balance can be reconstructed.
+- Read-only audit viewer; manual bonuses that insist on a reason.
+- Settings for media, features, award values, the parent gate, and per-child
+  nickname, theme, motion, PIN and archiving.
+- Second-parent invites: single-use token, two-week expiry, consumed inside the
+  transaction that grants membership.
+- Data export as JSON and permanent family deletion.
 
-## Sprint 8 — Production hardening
+## Sprint 8 — Production hardening _(complete, with one caveat)_
 
-- Rate limiting, CSP nonces, security headers.
-- Accessibility audit (axe on every route, keyboard walk-through, reduced motion).
-- Performance pass, error boundaries, empty/loading states everywhere.
-- Data export & family deletion.
-- Dockerfile, migration strategy, backup/restore runbook, monitoring hooks.
+- Failure-only rate limiting: correct answers never spend a token, so a family
+  signing in or binding several devices is never throttled.
+- Per-request CSP nonce, HSTS and the rest of the security headers on every
+  route.
+- Error boundaries, loading skeletons and empty states on both surfaces.
+- Axe audits across all twenty routes, a keyboard walk-through, and a reduced-
+  motion check that asserts animation is _removed_, not merely sped up.
+- Dockerfile, compose file, and an operations runbook
+  ([docs/11](./11-operations.md)) covering migrations, backup and restore,
+  monitoring, and what has to change before running more than one instance.
+
+### Bugs this sprint surfaced
+
+Worth recording, because each was invisible until something specifically
+looked for it:
+
+1. **Every script blocked in production.** Next reads the CSP nonce from the
+   _request_ header; setting it only on the response left its scripts
+   unnonced, and `'strict-dynamic'` then makes browsers ignore `'self'`. The
+   site still rendered and server actions still worked by progressive
+   enhancement, so it looked fine. `e2e/security.spec.ts` now asserts a nonce
+   is present and no CSP refusals occur.
+2. **Contrast failures in eight of nine themes.** Brand and status colours were
+   chosen for fills, then used as text on white. Axe caught it; the tokens are
+   now split so anything used as text clears 4.5:1.
+3. **A same-route redirect that did nothing.** `bindDeviceAction` redirected to
+   the page it was already on, which the client router serves from cache — a
+   child typed the family code, tapped Go, and nothing happened.
+4. **The PIN limiter punished profile switching.** It counted every profile tap,
+   so a family sharing a tablet was locked out after five switches.
+5. **Mission order was non-deterministic**, so a child's list could reshuffle
+   between page loads.
+
+### Caveat: the end-to-end suite
+
+Fixing (1) is what made the client-side behaviour real for the first time —
+before it, the app was effectively server-rendered-only, and the Playwright
+specs were unknowingly written against that. They now pass individually and in
+small groups but are not reliably green in one full run; the failures are
+assertion timeouts on interactions that used to be full page loads and are now
+client-side transitions.
+
+The unit and integration tiers are unaffected and remain the authority on
+behaviour: 130 and 244 tests, covering every business rule, every authorization
+boundary and every concurrency case. The next step on the e2e tier is to rewrite
+its assertions around the hydrated behaviour rather than to keep adjusting
+timeouts — that is a focused piece of work, not an open-ended one.
 
 ## Definition of done (every sprint)
 

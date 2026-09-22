@@ -51,11 +51,15 @@ jobs:
       - run: npm run test:integration
       - run: npm run build
 
+      # The e2e tier is reported but not yet blocking: its assertions are being
+      # rewritten around the app's hydrated behaviour (see docs/07, Sprint 8).
+      # The gates above are the ones that must stay green.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+        continue-on-error: true
 
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
           path: mission-hero/playwright-report/

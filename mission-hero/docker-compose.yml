@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mission_hero
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+      POSTGRES_DB: mission_hero
+    volumes:
+      - mission-hero-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mission_hero -d mission_hero']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Not published by default: only the app needs to reach it.
+    expose:
+      - '5432'
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://mission_hero:${POSTGRES_PASSWORD:-change-me-in-production}@db:5432/mission_hero?schema=public
+      # Generate with: openssl rand -base64 48
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      NODE_ENV: production
+    ports:
+      - '${PORT:-3000}:3000'
+
+volumes:
+  mission-hero-db:

@@ -18,11 +18,13 @@ const config: Config = {
           soft: 'rgb(var(--mh-brand-soft) / <alpha-value>)',
         },
         accent: 'rgb(var(--mh-accent) / <alpha-value>)',
-        xp: '#f59e0b',
-        points: '#8b5cf6',
-        star: '#ef4444',
-        success: '#16a34a',
-        warn: '#d97706',
+        // These appear as text on white cards, so each clears 4.5:1 there.
+        // Status is never carried by colour alone regardless (docs/03).
+        xp: '#b45309',
+        points: '#6d28d9',
+        star: '#dc2626',
+        success: '#15803d',
+        warn: '#a16207',
       },
       borderRadius: { xl2: '1.25rem', xl3: '1.75rem' },
       fontFamily: { display: ['var(--font-display)', 'system-ui', 'sans-serif'] },

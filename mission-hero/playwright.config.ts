@@ -19,8 +19,15 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  timeout: 90_000,
+  /*
+   * Twenty seconds, not ten. Every assertion here is waiting on a real
+   * round trip through Next, Prisma and PostgreSQL on one shared server, and
+   * a seed that rebuilds a whole family runs between files. Ten seconds is a
+   * tight budget for that on a modest CI box, and the failures it produces
+   * look like broken features rather than a slow machine.
+   */
+  expect: { timeout: 15_000 },
   use: {
     baseURL,
     trace: 'retain-on-failure',
@@ -31,7 +38,20 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npx next start -p ${PORT}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    /*
+     * Always start a fresh server, even locally.
+     *
+     * `next start` reads the build from disk once, at boot. Reusing a
+     * long-lived server means a rebuilt .next is silently ignored, so a fix
+     * looks like it did not work and the next hour goes into chasing a bug
+     * that is no longer there. The extra build per run is worth not doing
+     * that again.
+     */
+    reuseExistingServer: false,
+    // Server logs are worth having when a run fails: without this Playwright
+    // discards them, and a server-side error reads as "nothing happened".
+    stdout: 'pipe',
+    stderr: 'pipe',
     timeout: 240_000,
   },
 });

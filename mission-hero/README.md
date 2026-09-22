@@ -119,11 +119,11 @@ Zod · Vitest · Playwright.
 
 ## Testing
 
-| Tier                | Count | What it proves                                                                                                            |
-| ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
-| Domain unit         | 100   | Pure rules, including a seeded 60k-trial check that the wheel's odds match its configuration                              |
-| Service integration | 202   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked |
-| End-to-end          | 19    | The three vertical slices, the daily loop, learning and discovery, and the threat model, in a real browser at phone width |
+| Tier                | Count | What it proves                                                                                                                 |
+| ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Domain unit         | 130   | Pure rules, including a seeded 60k-trial check that the wheel's odds match its configuration                                   |
+| Service integration | 244   | Transactions, constraints, idempotency, authorization and concurrency — against real PostgreSQL, with Prisma never mocked      |
+| End-to-end          | 27    | The vertical slices, daily loop, learning, the threat model and accessibility, in a real browser at phone width — see _Status_ |
 
 The integration tier is deliberately the heaviest. The risky question in this
 product is "did exactly one ledger row get written under concurrency", and a
@@ -159,12 +159,23 @@ These are treated as engineering constraints, not copy decisions:
 
 ## Status
 
-Sprints 0–5 of [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
-foundations, the three vertical slices, the daily loop, and learning and
-discovery — memory challenges, secret missions and bonus challenges — all
-working end to end with green tests. A parent can take a brand-new family from
-nothing to a child completing a mission, learning a verse by heart and taking on
-a bonus challenge, without touching the seed.
+All eight sprints in [the plan](./docs/07-mvp-sprint-plan.md) are complete: the
+foundations, the three vertical slices, the daily loop, learning and discovery,
+progression and collectibles, parent depth, and production hardening. A parent
+can take a brand-new family from nothing through missions, character, rewards,
+memory, quests, settings, a second parent, a data export and deletion.
 
-Sprints 6–8 (progression depth, the adventure map, collectibles, parent settings
-and production hardening) build on top of this without changing its shape.
+**Green:** `lint`, `typecheck`, **130 unit**, **244 integration**, `build`.
+The integration tier runs against real PostgreSQL with Prisma never mocked, and
+covers every business rule, authorization boundary and concurrency case.
+
+**Not green:** the end-to-end suite passes per-spec but is not reliably green in
+a single full run. Sprint 8 fixed a CSP bug that had been blocking _all_
+client-side JavaScript in production builds; the app had therefore been
+behaving as if server-rendered only, and the Playwright specs were written
+against that. Their assertions now need rewriting around the hydrated
+behaviour. Details, and the four other bugs that sprint surfaced, are in
+[docs/07 §Sprint 8](./docs/07-mvp-sprint-plan.md).
+
+To try it by hand, see [TESTING.md](./TESTING.md). To run or deploy it, see
+[docs/11 — Operations](./docs/11-operations.md).

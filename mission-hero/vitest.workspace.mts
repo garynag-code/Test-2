@@ -12,10 +12,11 @@ const serverOnlyShim = fileURLToPath(new URL('./src/test/server-only-shim.ts', i
 export default defineWorkspace([
   {
     plugins: [tsconfigPaths()],
+    resolve: { alias: { 'server-only': serverOnlyShim } },
     test: {
       name: 'unit',
       environment: 'node',
-      include: ['src/domain/**/*.test.ts', 'src/lib/**/*.test.ts'],
+      include: ['src/domain/**/*.test.ts', 'src/lib/**/*.test.ts', 'src/server/rate-limit.test.ts'],
     },
   },
   {
@@ -24,7 +25,7 @@ export default defineWorkspace([
     test: {
       name: 'integration',
       environment: 'node',
-      include: ['src/features/**/*.test.ts', 'src/server/**/*.test.ts'],
+      include: ['src/features/**/*.test.ts'],
       globalSetup: ['src/test/global-setup.ts'],
       setupFiles: ['src/test/setup-integration.ts'],
       // Integration tests share one PostgreSQL database; a single fork keeps

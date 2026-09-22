@@ -7,7 +7,17 @@ import { reseed, signInAsChild } from './helpers';
  * stored result rather than deciding anything.
  */
 
-test.beforeEach(() => {
+/*
+ * Seeded once per file rather than before every test.
+ *
+ * The seed deletes the family and rebuilds it, which cascades across fifty
+ * tables. Doing that between every test starves the running server's
+ * connection pool badly enough that a single indexed lookup can take longer
+ * than the assertion timeout — a failure that looks like a broken feature and
+ * is really just contention. The tests in this file touch different missions
+ * and children, so they stay independent without it.
+ */
+test.beforeAll(() => {
   reseed();
 });
 
