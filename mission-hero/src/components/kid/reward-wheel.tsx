@@ -20,6 +20,17 @@ const SEGMENT_COLOURS = [
 const SPIN_MS = 3600;
 
 /**
+ * The angle that puts a segment's centre under the pointer at the top.
+ *
+ * `turns` is how many full rotations to add before landing — five for a live
+ * spin, none for a replay of one that already happened.
+ */
+function landingAngle(segmentIndex: number, segmentCount: number, turns: number): number {
+  const sliceAngle = 360 / Math.max(1, segmentCount);
+  return 360 * turns - (segmentIndex * sliceAngle + sliceAngle / 2);
+}
+
+/**
  * The wheel is a *replay*, not a decision.
  *
  * The server has already drawn the winner and written the RewardSpin row before
@@ -27,9 +38,33 @@ const SPIN_MS = 3600;
  * the segment it was given (BR-46). There is no near-miss easing and no
  * casino styling — the rotation simply decelerates and stops (brief §42).
  */
-export function RewardWheel({ wheel }: { wheel: WheelView }) {
-  const [result, setResult] = useState<SpinResult | null>(null);
-  const [rotation, setRotation] = useState(0);
+export function RewardWheel({
+  wheel,
+  pendingSpin = null,
+}: {
+  wheel: WheelView;
+  /** A spin already paid for but not yet shown, replayed on load (BR-68). */
+  pendingSpin?: SpinResult | null;
+}) {
+  /*
+   * Only the spin present at mount is a replay.
+   *
+   * `spinAction` revalidates this route, so the spin this component is itself
+   * animating comes back down as a `pendingSpin` prop a moment after the
+   * button is pressed. Treating that as a replay would cut the animation short
+   * and, worse, settle the "owed" flag while the wheel is still turning —
+   * which is precisely the state a reload needs to find (BR-68).
+   */
+  const replay = useRef(pendingSpin);
+  const [result, setResult] = useState<SpinResult | null>(replay.current);
+  // A replayed spin is already over, so the wheel starts at its landing angle
+  // rather than turning to it: the animation belonged to the visit that was
+  // interrupted, not to this one.
+  const [rotation, setRotation] = useState(() =>
+    replay.current
+      ? landingAngle(Number(replay.current.segmentIndex), wheel.segments.length, 0)
+      : 0,
+  );
   const [spinning, setSpinning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -46,6 +81,20 @@ export function RewardWheel({ wheel }: { wheel: WheelView }) {
     [],
   );
 
+  /*
+   * Displaying the result is what marks it revealed — not receiving it.
+   *
+   * Tying this to the render that actually shows the celebration covers both
+   * paths with one rule: a live spin settles when its animation ends, a replay
+   * settles on mount, and a spin still turning settles for neither.
+   */
+  const revealed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!result || revealed.current === result.spinId) return;
+    revealed.current = result.spinId;
+    void markSpinRevealedAction(result.spinId);
+  }, [result]);
+
   const segmentCount = Math.max(1, wheel.segments.length);
   const sliceAngle = 360 / segmentCount;
 
@@ -59,13 +108,11 @@ export function RewardWheel({ wheel }: { wheel: WheelView }) {
       }
 
       const index = Number(response.result.segmentIndex);
-      // Land with the winning slice's centre under the pointer at the top.
-      const target = 360 * 5 - (index * sliceAngle + sliceAngle / 2);
+      const target = landingAngle(index, segmentCount, 5);
 
       if (reducedMotion) {
         setRotation(target);
         setResult(response.result);
-        void markSpinRevealedAction(response.result.spinId);
         return;
       }
 
@@ -74,10 +121,9 @@ export function RewardWheel({ wheel }: { wheel: WheelView }) {
       timer.current = setTimeout(() => {
         setSpinning(false);
         setResult(response.result!);
-        void markSpinRevealedAction(response.result!.spinId);
       }, SPIN_MS);
     });
-  }, [reducedMotion, sliceAngle, wheel.wheelId]);
+  }, [reducedMotion, segmentCount, wheel.wheelId]);
 
   return (
     <div className="space-y-5">

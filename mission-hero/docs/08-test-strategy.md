@@ -112,3 +112,26 @@ lint → typecheck → unit → integration (with postgres service) → build �
 
 Any red step blocks the merge. Flaky-by-design tests (statistical, concurrency) use
 fixed seeds and explicit synchronisation so a red result always means a real defect.
+
+## 10. One known harness weakness
+
+The integration tier and the end-to-end tier share a single PostgreSQL server.
+Both are green, and the e2e suite has passed several consecutive full runs — but
+twice, on a run started immediately after the ~3-minute integration tier, two
+`sprint-4` specs failed with a server action that had not responded inside the
+15-second assertion budget (the submit button still reading "Creating…", the
+row never written). Each passed on its own straight afterwards, and neither
+failure has reproduced on a run started from an idle database.
+
+So the symptom is contention, not a defect: the same database has just had tens
+of thousands of rows churned across fifty tables, and autovacuum is still
+working through them. It is recorded here rather than dismissed, because a
+suite that is green only from a cold start is green on a technicality.
+
+The fix is isolation, not a longer timeout: give the e2e tier its own database
+(`E2E_DATABASE_URL`, migrated and seeded like `TEST_DATABASE_URL` already is)
+and point `playwright.config.ts`'s `webServer.env` and `reseed()` at it. CI runs
+the tiers in one job on one container, so it is exposed to exactly this.
+
+Until then: if a `sprint-4` spec fails on a run that followed the integration
+tier, re-run that file before believing it.

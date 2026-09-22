@@ -114,6 +114,28 @@ describe('spinning (BR-45, BR-46, BR-47)', () => {
     expect(await prisma.rewardSpin.count()).toBe(1);
   });
 
+  it('a spin that was paid for but never shown is still owed (BR-68)', async () => {
+    const row = await createWheelFixture(fixture);
+    await givePoints(fixture.familyId, fixture.childId, 100);
+
+    const result = await wheel.spin(fixture.childActor, { wheelId: row.id, today: TODAY });
+
+    // The child was charged the moment the spin committed. If the page reloads
+    // before the animation ends, this is what gives them their prize back.
+    const owed = await wheel.getPendingSpin(fixture.childActor, fixture.childId);
+    expect(owed).not.toBeNull();
+    expect(owed?.spinId).toBe(result.spinId);
+    expect(owed?.label).toBe(result.label);
+    expect(owed?.segmentIndex).toBe(result.segmentIndex);
+
+    // Showing it settles the debt — the celebration does not repeat forever.
+    await wheel.markRevealed(fixture.childActor, result.spinId);
+    expect(await wheel.getPendingSpin(fixture.childActor, fixture.childId)).toBeNull();
+
+    // And replaying never redraws.
+    expect(await prisma.rewardSpin.count()).toBe(1);
+  });
+
   it('always lands on a real segment of this wheel', async () => {
     const row = await createWheelFixture(fixture, {
       pointThreshold: 0,
@@ -239,6 +261,16 @@ describe('authorization', () => {
       wheel.spin(fixture.childActor, { wheelId: row.id, today: TODAY }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(await prisma.rewardSpin.count()).toBe(0);
+  });
+
+  it("a child is never owed another child's spin (BR-57)", async () => {
+    const row = await createWheelFixture(fixture, { pointThreshold: 0, deductPoints: false });
+    await wheel.spin(fixture.childActor, { wheelId: row.id, today: TODAY });
+
+    expect(await wheel.getPendingSpin(fixture.secondChildActor, fixture.secondChildId)).toBeNull();
+    await expect(
+      wheel.getPendingSpin(fixture.childActor, fixture.secondChildId),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it("a child cannot replay another child's spin (BR-57)", async () => {

@@ -115,6 +115,10 @@ Rules are numbered so tests and code comments can cite them (`// BR-14`).
   the spin.
 - **BR-48** A segment with `maxWinsPerChild` reached is excluded from the draw (weight 0)
   rather than re-rolled.
+- **BR-68** A spin that was paid for but never shown is **owed**. The points leave the
+  ledger when the spin commits, before the wheel turns, so `resultRevealedAt` is what
+  separates "shown" from "owed": until it is set, the next load of the wheel replays that
+  result instead of offering a fresh spin. Showing it sets the flag.
 
 ## Memory
 

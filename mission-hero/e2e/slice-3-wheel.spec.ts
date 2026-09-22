@@ -59,3 +59,29 @@ test('a spin lands on the server-chosen reward and persists it', async ({ page }
   const labels = await page.locator('ol li span:nth-child(2)').allInnerTexts();
   expect(labels.some((label) => wonText.includes(label.trim()))).toBe(true);
 });
+
+test('a spin interrupted mid-animation still shows what was won (BR-68)', async ({ page }) => {
+  // One spin a day (BR-44), and the test above has already used Josh's.
+  reseed();
+
+  await signInAsChild(page);
+  await page.goto('/kids/wheel');
+
+  const spinButton = page.getByRole('button', { name: 'SPIN!' });
+  await expect(spinButton).toBeEnabled();
+  await spinButton.click();
+
+  // Reload while the wheel is still turning — a locked phone, a stray refresh.
+  // The points have already gone; the prize must not go with them.
+  await expect(page.getByRole('button', { name: 'Spinning…' })).toBeVisible();
+  await page.reload();
+
+  const result = page.getByRole('status');
+  await expect(result).toBeVisible();
+  await expect(result).toContainText('You won');
+
+  // Shown once, not forever: the next visit is an ordinary locked wheel.
+  await page.reload();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByText('80 more points to unlock a spin.')).toBeVisible();
+});

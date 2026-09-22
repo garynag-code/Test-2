@@ -21,6 +21,9 @@ export default async function WheelPage() {
     ? await wheelService.getWheelForChild(actor, { childId: actor.childId, today })
     : null;
 
+  // A spin already paid for but never shown — see BR-68.
+  const pendingSpin = wheel ? await wheelService.getPendingSpin(actor, actor.childId) : null;
+
   return (
     <div className="pb-24">
       <header className="mh-gradient px-5 pb-8 pt-8 text-white">
@@ -34,7 +37,7 @@ export default async function WheelPage() {
 
       <div className="mx-auto max-w-md px-5 py-6">
         {wheel ? (
-          <RewardWheel wheel={wheel} />
+          <RewardWheel wheel={wheel} pendingSpin={pendingSpin} />
         ) : (
           <EmptyState
             icon="🎡"

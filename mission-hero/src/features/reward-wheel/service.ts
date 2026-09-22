@@ -252,6 +252,38 @@ export async function getSpin(actor: Actor, spinId: string): Promise<SpinResult>
   };
 }
 
+/**
+ * The spin a child has paid for but has not been shown yet (BR-68).
+ *
+ * `spinAction` commits the RewardSpin and takes the points before the wheel
+ * starts turning, so a reload during the three-second animation — a locked
+ * phone, a backgrounded tab, a stray refresh — would otherwise leave a child
+ * charged for a prize they never saw. `resultRevealedAt` is what distinguishes
+ * "shown" from "owed"; this returns the one that is still owed.
+ *
+ * At most one can exist: a spin is marked revealed the moment it is displayed,
+ * and eligibility bars a second spin until the next day.
+ */
+export async function getPendingSpin(actor: Actor, childId: string): Promise<SpinResult | null> {
+  assertSelfChild(childId, actor);
+
+  const spinRow = await prisma.rewardSpin.findFirst({
+    where: { childId, familyId: actor.familyId, resultRevealedAt: null },
+    orderBy: { createdAt: 'desc' },
+    include: { item: true },
+  });
+  if (!spinRow) return null;
+
+  return {
+    spinId: spinRow.id,
+    segmentIndex: spinRow.segmentIndex,
+    label: spinRow.item.label,
+    iconKey: spinRow.item.iconKey,
+    pointsSpent: spinRow.pointsSpent,
+    balanceAfter: await ledger.getPointsBalance(prisma, spinRow.childId),
+  };
+}
+
 export async function markRevealed(actor: Actor, spinId: string): Promise<void> {
   const spinRow = await prisma.rewardSpin.findFirst({
     where: { id: spinId, familyId: actor.familyId },
