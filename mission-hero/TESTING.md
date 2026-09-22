@@ -2,7 +2,13 @@
 
 Everything below runs against the seeded **Adventure Family**.
 
-## Starting it up
+**Start where you are:** on a computer, the next section gets it running
+locally. With only a phone, skip to
+[Testing from a phone with no computer](#testing-from-a-phone-with-no-computer),
+which deploys it and hands you a web address. The walkthroughs further down
+apply either way.
+
+## Starting it up, on a computer
 
 You need [Node.js 20 or newer](https://nodejs.org) and
 [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Docker only
@@ -36,7 +42,55 @@ stop the database with
 `docker compose -f docker-compose.dev.yml down`. Your data survives both;
 `npm run db:reset` is what wipes it back to the seed.
 
-## Testing on an Android phone
+## Testing from a phone with no computer
+
+The phone cannot run the app itself — it needs a database and a Node server. So
+the app goes on the internet with a real `https://` address, and the phone just
+opens it like any website. `render.yaml` in this folder describes the whole
+setup, so the host builds it without you typing a single command.
+
+Everything below happens in the phone's browser.
+
+1. **Put this repository on GitHub** if it is not already, and sign in to
+   [github.com](https://github.com) on the phone.
+2. Go to [render.com](https://render.com) and sign up **with GitHub**.
+3. **New → Blueprint**, choose this repository, and let it read `render.yaml`.
+4. It will ask for one value, **SEED_PARENT_PASSWORD**. Type a password you
+   choose and write it down — that is the parent login. It has to be your own:
+   the demo password is printed in this repository for anyone to read, and the
+   app has no change-password screen yet.
+5. **Apply**. The first build takes five to ten minutes. When it finishes,
+   Render shows an address like `https://mission-hero.onrender.com`.
+6. Open that address on the phone. Sign in as a parent with
+   `mom@adventure.family` and the password from step 4, or tap through to the
+   child side with the family code **ADVENTUR**.
+7. Chrome menu → **Add to Home screen**, so it opens with one tap.
+
+### What the free tier costs you
+
+|                                           |                                                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| The app sleeps after 15 minutes of no use | The next visit takes about a minute to wake. It is not broken                                                                              |
+| The free database expires after 30 days   | Fine for trying it out; a real family needs a paid database or another host                                                                |
+| The region is set to Frankfurt            | Closest Render offers to southern Africa. Change `region:` in `render.yaml` if you are elsewhere — the service and the database must match |
+
+### Before you put anything real in it
+
+That address is on the public internet, and anyone who has it can try to sign
+in. While you are only testing:
+
+- Keep the seeded Adventure Family. Do not add your own children's names,
+  photos or anything you would not want a stranger to read.
+- Use a password you do not use anywhere else.
+- Delete the Render service when you are done testing.
+
+The app's own privacy rules still hold — no child email or phone number, no
+public profiles, nothing shared between families — but none of that is a reason
+to trust a test deployment with a real child's details.
+
+---
+
+## Testing on an Android phone, with a computer
 
 This is a phone app first, so it is worth seeing on one. You do not need to
 publish anything — the phone can reach the dev server running on your computer,

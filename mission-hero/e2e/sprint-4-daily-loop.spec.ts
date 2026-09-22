@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { reseed, signInAsChild, signInAsParent } from './helpers';
+import { clickWhenHydrated, reseed, signInAsChild, signInAsParent } from './helpers';
 
 /**
  * Sprint 4 — the daily loop in one piece: check in, spend points, and a parent
@@ -29,10 +29,10 @@ test('a child checks in once a day and cannot farm it', async ({ page }) => {
   await prompt.click();
 
   await expect(page.getByRole('heading', { name: 'Daily Check-In' })).toBeVisible();
-  await page.getByRole('button', { name: 'Good' }).click();
+  await clickWhenHydrated(page.getByRole('button', { name: 'Good' }));
   await page.getByLabel('What are you going to crush today?').fill('Finish my reading.');
   await page.getByLabel('What are you thankful for?').fill('Sarah helped me.');
-  await page.getByRole('button', { name: /CHECK IN/ }).click();
+  await clickWhenHydrated(page.getByRole('button', { name: /CHECK IN/ }));
 
   await expect(page.getByText("You've checked in today!")).toBeVisible();
   await expect(page.getByText('+5 XP')).toBeVisible();
@@ -59,8 +59,8 @@ test('a child spends points and a parent returns them by declining', async ({ br
   // Josh starts with 120 points; ice cream costs 60.
   await expect(child.getByText('120 points to spend')).toBeVisible();
   const iceCream = child.locator('li', { hasText: 'Ice cream' }).first();
-  await iceCream.getByRole('button', { name: 'Redeem' }).click();
-  await iceCream.getByRole('button', { name: 'Yes please' }).click();
+  await clickWhenHydrated(iceCream.getByRole('button', { name: 'Redeem' }));
+  await clickWhenHydrated(iceCream.getByRole('button', { name: 'Yes please' }));
 
   await expect(child.getByText('Sent! A grown-up will sort this out.')).toBeVisible();
   await child.reload();
@@ -71,7 +71,7 @@ test('a child spends points and a parent returns them by declining', async ({ br
 
   const request = parent.locator('li', { hasText: 'Josh wants Ice cream' }).first();
   await expect(request).toBeVisible();
-  await request.getByRole('button', { name: 'Not this time' }).click();
+  await clickWhenHydrated(request.getByRole('button', { name: 'Not this time' }));
   // Wait for the decision to land before looking at the other context.
   await expect(parent.locator('li', { hasText: 'Josh wants Ice cream' })).toHaveCount(0);
 
@@ -89,18 +89,18 @@ test('a parent sets up a new hero and a mission from scratch', async ({ page }) 
   await page.goto('/parent/children');
   await page.getByLabel('What should we call them?').fill('Ben');
   await page.getByLabel('Age').selectOption('AGE_6_8');
-  await page.getByRole('button', { name: 'Add hero' }).click();
+  await clickWhenHydrated(page.getByRole('button', { name: 'Add hero' }));
   // The durable outcome, not the flash message: Ben is in the list.
   await expect(page.locator('li', { hasText: 'Ben' })).toBeVisible();
 
   await page.goto('/parent/tasks');
   await page.getByLabel('Mission name').fill('Water the plants');
   // Click the label: the checkbox itself is visually hidden inside it.
-  await page.locator('label', { hasText: 'Ben' }).first().click();
+  await clickWhenHydrated(page.locator('label', { hasText: 'Ben' }).first());
   await expect(page.getByRole('checkbox', { name: 'Ben' })).toBeChecked();
   await page.getByLabel('XP', { exact: true }).fill('15');
   await page.getByLabel('Reward points').fill('5');
-  await page.getByRole('button', { name: 'Create mission' }).click();
+  await clickWhenHydrated(page.getByRole('button', { name: 'Create mission' }));
 
   await expect(page.locator('li', { hasText: 'Water the plants' })).toBeVisible();
 
@@ -119,28 +119,30 @@ test('notifications reach both inboxes and clear independently', async ({ browse
   const parent = await parentContext.newPage();
 
   await signInAsChild(child);
-  await child
-    .locator('li', { hasText: 'Make your bed' })
-    .first()
-    .getByRole('button', { name: 'DONE!' })
-    .click();
+  await clickWhenHydrated(
+    child
+      .locator('li', { hasText: 'Make your bed' })
+      .first()
+      .getByRole('button', { name: 'DONE!' }),
+  );
   await expect(child.getByText('Waiting').first()).toBeVisible();
 
   await signInAsParent(parent);
   await parent.goto('/parent/notifications');
   await expect(parent.getByText('Josh completed Make your bed')).toBeVisible();
 
-  await parent.getByRole('button', { name: 'Mark all read' }).click();
+  await clickWhenHydrated(parent.getByRole('button', { name: 'Mark all read' }));
   await expect(parent.getByText('All caught up')).toBeVisible();
 
   // The child's own inbox is untouched by the parent clearing theirs.
   await parent.goto('/parent/approvals');
-  await parent
-    .locator('li', { hasText: 'Make your bed' })
-    .first()
-    .getByRole('button', { name: 'Approve', exact: true })
-    .click();
-  await parent.getByRole('button', { name: 'Approve & award' }).click();
+  await clickWhenHydrated(
+    parent
+      .locator('li', { hasText: 'Make your bed' })
+      .first()
+      .getByRole('button', { name: 'Approve', exact: true }),
+  );
+  await clickWhenHydrated(parent.getByRole('button', { name: 'Approve & award' }));
   await expect(parent.locator('li', { hasText: 'Make your bed' })).toHaveCount(0);
 
   await child.goto('/kids/news');

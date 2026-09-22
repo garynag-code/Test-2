@@ -4,6 +4,16 @@
  * Idempotent — running it twice leaves one family, so `npm run db:seed` is safe
  * during development. Everything here goes through the same schema the app
  * uses; there is no privileged back door.
+ *
+ * Two switches exist for hosted deployments, where this runs on every boot:
+ *
+ * `--if-empty` makes it a no-op once the family exists. Without it a host that
+ * restarts — which a free tier does constantly — would wipe everything the
+ * family had done since the last restart.
+ *
+ * `SEED_PARENT_PASSWORD` replaces the demo password below. The default is
+ * printed in this repository, so anything reachable from the internet needs
+ * its own; the app has no change-password screen yet to fix it afterwards.
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -16,8 +26,16 @@ const prisma = new PrismaClient();
 const FAMILY_CODE = 'ADVENTUR';
 const TIMEZONE = 'Africa/Johannesburg';
 
+const PARENT_PASSWORD = process.env.SEED_PARENT_PASSWORD || 'MissionHero123!';
+
 async function main(): Promise<void> {
   const existing = await prisma.family.findUnique({ where: { familyCode: FAMILY_CODE } });
+
+  if (existing && process.argv.includes('--if-empty')) {
+    console.log('The Adventure Family is already here — leaving it alone.');
+    return;
+  }
+
   if (existing) {
     console.log('Removing the previous Adventure Family so the seed is repeatable…');
     await prisma.family.delete({ where: { id: existing.id } });
@@ -32,7 +50,7 @@ async function main(): Promise<void> {
   await seedFamilyDefaults(prisma, family.id);
 
   // --- parents -------------------------------------------------------------
-  const passwordHash = await bcrypt.hash('MissionHero123!', 12);
+  const passwordHash = await bcrypt.hash(PARENT_PASSWORD, 12);
 
   const mom = await prisma.user.create({
     data: { email: 'mom@adventure.family', passwordHash, displayName: 'Sam Adventure' },
@@ -497,14 +515,20 @@ async function main(): Promise<void> {
     ],
   });
 
+  // Never echo a password somebody chose: on a hosted deployment this line
+  // lands in a log the platform keeps.
+  const passwordHint = process.env.SEED_PARENT_PASSWORD
+    ? 'the password you set in SEED_PARENT_PASSWORD'
+    : PARENT_PASSWORD;
+
   console.log(`
   Mission Hero seeded.
 
     Family        The Adventure Family
     Family code   ${FAMILY_CODE}      (type this on a child's device)
 
-    Parent login  mom@adventure.family / MissionHero123!
-                  dad@adventure.family / MissionHero123!
+    Parent login  mom@adventure.family / ${passwordHint}
+                  dad@adventure.family / ${passwordHint}
 
     Children      Josh (10) · Sarah (7)     no PIN set, so they can just tap their avatar
   `);

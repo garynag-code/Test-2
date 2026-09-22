@@ -113,7 +113,7 @@ lint → typecheck → unit → integration (with postgres service) → build �
 Any red step blocks the merge. Flaky-by-design tests (statistical, concurrency) use
 fixed seeds and explicit synchronisation so a red result always means a real defect.
 
-## 10. One known harness weakness
+## 10. A weakness this document blamed on contention (superseded by §11)
 
 The integration tier and the end-to-end tier share a single PostgreSQL server.
 Both are green, and the e2e suite has passed several consecutive full runs — but
@@ -135,3 +135,39 @@ the tiers in one job on one container, so it is exposed to exactly this.
 
 Until then: if a `sprint-4` spec fails on a run that followed the integration
 tier, re-run that file before believing it.
+
+## 11. An open bug the suite keeps catching
+
+Replacing §10, which blamed contention. It was not contention.
+
+Two causes were found underneath it. The first is fixed: every page carried a
+per-request CSP nonce while four routes — including `/parent/login` — were
+statically prerendered, so their script tags held a nonce from build time that
+no longer matched the response header. With `'strict-dynamic'` a browser then
+ignores `'self'` and refuses **every** script on the page. The app rendered,
+looked correct, and did nothing: forms fell back to plain posts the server does
+not recognise as actions, so a hero or a mission was simply never written, with
+no error anywhere. `export const dynamic = 'force-dynamic'` on the root layout
+ends it; measured across many runs, CSP refusals went from routine to zero, and
+the suite got a minute faster.
+
+The second is still open. After a successful create, the list on the page does
+not repaint promptly:
+
+```
+list 3s after "Create mission"  = []                            (4 runs of 4)
+list after a manual reload      = ["Water the plants ..."]
+```
+
+The row is written correctly every time. The page renders in about 90ms when
+requested directly, so this is not a slow server — the client router is not
+refetching after the action's `revalidatePath`. It usually resolves inside the
+15-second assertion window, which is why the suite passes roughly two runs in
+three rather than failing outright.
+
+It matters more to a parent than to the suite: they create a mission, the list
+does not change, and the reasonable conclusion is that it did not work — so
+they make it again. `router.refresh()` in the form's success effect was the
+obvious fix and did **not** change the measurement, so it was reverted rather
+than committed as an unverified guess. The next step is to find out why the
+refetch does not happen, not to widen the timeout.

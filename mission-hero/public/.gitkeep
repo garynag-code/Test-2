@@ -1,0 +1,4 @@
+Next serves anything in this directory at the site root.
+
+It is kept in git even while empty because the Dockerfile copies it into the
+runtime image, and Docker fails a COPY whose source does not exist.

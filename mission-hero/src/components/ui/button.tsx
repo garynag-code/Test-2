@@ -1,5 +1,7 @@
+'use client';
+
 import { cva, type VariantProps } from 'class-variance-authority';
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const button = cva(
@@ -31,9 +33,36 @@ export interface ButtonProps
   children: ReactNode;
 }
 
+/**
+ * Every button here stays disabled until React has attached to it.
+ *
+ * Nothing on either surface works without JavaScript. Forms are driven by
+ * `useActionState`, which does not progressively enhance without a
+ * `permalink` — before hydration the submit is an ordinary POST carrying no
+ * action reference, so the server re-renders the same page and the tap does
+ * nothing at all: no error, no spinner, no row written. Buttons that act
+ * through `onClick` are just as dead in that window.
+ *
+ * On a developer's machine the window is a few hundred milliseconds. On a
+ * child's phone waking a sleeping server it is long enough to tap twice and
+ * decide the app is broken — and they would be right, because the first tap
+ * really did nothing.
+ *
+ * Disabling until mounted turns that silent no-op into a control that visibly
+ * is not ready yet, which is the honest thing for it to be. It also gives the
+ * end-to-end suite something real to wait on: "enabled" now means "will
+ * work", where before it meant nothing at all.
+ */
 export function Button({ className, variant, size, children, ...props }: ButtonProps) {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
   return (
-    <button className={cn(button({ variant, size }), className)} {...props}>
+    <button
+      className={cn(button({ variant, size }), className)}
+      {...props}
+      disabled={props.disabled || !hydrated}
+    >
       {children}
     </button>
   );
