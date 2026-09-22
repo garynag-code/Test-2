@@ -36,6 +36,51 @@ stop the database with
 `docker compose -f docker-compose.dev.yml down`. Your data survives both;
 `npm run db:reset` is what wipes it back to the seed.
 
+## Testing on an Android phone
+
+This is a phone app first, so it is worth seeing on one. You do not need to
+publish anything — the phone can reach the dev server running on your computer,
+as long as both are on the same Wi-Fi.
+
+1. Start it the usual way: `npm run dev`.
+2. Read the second line it prints:
+
+   ```
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.50:3000     ← this one
+   ```
+
+3. Type that **Network** address into Chrome on the phone. That is the whole
+   trick: `localhost` on the phone means the phone itself, which is why it has
+   to be the numbered address.
+4. Chrome menu → **Add to Home screen** puts it one tap away, which is how a
+   child would actually reach it.
+
+Sign in on the phone as a child (family code **ADVENTUR**) and keep the parent
+side open on your computer. That is the real shape of the product: the child
+has the phone, the grown-up approves from somewhere else.
+
+**Use `npm run dev` for this, not a production build.** Session cookies are
+marked `Secure` in production, and browsers throw those away over plain
+`http://` — so sign-in fails with no error at all: the form posts, the page
+comes back, and you are still logged out. The app now warns about this at
+startup, but the short version is that a production build wants HTTPS. In
+development the cookies are not `Secure`, so everything works.
+
+If the phone cannot load the page at all:
+
+| What to check                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Both devices on the same Wi-Fi — not one on mobile data, and not a "guest" network, which usually blocks devices from seeing each other                  |
+| Your computer's firewall. macOS and Windows both prompt the first time something listens on a port; if you dismissed it, allow Node through on port 3000 |
+| The address is from **Network:**, not `localhost`                                                                                                        |
+
+Two things are expected and harmless: code changes will not hot-reload on the
+phone (refresh the page yourself), and the browser console shows an aborted
+`_rsc` request or two, which is Next discarding a prefetch it no longer needs.
+
+---
+
 The seed prints the credentials. In short:
 
 | Who         | How to get in                                 |
