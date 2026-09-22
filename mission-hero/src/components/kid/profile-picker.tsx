@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { selectChildAction } from '@/features/auth/actions';
 import { PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
@@ -25,6 +26,20 @@ const AVATARS: Record<string, string> = {
 export function ProfilePicker({ familyId, profiles }: { familyId: string; profiles: Profile[] }) {
   const [state, action] = useActionState(selectChildAction, undefined);
   const [selected, setSelected] = useState<Profile | null>(null);
+  const router = useRouter();
+
+  /*
+   * Navigation happens here rather than as a redirect inside the action.
+   *
+   * Setting the session cookie and redirecting in one action response races:
+   * the router can request the next page before the browser has committed the
+   * Set-Cookie, and `/kids/home` then sees no session and bounces back here.
+   * Navigating once the action has resolved means the cookie is already in the
+   * jar, so the request that follows carries it.
+   */
+  useEffect(() => {
+    if (state?.ok) router.push('/kids/home');
+  }, [state?.ok, router]);
 
   if (profiles.length === 0) {
     return (

@@ -163,8 +163,17 @@ export async function selectChildAction(
   }
 
   await startChildSession(result.childId!, result.familyId!);
-  // No revalidation here: this redirect goes to a different route, and
-  // revalidating the layout we are currently rendering makes the router
-  // re-render `/kids` instead of following the redirect.
-  redirect('/kids/home');
+
+  /*
+   * Deliberately no redirect, for the same reason as the device bind above.
+   *
+   * Setting a cookie and redirecting in one action response races: the client
+   * router can issue the navigation before the browser has committed the
+   * Set-Cookie, and `/kids/home` then sees no session and bounces straight
+   * back to the picker. Returning lets Next re-render `/kids`, whose server
+   * component already redirects to the home page once a child session exists —
+   * a redirect decided during render, after the cookie is unambiguously there.
+   */
+  revalidatePath('/kids', 'layout');
+  return { ok: true };
 }

@@ -169,13 +169,18 @@ memory, quests, settings, a second parent, a data export and deletion.
 The integration tier runs against real PostgreSQL with Prisma never mocked, and
 covers every business rule, authorization boundary and concurrency case.
 
-**Not green:** the end-to-end suite passes per-spec but is not reliably green in
-a single full run. Sprint 8 fixed a CSP bug that had been blocking _all_
-client-side JavaScript in production builds; the app had therefore been
-behaving as if server-rendered only, and the Playwright specs were written
-against that. Their assertions now need rewriting around the hydrated
-behaviour. Details, and the four other bugs that sprint surfaced, are in
-[docs/07 §Sprint 8](./docs/07-mvp-sprint-plan.md).
+**Not green:** the end-to-end suite passes 22–24 of its 27 tests on any given
+run, with the failures moving between runs rather than settling. Every spec
+passes when run on its own.
+
+Sprint 8 fixed a CSP bug that had been blocking _all_ client-side JavaScript in
+production builds. The app had therefore been behaving as if server-rendered
+only, and the Playwright specs were written against that; chasing the fallout
+turned up three further defects that only exist once JavaScript runs. What is
+left is a shared-server timing problem in the harness rather than reproducible
+product defects, so it is marked non-blocking in CI rather than presented as
+passing. The eight bugs that sprint surfaced, and the plan for the harness, are
+in [docs/07 §Sprint 8](./docs/07-mvp-sprint-plan.md).
 
 To try it by hand, see [TESTING.md](./TESTING.md). To run or deploy it, see
 [docs/11 — Operations](./docs/11-operations.md).
