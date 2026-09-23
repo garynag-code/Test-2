@@ -46,15 +46,18 @@ stop the database with
 
 The phone cannot run the app itself — it needs a database and a Node server. So
 the app goes on the internet with a real `https://` address, and the phone just
-opens it like any website. `render.yaml` in this folder describes the whole
-setup, so the host builds it without you typing a single command.
+opens it like any website. `render.yaml` at the **repository root** (not in
+this folder — Render only looks at the root) describes the whole setup, so the
+host builds it without you typing a single command.
 
 Everything below happens in the phone's browser.
 
 1. **Put this repository on GitHub** if it is not already, and sign in to
    [github.com](https://github.com) on the phone.
 2. Go to [render.com](https://render.com) and sign up **with GitHub**.
-3. **New → Blueprint**, choose this repository, and let it read `render.yaml`.
+3. **Blueprints** in the left-hand menu → **New Blueprint Instance**, choose
+   this repository, and let it read `render.yaml`. (It is not under **New +**
+   with the service types; a Blueprint creates several of those at once.)
 4. It will ask for one value, **SEED_PARENT_PASSWORD**. Type a password you
    choose and write it down — that is the parent login. It has to be your own:
    the demo password is printed in this repository for anyone to read, and the
@@ -69,11 +72,11 @@ Everything below happens in the phone's browser.
 
 ### What the free tier costs you
 
-|                                           |                                                                                                                                            |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| The app sleeps after 15 minutes of no use | The next visit takes about a minute to wake. It is not broken                                                                              |
-| The free database expires after 30 days   | Fine for trying it out; a real family needs a paid database or another host                                                                |
-| The region is set to Frankfurt            | Closest Render offers to southern Africa. Change `region:` in `render.yaml` if you are elsewhere — the service and the database must match |
+|                                           |                                                                                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The app sleeps after 15 minutes of no use | The next visit takes about a minute to wake. It is not broken                                                                                       |
+| The free database expires after 30 days   | Fine for trying it out; a real family needs a paid database or another host                                                                         |
+| The region is set to Frankfurt            | Closest Render offers to southern Africa. Change `region:` in the root `render.yaml` if you are elsewhere — the service and the database must match |
 
 ### Before you put anything real in it
 

@@ -3,8 +3,13 @@
 # service, and gives the service an https:// address — which the session
 # cookies require, since they are marked Secure in production.
 #
-# Deploy: render.com → New → Blueprint → pick this repository.
-# It will ask for SEED_PARENT_PASSWORD. Everything else is derived.
+# This file has to live at the repository root: Render only looks for it here,
+# not inside a subdirectory. The app itself is in mission-hero/, which is what
+# `rootDir` below points at.
+#
+# Deploy: render.com → Blueprints → New Blueprint Instance → pick this
+# repository. It will ask for SEED_PARENT_PASSWORD; everything else is
+# derived. TESTING.md has the same steps written out for a phone.
 #
 # Free tiers being what they are: the web service sleeps after 15 minutes of
 # inactivity and takes about a minute to wake, and the free database expires
@@ -15,6 +20,8 @@ services:
     name: mission-hero
     runtime: node
     plan: free
+    # The repository holds more than this app; everything below runs in here.
+    rootDir: mission-hero
     # Closest Render region to southern Africa. Oregon, Ohio, Virginia and
     # Singapore are the alternatives — the database below must match.
     region: frankfurt
