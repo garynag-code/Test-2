@@ -40,7 +40,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: '22'
+        value: "22"
       # Signs the session cookies. Render generates it once and keeps it.
       - key: AUTH_SECRET
         generateValue: true
@@ -54,7 +54,7 @@ services:
           name: mission-hero-db
           property: connectionString
       - key: MEDIA_UPLOADS_ENABLED
-        value: 'false'
+        value: "false"
 
 databases:
   - name: mission-hero-db
