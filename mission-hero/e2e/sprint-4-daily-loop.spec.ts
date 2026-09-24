@@ -112,6 +112,42 @@ test('a parent sets up a new hero and a mission from scratch', async ({ page }) 
   await expect(mission).toContainText('+5 points');
 });
 
+test('a parent edits a mission and the child sees the new value', async ({ page }) => {
+  await signInAsParent(page);
+  await page.goto('/parent/tasks');
+
+  const row = page.locator('li').filter({ hasText: 'Brush your teeth' }).first();
+  await clickWhenHydrated(row.getByText('Edit'));
+
+  const form = row.locator('form');
+  // The form opens on what the mission already is, not on blanks.
+  await expect(form.getByLabel('Mission name')).toHaveValue('Brush your teeth');
+
+  await form.getByLabel('Mission name').fill('Brush your teeth properly');
+  await form.getByLabel('XP', { exact: true }).fill('12');
+  await clickWhenHydrated(form.getByRole('button', { name: 'Save changes' }));
+
+  /*
+   * The durable outcome rather than the banner.
+   *
+   * Reloading once races the save: the click returns as soon as it is
+   * dispatched, so a reload can fetch the page before the row is written.
+   * Retrying the reload asserts what is actually meant — that the change
+   * lands — without depending on a confirmation message.
+   */
+  await expect(async () => {
+    await page.reload();
+    await expect(page.locator('li').filter({ hasText: 'Brush your teeth properly' })).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
+
+  await signInAsChild(page);
+  const mission = page.locator('li', { hasText: 'Brush your teeth properly' }).first();
+  await expect(mission).toBeVisible();
+  await expect(mission).toContainText('+12 XP');
+});
+
 test('notifications reach both inboxes and clear independently', async ({ browser }) => {
   const childContext = await browser.newContext();
   const parentContext = await browser.newContext();

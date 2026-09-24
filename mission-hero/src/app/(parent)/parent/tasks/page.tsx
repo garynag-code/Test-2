@@ -5,6 +5,7 @@ import { Card, CardTitle, EmptyState } from '@/components/ui/card';
 import * as children from '@/features/children/service';
 import * as character from '@/features/character/service';
 import { AddTaskForm } from '@/components/parent/add-task-form';
+import { DeleteTaskButton } from '@/components/parent/delete-task-button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Missions' };
@@ -123,6 +124,49 @@ export default async function TasksPage() {
                           ) : null}
                         </p>
                       </div>
+
+                      <details className="mt-3 border-t border-border pt-3">
+                        <summary className="mh-tap-sm inline-flex cursor-pointer items-center rounded-full border-2 border-border px-4 text-sm font-bold text-ink">
+                          Edit
+                        </summary>
+                        <div className="mt-3 space-y-3">
+                          <AddTaskForm
+                            childOptions={kids.map((child) => ({
+                              id: child.id,
+                              nickname: child.nickname,
+                            }))}
+                            traits={traits.map((trait) => ({ id: trait.id, label: trait.label }))}
+                            categories={categories.map((category) => ({
+                              key: category.key,
+                              label: category.label,
+                            }))}
+                            today={toLocalDate(new Date(), family.timezone)}
+                            task={{
+                              id: task.id,
+                              title: task.title,
+                              description: task.description,
+                              categoryKey:
+                                categories.find((category) => category.id === task.categoryId)
+                                  ?.key ?? null,
+                              iconKey: task.iconKey,
+                              xpValue: task.xpValue,
+                              rewardPointsValue: task.rewardPointsValue,
+                              characterTraitId: task.characterTraitId,
+                              evidenceType: task.evidenceType,
+                              frequency: task.schedule?.frequency ?? 'DAILY',
+                              weekdays: task.schedule?.weekdays ?? [],
+                              startDate: task.schedule
+                                ? utcDateToLocalDate(task.schedule.startDate)
+                                : toLocalDate(new Date(), family.timezone),
+                              dueTime: task.schedule?.dueTime ?? null,
+                              childIds: task.assignments.map((a) => a.childId),
+                            }}
+                          />
+                          <div className="border-t border-border pt-3">
+                            <DeleteTaskButton taskId={task.id} title={task.title} />
+                          </div>
+                        </div>
+                      </details>
                     </Card>
                   </li>
                 ))}

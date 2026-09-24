@@ -113,6 +113,131 @@ describe('creating a task', () => {
   });
 });
 
+describe('editing a task', () => {
+  it('changes what it is called and what it is worth', async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+
+    await tasks.updateTask(fixture.parentActor, {
+      ...taskInput({ title: 'Read for 30 minutes', xpValue: 25, rewardPointsValue: 12 }),
+      taskId: task.id,
+      active: true,
+    });
+
+    const after = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(after.title).toBe('Read for 30 minutes');
+    expect(after.xpValue).toBe(25);
+    expect(after.rewardPointsValue).toBe(12);
+  });
+
+  it('changes the schedule in place rather than leaving two', async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+
+    await tasks.updateTask(fixture.parentActor, {
+      ...taskInput({
+        schedule: {
+          frequency: 'WEEKLY' as const,
+          interval: 1,
+          weekdays: [1],
+          startDate: '2026-09-21',
+        },
+      }),
+      taskId: task.id,
+      active: true,
+    });
+
+    const schedules = await prisma.taskSchedule.findMany({ where: { taskId: task.id } });
+    expect(schedules).toHaveLength(1);
+    expect(schedules[0]?.frequency).toBe('WEEKLY');
+  });
+
+  it('takes back an untouched card when a child is unassigned', async () => {
+    const task = await tasks.createTask(
+      fixture.parentActor,
+      taskInput({ childIds: [fixture.childId, fixture.secondChildId] }),
+    );
+    await tasks.ensureOccurrences(prisma, {
+      childId: fixture.secondChildId,
+      familyId: fixture.familyId,
+      date: '2026-09-21' as never,
+    });
+    expect(
+      await prisma.taskOccurrence.count({
+        where: { taskId: task.id, childId: fixture.secondChildId },
+      }),
+    ).toBe(1);
+
+    await tasks.updateTask(fixture.parentActor, {
+      ...taskInput({ childIds: [fixture.childId] }),
+      taskId: task.id,
+      active: true,
+    });
+
+    expect(
+      await prisma.taskOccurrence.count({
+        where: { taskId: task.id, childId: fixture.secondChildId },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.taskAssignment.count({
+        where: { taskId: task.id, childId: fixture.secondChildId },
+      }),
+    ).toBe(0);
+  });
+
+  it('still refuses a mission worth nothing (BR-8)', async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+
+    await expect(
+      tasks.updateTask(fixture.parentActor, {
+        ...taskInput({ xpValue: 0, rewardPointsValue: 0, characterStarValue: 0 }),
+        taskId: task.id,
+        active: true,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("a parent cannot edit another family's mission", async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+    const stranger = await createFamilyFixture();
+
+    await expect(
+      tasks.updateTask(stranger.parentActor, {
+        ...taskInput({ childIds: [stranger.childId] }),
+        taskId: task.id,
+        active: true,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('retiring a task', () => {
+  it('hides it and clears what was outstanding, keeping the history', async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+    await tasks.ensureOccurrences(prisma, {
+      childId: fixture.childId,
+      familyId: fixture.familyId,
+      date: '2026-09-21' as never,
+    });
+
+    await tasks.deleteTask(fixture.parentActor, { taskId: task.id });
+
+    const after = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(after.deletedAt).not.toBeNull();
+    expect(after.active).toBe(false);
+    expect(await prisma.taskOccurrence.count({ where: { taskId: task.id, status: 'OPEN' } })).toBe(
+      0,
+    );
+  });
+
+  it('a child cannot retire a mission', async () => {
+    const task = await tasks.createTask(fixture.parentActor, taskInput());
+
+    await expect(tasks.deleteTask(fixture.childActor, { taskId: task.id })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+});
+
 describe('occurrence materialisation (BR-23)', () => {
   it('creates one occurrence per due day, and only once', async () => {
     await tasks.createTask(fixture.parentActor, taskInput());

@@ -3,11 +3,29 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { createTaskAction } from '@/features/tasks/actions';
+import { createTaskAction, updateTaskAction } from '@/features/tasks/actions';
 
 interface ChildOption {
   id: string;
   nickname: string;
+}
+
+/** An existing mission, when this form is editing one rather than adding. */
+export interface TaskDefaults {
+  id: string;
+  title: string;
+  description: string | null;
+  categoryKey: string | null;
+  iconKey: string;
+  xpValue: number;
+  rewardPointsValue: number;
+  characterTraitId: string | null;
+  evidenceType: string;
+  frequency: string;
+  weekdays: number[];
+  startDate: string;
+  dueTime: string | null;
+  childIds: string[];
 }
 
 interface AddTaskFormProps {
@@ -16,6 +34,8 @@ interface AddTaskFormProps {
   traits: Array<{ id: string; label: string }>;
   categories: Array<{ key: string; label: string }>;
   today: string;
+  /** Absent when adding. Present when editing that mission. */
+  task?: TaskDefaults;
 }
 
 const ICONS = [
@@ -41,24 +61,38 @@ const WEEKDAYS = [
   { value: 0, label: 'Sun' },
 ];
 
-export function AddTaskForm({ childOptions, traits, categories, today }: AddTaskFormProps) {
-  const [state, action] = useActionState(createTaskAction, undefined);
-  const [frequency, setFrequency] = useState('DAILY');
+/**
+ * One form for adding a mission and for editing one.
+ *
+ * The fields are identical either way, and two copies of twenty inputs would
+ * drift apart the first time one of them changed. Editing differs only in
+ * where it posts, what the values start as, and that it does not clear itself
+ * afterwards — you have just told it what you wanted.
+ */
+export function AddTaskForm({ childOptions, traits, categories, today, task }: AddTaskFormProps) {
+  const editing = Boolean(task);
+  const [state, action] = useActionState(editing ? updateTaskAction : createTaskAction, undefined);
+  const [frequency, setFrequency] = useState(task?.frequency ?? 'DAILY');
+  // Several edit forms can be open at once; duplicate ids would aim every
+  // label at whichever rendered first.
+  const uid = task ? `t-${task.id}` : 'new';
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state?.ok) {
+    if (state?.ok && !editing) {
       formRef.current?.reset();
       setFrequency('DAILY');
     }
-  }, [state?.ok]);
+  }, [state?.ok, editing]);
 
   return (
     <form ref={formRef} action={action} className="space-y-4">
-      <Field label="Mission name" htmlFor="title">
+      {task ? <input type="hidden" name="taskId" value={task.id} /> : null}
+      <Field label="Mission name" htmlFor={`${uid}-title`}>
         <input
-          id="title"
+          id={`${uid}-title`}
           name="title"
+          defaultValue={task?.title ?? ''}
           required
           maxLength={120}
           placeholder="Read for 20 minutes"
@@ -74,7 +108,13 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
               key={child.id}
               className="mh-tap-sm flex cursor-pointer items-center gap-2 rounded-full border-2 border-border px-4 text-sm font-bold has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
             >
-              <input type="checkbox" name="childIds" value={child.id} className="sr-only" />
+              <input
+                type="checkbox"
+                name="childIds"
+                value={child.id}
+                defaultChecked={task?.childIds.includes(child.id) ?? false}
+                className="sr-only"
+              />
               {child.nickname}
             </label>
           ))}
@@ -82,25 +122,25 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
       </fieldset>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="XP" htmlFor="xpValue">
+        <Field label="XP" htmlFor={`${uid}-xpValue`}>
           <input
-            id="xpValue"
+            id={`${uid}-xpValue`}
             name="xpValue"
             type="number"
             min={0}
             max={1000}
-            defaultValue={10}
+            defaultValue={task?.xpValue ?? 10}
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           />
         </Field>
-        <Field label="Reward points" htmlFor="rewardPointsValue">
+        <Field label="Reward points" htmlFor={`${uid}-rewardPointsValue`}>
           <input
-            id="rewardPointsValue"
+            id={`${uid}-rewardPointsValue`}
             name="rewardPointsValue"
             type="number"
             min={0}
             max={1000}
-            defaultValue={5}
+            defaultValue={task?.rewardPointsValue ?? 5}
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           />
         </Field>
@@ -108,13 +148,13 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
 
       <Field
         label="Also builds a character trait"
-        htmlFor="characterTraitId"
+        htmlFor={`${uid}-characterTraitId`}
         hint="Optional. Adds one Character Star when approved."
       >
         <select
-          id="characterTraitId"
+          id={`${uid}-characterTraitId`}
           name="characterTraitId"
-          defaultValue=""
+          defaultValue={task?.characterTraitId ?? ''}
           className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
         >
           <option value="">None</option>
@@ -128,11 +168,11 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
       <input type="hidden" name="characterStarValue" value={1} />
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Category" htmlFor="categoryKey">
+        <Field label="Category" htmlFor={`${uid}-categoryKey`}>
           <select
-            id="categoryKey"
+            id={`${uid}-categoryKey`}
             name="categoryKey"
-            defaultValue=""
+            defaultValue={task?.categoryKey ?? ''}
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           >
             <option value="">None</option>
@@ -143,11 +183,11 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
             ))}
           </select>
         </Field>
-        <Field label="Icon" htmlFor="iconKey">
+        <Field label="Icon" htmlFor={`${uid}-iconKey`}>
           <select
-            id="iconKey"
+            id={`${uid}-iconKey`}
             name="iconKey"
-            defaultValue="target"
+            defaultValue={task?.iconKey ?? 'target'}
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           >
             {ICONS.map((icon) => (
@@ -159,9 +199,9 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
         </Field>
       </div>
 
-      <Field label="How often?" htmlFor="frequency">
+      <Field label="How often?" htmlFor={`${uid}-frequency`}>
         <select
-          id="frequency"
+          id={`${uid}-frequency`}
           name="frequency"
           value={frequency}
           onChange={(event) => setFrequency(event.target.value)}
@@ -186,7 +226,13 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
                 key={day.value}
                 className="mh-tap-sm flex cursor-pointer items-center justify-center rounded-full border-2 border-border px-3 text-sm font-bold has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
               >
-                <input type="checkbox" name="weekdays" value={day.value} className="sr-only" />
+                <input
+                  type="checkbox"
+                  name="weekdays"
+                  value={day.value}
+                  defaultChecked={task?.weekdays.includes(day.value) ?? false}
+                  className="sr-only"
+                />
                 {day.label}
               </label>
             ))}
@@ -195,21 +241,21 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
       ) : null}
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Starting" htmlFor="startDate">
+        <Field label="Starting" htmlFor={`${uid}-startDate`}>
           <input
-            id="startDate"
+            id={`${uid}-startDate`}
             name="startDate"
             type="date"
-            defaultValue={today}
+            defaultValue={task?.startDate ?? today}
             required
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           />
         </Field>
-        <Field label="Evidence" htmlFor="evidenceType">
+        <Field label="Evidence" htmlFor={`${uid}-evidenceType`}>
           <select
-            id="evidenceType"
+            id={`${uid}-evidenceType`}
             name="evidenceType"
-            defaultValue="NONE"
+            defaultValue={task?.evidenceType ?? 'NONE'}
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           >
             <option value="NONE">None</option>
@@ -232,11 +278,11 @@ export function AddTaskForm({ childOptions, traits, categories, today }: AddTask
           role="status"
           className="rounded-xl2 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
         >
-          Mission created.
+          {editing ? 'Saved.' : 'Mission created.'}
         </p>
       ) : null}
 
-      <Submit />
+      <Submit editing={editing} />
     </form>
   );
 }
@@ -263,11 +309,12 @@ function Field({
   );
 }
 
-function Submit() {
+function Submit({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
+  const label = editing ? 'Save changes' : 'Create mission';
   return (
     <Button type="submit" variant="primary" size="block" disabled={pending}>
-      {pending ? 'Creating…' : 'Create mission'}
+      {pending ? (editing ? 'Saving…' : 'Creating…') : label}
     </Button>
   );
 }

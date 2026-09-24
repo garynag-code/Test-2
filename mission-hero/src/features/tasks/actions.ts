@@ -6,7 +6,7 @@ import { isAppError } from '@/server/errors';
 import { prisma } from '@/server/db/prisma';
 import { toLocalDate } from '@/domain/dates';
 import { z } from 'zod';
-import { createTaskSchema } from '@/features/tasks/schemas';
+import { createTaskSchema, updateTaskSchema } from '@/features/tasks/schemas';
 import * as tasks from '@/features/tasks/service';
 import * as approvals from '@/features/approvals/service';
 
@@ -84,6 +84,86 @@ const formSchema = z.object({
   dueTime: z.string().optional(),
 });
 
+/**
+ * The add form and the edit form send the same fields, so they are read the
+ * same way. The checkbox groups need `getAll`, which `Object.fromEntries`
+ * flattens to a single value, so they are taken from the FormData directly.
+ */
+function toTaskInput(parsed: z.infer<typeof formSchema>, formData: FormData) {
+  const childIds = formData.getAll('childIds').map(String).filter(Boolean);
+  const weekdays = formData.getAll('weekdays').map((value) => Number(value));
+
+  return {
+    title: parsed.title,
+    description: parsed.description || undefined,
+    categoryKey: parsed.categoryKey || undefined,
+    iconKey: parsed.iconKey || 'target',
+    colorKey: 'brand',
+    xpValue: parsed.xpValue,
+    rewardPointsValue: parsed.rewardPointsValue,
+    characterTraitId: parsed.characterTraitId || undefined,
+    characterStarValue: parsed.characterTraitId ? (parsed.characterStarValue ?? 1) : 0,
+    difficulty: parsed.difficulty ?? 'STANDARD',
+    evidenceType: parsed.evidenceType ?? 'NONE',
+    approvalRequired: true,
+    streakEligible: true,
+    isFamilyTask: childIds.length > 1,
+    childIds,
+    schedule: {
+      frequency: parsed.frequency,
+      interval: 1,
+      weekdays,
+      startDate: parsed.startDate,
+      dueTime: parsed.dueTime || null,
+    },
+  };
+}
+
+export async function updateTaskAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const actor = await requireParent();
+
+  const parsedForm = formSchema.safeParse(Object.fromEntries(formData));
+  if (!parsedForm.success) {
+    return { error: parsedForm.error.issues[0]?.message ?? 'Check those details' };
+  }
+
+  const validated = updateTaskSchema.safeParse({
+    ...toTaskInput(parsedForm.data, formData),
+    taskId: String(formData.get('taskId') ?? ''),
+    active: formData.get('active') !== 'false',
+  });
+  if (!validated.success) {
+    return { error: validated.error.issues[0]?.message ?? 'Check those details' };
+  }
+
+  try {
+    await tasks.updateTask(actor, validated.data);
+  } catch (error) {
+    if (isAppError(error)) return { error: error.publicMessage };
+    throw error;
+  }
+
+  revalidatePath('/parent/tasks');
+  revalidatePath('/parent');
+  return { ok: true };
+}
+
+export async function deleteTaskAction(taskId: string): Promise<ActionState> {
+  const actor = await requireParent();
+  try {
+    await tasks.deleteTask(actor, { taskId });
+  } catch (error) {
+    if (isAppError(error)) return { error: error.publicMessage };
+    throw error;
+  }
+  revalidatePath('/parent/tasks');
+  revalidatePath('/parent');
+  return { ok: true };
+}
+
 export async function createTaskAction(
   _state: ActionState,
   formData: FormData,
@@ -96,37 +176,7 @@ export async function createTaskAction(
     return { error: parsedForm.error.issues[0]?.message ?? 'Check those details' };
   }
 
-  const childIds = formData.getAll('childIds').map(String).filter(Boolean);
-  const weekdays = formData.getAll('weekdays').map((value) => Number(value));
-
-  const input = {
-    title: parsedForm.data.title,
-    description: parsedForm.data.description || undefined,
-    categoryKey: parsedForm.data.categoryKey || undefined,
-    iconKey: parsedForm.data.iconKey || 'target',
-    colorKey: 'brand',
-    xpValue: parsedForm.data.xpValue,
-    rewardPointsValue: parsedForm.data.rewardPointsValue,
-    characterTraitId: parsedForm.data.characterTraitId || undefined,
-    characterStarValue: parsedForm.data.characterTraitId
-      ? (parsedForm.data.characterStarValue ?? 1)
-      : 0,
-    difficulty: parsedForm.data.difficulty ?? 'STANDARD',
-    evidenceType: parsedForm.data.evidenceType ?? 'NONE',
-    approvalRequired: true,
-    streakEligible: true,
-    isFamilyTask: childIds.length > 1,
-    childIds,
-    schedule: {
-      frequency: parsedForm.data.frequency,
-      interval: 1,
-      weekdays,
-      startDate: parsedForm.data.startDate,
-      dueTime: parsedForm.data.dueTime || null,
-    },
-  };
-
-  const validated = createTaskSchema.safeParse(input);
+  const validated = createTaskSchema.safeParse(toTaskInput(parsedForm.data, formData));
   if (!validated.success) {
     return { error: validated.error.issues[0]?.message ?? 'Check those details' };
   }

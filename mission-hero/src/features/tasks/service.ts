@@ -17,7 +17,13 @@ import { PENDING, REDO } from '@/domain/copy';
 import * as audit from '@/features/audit/service';
 import * as notifications from '@/features/notifications/service';
 import * as repo from './repo';
-import { createTaskSchema, type CreateTaskInput, type SubmitCompletionInput } from './schemas';
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  type CreateTaskInput,
+  type SubmitCompletionInput,
+  type UpdateTaskInput,
+} from './schemas';
 import type { MissionCard, MissionState, WeeklyProgress } from './types';
 
 /**
@@ -106,6 +112,185 @@ export async function createTask(actor: Actor, input: CreateTaskInput) {
         xpValue: task.xpValue,
         rewardPointsValue: task.rewardPointsValue,
       },
+    });
+
+    return task;
+  });
+}
+
+/**
+ * Editing a mission.
+ *
+ * Everything about a mission can change except what it has already paid out.
+ * The ledger is immutable, so past awards are untouched by definition — but a
+ * completion that is *waiting* for approval will be paid at the new value,
+ * because approval reads the mission when the grown-up approves it. That is
+ * the right way round: the parent decides what a thing is worth, and they are
+ * deciding right now.
+ *
+ * Occurrences are materialised a day at a time, on demand, so a changed
+ * schedule needs no cleanup — tomorrow simply follows the new rule. The one
+ * exception is a child who has just been unassigned: today's card would sit
+ * on their screen claiming to be theirs. Those are removed, unless they have
+ * already been acted on, which is somebody's work and not ours to erase.
+ */
+export async function updateTask(actor: Actor, input: UpdateTaskInput) {
+  if (actor.type !== 'parent') throw notFound();
+  const parsed = updateTaskSchema.parse(input);
+
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.task.findFirst({
+      where: { id: parsed.taskId, familyId: actor.familyId, deletedAt: null },
+      include: { schedule: true, assignments: true },
+    });
+    if (!before) throw notFound('That mission was not found.');
+
+    const children = await tx.childProfile.findMany({
+      where: { id: { in: parsed.childIds }, familyId: actor.familyId, deletedAt: null },
+      select: { id: true },
+    });
+    if (children.length !== parsed.childIds.length)
+      throw notFound('One of those heroes was not found.');
+
+    if (parsed.characterTraitId) {
+      const trait = await tx.characterTrait.findFirst({
+        where: { id: parsed.characterTraitId, familyId: actor.familyId },
+        select: { id: true },
+      });
+      if (!trait) throw notFound('That character trait was not found.');
+    }
+
+    const categoryId = parsed.categoryKey
+      ? ((
+          await tx.taskCategory.findUnique({
+            where: { familyId_key: { familyId: actor.familyId, key: parsed.categoryKey } },
+            select: { id: true },
+          })
+        )?.id ?? null)
+      : null;
+
+    await tx.task.update({
+      where: { id: before.id },
+      data: {
+        title: parsed.title,
+        description: parsed.description ?? null,
+        categoryId,
+        iconKey: parsed.iconKey,
+        colorKey: parsed.colorKey,
+        xpValue: parsed.xpValue,
+        rewardPointsValue: parsed.rewardPointsValue,
+        characterTraitId: parsed.characterTraitId ?? null,
+        characterStarValue: parsed.characterStarValue,
+        difficulty: parsed.difficulty,
+        evidenceType: parsed.evidenceType,
+        approvalRequired: parsed.approvalRequired,
+        streakEligible: parsed.streakEligible,
+        isFamilyTask: parsed.isFamilyTask,
+        notes: parsed.notes ?? null,
+        active: parsed.active,
+        schedule: {
+          update: {
+            frequency: parsed.schedule.frequency,
+            interval: parsed.schedule.interval,
+            weekdays: parsed.schedule.weekdays,
+            monthDay: parsed.schedule.monthDay ?? null,
+            month: parsed.schedule.month ?? null,
+            startDate: localDateToUtcDate(parsed.schedule.startDate as LocalDate),
+            endDate: parsed.schedule.endDate
+              ? localDateToUtcDate(parsed.schedule.endDate as LocalDate)
+              : null,
+            dueTime: parsed.schedule.dueTime ?? null,
+          },
+        },
+      },
+    });
+
+    const keep = new Set(children.map((child) => child.id));
+    const dropped = before.assignments
+      .map((assignment) => assignment.childId)
+      .filter((childId) => !keep.has(childId));
+
+    if (dropped.length > 0) {
+      await tx.taskAssignment.deleteMany({
+        where: { taskId: before.id, childId: { in: dropped } },
+      });
+      // Only cards nobody has touched: a submitted or approved one is a
+      // record of something that happened.
+      await tx.taskOccurrence.deleteMany({
+        where: { taskId: before.id, childId: { in: dropped }, status: 'OPEN' },
+      });
+    }
+
+    const added = children
+      .map((child) => child.id)
+      .filter((childId) => !before.assignments.some((a) => a.childId === childId));
+
+    if (added.length > 0) {
+      await tx.taskAssignment.createMany({
+        data: added.map((childId) => ({ taskId: before.id, childId })),
+        skipDuplicates: true,
+      });
+    }
+
+    const after = await tx.task.findFirstOrThrow({
+      where: { id: before.id },
+      include: { schedule: true, assignments: true },
+    });
+
+    await audit.record(tx, {
+      actor,
+      action: 'TASK_UPDATED',
+      entityType: 'Task',
+      entityId: after.id,
+      before: {
+        title: before.title,
+        xpValue: before.xpValue,
+        rewardPointsValue: before.rewardPointsValue,
+        childIds: before.assignments.map((a) => a.childId),
+      },
+      after: {
+        title: after.title,
+        xpValue: after.xpValue,
+        rewardPointsValue: after.rewardPointsValue,
+        childIds: after.assignments.map((a) => a.childId),
+      },
+    });
+
+    return after;
+  });
+}
+
+/**
+ * Retiring a mission.
+ *
+ * Soft, because everything a child ever did against it hangs off this row —
+ * their ledger entries, their streak, their history. It stops appearing and
+ * stops generating occurrences; it does not take the past with it.
+ */
+export async function deleteTask(actor: Actor, input: { taskId: string }) {
+  if (actor.type !== 'parent') throw notFound();
+
+  return prisma.$transaction(async (tx) => {
+    const task = await tx.task.findFirst({
+      where: { id: input.taskId, familyId: actor.familyId, deletedAt: null },
+      select: { id: true, title: true },
+    });
+    if (!task) throw notFound('That mission was not found.');
+
+    await tx.task.update({
+      where: { id: task.id },
+      data: { deletedAt: new Date(), active: false },
+    });
+
+    // Nothing outstanding should keep asking to be done.
+    await tx.taskOccurrence.deleteMany({ where: { taskId: task.id, status: 'OPEN' } });
+
+    await audit.record(tx, {
+      actor,
+      action: 'TASK_DELETED',
+      entityType: 'Task',
+      entityId: task.id,
+      before: { title: task.title },
     });
 
     return task;
