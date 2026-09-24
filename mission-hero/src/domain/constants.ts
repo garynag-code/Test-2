@@ -26,15 +26,24 @@ export const COOKIE_DEVICE = 'mh_device';
 export const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 /*
- * A code the app generates is always 8 characters from the alphabet above,
- * which leaves out the pairs children misread: O/0, I/1 and L.
+ * Two different minimums, on purpose.
  *
- * A code a family chooses for itself is allowed to be anything typeable
- * between these lengths. The restricted alphabet protects a random string
- * nobody can predict; it has no business rejecting "MILLERS" because somebody
- * wanted their own name on it. Short is fine too — a child types this.
+ * FAMILY_CODE_MIN_LENGTH is what a family may *choose*. Eight characters is
+ * the floor because this code is the only thing standing between a stranger
+ * and a list of children's names: short codes are guessable, and a family
+ * that picks "SAM" has weakened the one gate the child surface has.
+ *
+ * FAMILY_CODE_LEGACY_MIN_LENGTH is what sign-in still *accepts*. Tightening
+ * the rule must not lock a child out of a family whose code was already
+ * shorter — they would have no way in and no idea why. Old codes keep working
+ * until a grown-up changes them, at which point the new floor applies.
+ *
+ * The restricted alphabet above still governs codes the app invents. It has
+ * no business rejecting "MILLERS1" because somebody wanted their own name on
+ * it, so a chosen code may use any letter or digit.
  */
-export const FAMILY_CODE_MIN_LENGTH = 4;
+export const FAMILY_CODE_MIN_LENGTH = 8;
+export const FAMILY_CODE_LEGACY_MIN_LENGTH = 4;
 export const FAMILY_CODE_MAX_LENGTH = 12;
 export const FAMILY_CODE_LENGTH = 8;
 

@@ -25,6 +25,7 @@ export function FamilyCodeForm({ familyCode }: { familyCode: string }) {
         id="familyCode"
         name="familyCode"
         defaultValue={familyCode}
+        minLength={FAMILY_CODE_MIN_LENGTH}
         maxLength={FAMILY_CODE_MAX_LENGTH}
         autoCapitalize="characters"
         autoComplete="off"

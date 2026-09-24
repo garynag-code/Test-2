@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import {
   FAMILY_CODE_ALPHABET,
   FAMILY_CODE_LENGTH,
+  FAMILY_CODE_LEGACY_MIN_LENGTH,
   FAMILY_CODE_MAX_LENGTH,
   FAMILY_CODE_MIN_LENGTH,
 } from '@/domain/constants';
@@ -24,15 +25,30 @@ export function normaliseFamilyCode(input: string): string {
 }
 
 /**
- * Is this typeable as a family code?
+ * Could this be somebody's family code, for the purpose of looking it up?
  *
- * Deliberately looser than what `generateFamilyCode` produces. A generated
- * code is 8 characters from a restricted alphabet because nobody chose it and
- * a child has to read it off a screen. A code a family picked for itself —
- * "MILLERS", "NAGELS1" — is theirs, and rejecting it for containing an L
- * would be the app being clever at their expense.
+ * Deliberately looser than what a family may choose today: a code saved under
+ * an older, shorter rule must still get its children in. Tightening what can
+ * be *set* is a policy change; tightening what can be *typed* would be a
+ * lockout, and the child would have no idea why.
  */
 export function isValidFamilyCodeShape(input: string): boolean {
+  const normalised = normaliseFamilyCode(input);
+  return (
+    normalised.length >= FAMILY_CODE_LEGACY_MIN_LENGTH &&
+    normalised.length <= FAMILY_CODE_MAX_LENGTH
+  );
+}
+
+/**
+ * May a family set this as their code?
+ *
+ * Eight characters minimum: this code is the only thing between a stranger
+ * and a list of children's nicknames, and a short one is guessable. Any
+ * letter or digit is allowed — the restricted alphabet exists to keep a
+ * *generated* code readable, not to veto somebody's own family name.
+ */
+export function isChoosableFamilyCodeShape(input: string): boolean {
   const normalised = normaliseFamilyCode(input);
   return normalised.length >= FAMILY_CODE_MIN_LENGTH && normalised.length <= FAMILY_CODE_MAX_LENGTH;
 }

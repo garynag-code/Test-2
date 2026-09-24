@@ -281,27 +281,39 @@ describe('child settings', () => {
 
 describe('choosing the family code', () => {
   it('replaces the generated code with a memorable one', async () => {
-    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'nagels' });
+    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'nagelsfam' });
 
     const family = await prisma.family.findUniqueOrThrow({
       where: { id: fixture.familyId },
       select: { familyCode: true },
     });
     // Stored the way a child will type it, however it was entered.
-    expect(family.familyCode).toBe('NAGELS');
+    expect(family.familyCode).toBe('NAGELSFAM');
   });
 
   it('accepts what the child sign-in accepts', async () => {
-    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'MILL-ERS' });
+    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'MILL-ERSON' });
 
-    const found = await families.findFamilyByCode('millers');
+    const found = await families.findFamilyByCode('millerson');
     expect(found?.id).toBe(fixture.familyId);
   });
 
-  it('refuses one too short to be useful', async () => {
+  it('refuses a short code, which is the only gate the child surface has', async () => {
     await expect(
-      settings.updateFamilyCode(fixture.parentActor, { familyCode: 'AB' }),
+      settings.updateFamilyCode(fixture.parentActor, { familyCode: 'NAGELS' }),
     ).rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+
+  it('a code saved under the older, shorter rule still gets a child in', async () => {
+    // Tightening what may be chosen must not lock out a family whose code was
+    // already short — they would have no way in and no idea why.
+    await prisma.family.update({
+      where: { id: fixture.familyId },
+      data: { familyCode: 'OLDIE' },
+    });
+
+    const found = await families.findFamilyByCode('oldie');
+    expect(found?.id).toBe(fixture.familyId);
   });
 
   it('refuses a code another family already has', async () => {

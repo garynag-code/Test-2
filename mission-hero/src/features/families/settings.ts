@@ -9,7 +9,7 @@ import {
   PIN_MAX_LENGTH,
   PIN_MIN_LENGTH,
 } from '@/domain/constants';
-import { isValidFamilyCodeShape, normaliseFamilyCode } from '@/server/auth/family-code';
+import { isChoosableFamilyCodeShape, normaliseFamilyCode } from '@/server/auth/family-code';
 import * as audit from '@/features/audit/service';
 
 /**
@@ -100,7 +100,7 @@ export async function updateFamilyCode(actor: Actor, input: { familyCode: string
   const parsed = familyCodeSchema.parse(input);
   const familyCode = normaliseFamilyCode(parsed.familyCode);
 
-  if (!isValidFamilyCodeShape(familyCode)) {
+  if (!isChoosableFamilyCodeShape(familyCode)) {
     throw validation(
       `A family code is ${FAMILY_CODE_MIN_LENGTH} to ${FAMILY_CODE_MAX_LENGTH} letters and numbers.`,
     );
