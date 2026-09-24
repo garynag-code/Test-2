@@ -13,7 +13,8 @@ import {
   startChildSession,
   startParentSession,
 } from '@/server/auth/session';
-import { PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
+import { FAMILY_CODE_LENGTH, PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
+import { isValidFamilyCodeShape } from '@/server/auth/family-code';
 import * as families from '@/features/families/service';
 import * as children from '@/features/children/service';
 
@@ -107,14 +108,34 @@ export async function childLogoutAction(): Promise<void> {
   redirect('/kids');
 }
 
-/** Binds this device to a family. Confers no authority on its own. */
+/**
+ * Binds this device to a family. Confers no authority on its own.
+ *
+ * The two failures are told apart deliberately. "We couldn't find that code"
+ * is no help to someone who typed their family's *name* — which is what
+ * people do, because "family code" sounds like it could be one. Saying so
+ * costs nothing: a wrong-shaped code proves nothing about which families
+ * exist, so there is no guessing advantage to hand out here.
+ */
 export async function bindDeviceAction(
   _state: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const code = String(formData.get('familyCode') ?? '');
+
+  if (!isValidFamilyCodeShape(code)) {
+    return {
+      error: `A family code is ${FAMILY_CODE_LENGTH} letters and numbers, like ADVENTUR — not your family's name. A grown-up can find yours in Mission Hero under Children.`,
+    };
+  }
+
   const family = await families.findFamilyByCode(code);
-  if (!family) return { error: "We couldn't find that family code." };
+  if (!family) {
+    return {
+      error:
+        "That code doesn't match any family. Check it with a grown-up — they'll find it under Children.",
+    };
+  }
 
   await bindDeviceToFamily(family.id);
   redirect('/kids');

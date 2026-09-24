@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { APP_NAME, APP_TAGLINE } from '@/domain/constants';
+import { versionLabel } from '@/domain/version';
 
 /**
  * The role chooser. Deliberately the only public page in the product — every
@@ -37,6 +38,8 @@ export default function LandingPage() {
               Create your family
             </Link>
           </p>
+          {/* Which build this is — the quickest answer to "did my update land?" */}
+          <p className="text-center text-xs text-white/50">{versionLabel()}</p>
         </div>
       </div>
     </main>

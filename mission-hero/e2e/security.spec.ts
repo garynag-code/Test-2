@@ -61,7 +61,18 @@ test('an unknown family code is refused', async ({ page }) => {
 
   // Next.js renders its own empty route announcer with role=alert, so match the
   // message itself rather than the role.
-  await expect(page.getByText("We couldn't find that family code.")).toBeVisible();
+  await expect(page.getByText(/doesn't match any family/)).toBeVisible();
+});
+
+test('typing the family name instead of the code says so', async ({ page }) => {
+  // What people actually do: "family code" reads like it could be a name, and
+  // "we couldn't find that" leaves them retyping the same wrong thing.
+  await page.goto('/kids');
+  await waitForInteractive(page);
+  await page.getByLabel('Family code').fill('The Adventure Family');
+  await page.getByRole('button', { name: "Let's go!" }).click();
+
+  await expect(page.getByText(/not your family's name/)).toBeVisible();
 });
 
 test('security headers are set on the child surface', async ({ page }) => {
