@@ -5,6 +5,7 @@ import * as settings from '@/features/families/settings';
 import * as invites from '@/features/families/invites';
 import { FamilySettingsForm } from '@/components/parent/family-settings-form';
 import { ChildSettingsCard } from '@/components/parent/child-settings-card';
+import { DisplayNameForm } from '@/components/parent/display-name-form';
 import { InviteParentForm } from '@/components/parent/invite-parent-form';
 import { DeleteFamilyForm } from '@/components/parent/delete-family-form';
 
@@ -60,6 +61,7 @@ export default async function SettingsPage() {
               child={{
                 id: child.id,
                 nickname: child.nickname,
+                avatarKey: child.avatarKey,
                 themeKey: child.themeKey,
                 status: child.status,
                 pinRequired: child.pinRequired,
@@ -79,6 +81,14 @@ export default async function SettingsPage() {
         <CardTitle>
           <span id="grown-ups">Grown-ups</span>
         </CardTitle>
+        <Card>
+          <DisplayNameForm
+            displayName={
+              members.find((member) => member.userId === actor.userId)?.user.displayName ?? ''
+            }
+          />
+        </Card>
+
         <Card className="divide-y divide-border p-0">
           {members.map((member) => (
             <p

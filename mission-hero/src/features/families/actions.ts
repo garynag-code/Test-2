@@ -53,6 +53,7 @@ export async function updateChildSettingsAction(
     await settings.updateChildSettings(actor, {
       childId: String(formData.get('childId') ?? ''),
       nickname: String(formData.get('nickname') ?? ''),
+      avatarKey: String(formData.get('avatarKey') ?? 'hero-1'),
       themeKey: String(formData.get('themeKey') ?? 'space'),
       reducedMotion: toBool(formData.get('reducedMotion')),
       characterAutoApprove: toBool(formData.get('characterAutoApprove')),
@@ -63,6 +64,23 @@ export async function updateChildSettingsAction(
   } catch (error) {
     if (isAppError(error)) return { error: error.publicMessage };
     return { error: 'Those settings could not be saved.' };
+  }
+  revalidatePath('/parent/settings');
+  return { ok: true };
+}
+
+export async function updateDisplayNameAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const actor = await requireParent();
+  try {
+    await settings.updateDisplayName(actor, {
+      displayName: String(formData.get('displayName') ?? ''),
+    });
+  } catch (error) {
+    if (isAppError(error)) return { error: error.publicMessage };
+    return { error: 'That name could not be saved.' };
   }
   revalidatePath('/parent/settings');
   return { ok: true };

@@ -4,15 +4,7 @@ import { useActionState, useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { createChildAction } from '@/features/children/actions';
-
-const AVATARS = [
-  { key: 'hero-1', emoji: '🦸' },
-  { key: 'hero-2', emoji: '🧑‍🚀' },
-  { key: 'hero-3', emoji: '🦊' },
-  { key: 'hero-4', emoji: '🦄' },
-  { key: 'hero-5', emoji: '🐲' },
-  { key: 'hero-6', emoji: '🤖' },
-];
+import { AVATARS } from '@/domain/avatars';
 
 const THEMES = [
   'space',
@@ -83,7 +75,7 @@ export function AddChildForm() {
                 className="sr-only"
               />
               <span aria-hidden>{avatar.emoji}</span>
-              <span className="sr-only">{avatar.key}</span>
+              <span className="sr-only">{avatar.label}</span>
             </label>
           ))}
         </div>

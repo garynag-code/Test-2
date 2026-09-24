@@ -226,6 +226,31 @@ describe('child settings', () => {
     expect(child.pinFailedAttempts).toBe(0);
   });
 
+  it('changes the avatar, which used to be fixed at creation', async () => {
+    const before = await prisma.childProfile.findUniqueOrThrow({
+      where: { id: fixture.childId },
+      select: { nickname: true, themeKey: true },
+    });
+
+    await settings.updateChildSettings(fixture.parentActor, {
+      childId: fixture.childId,
+      nickname: before.nickname,
+      avatarKey: 'hero-19',
+      themeKey: before.themeKey,
+      reducedMotion: false,
+      characterAutoApprove: false,
+      dailyTaskTarget: 4,
+      notificationsEnabled: true,
+      soundEnabled: true,
+    });
+
+    const after = await prisma.childProfile.findUniqueOrThrow({
+      where: { id: fixture.childId },
+      select: { avatarKey: true },
+    });
+    expect(after.avatarKey).toBe('hero-19');
+  });
+
   it('refuses a malformed PIN', async () => {
     await expect(
       settings.setChildPin(fixture.parentActor, { childId: fixture.childId, pin: '12' }),
@@ -250,6 +275,35 @@ describe('child settings', () => {
     expect(child.status).toBe('ARCHIVED');
     expect(child.deletedAt).toBeNull();
     expect(await prisma.taskAssignment.count({ where: { childId: fixture.childId } })).toBe(1);
+  });
+});
+
+describe('a grown-up renaming themselves', () => {
+  it('changes their own display name and audits it', async () => {
+    await settings.updateDisplayName(fixture.parentActor, { displayName: 'Gogo Nomsa' });
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: fixture.parentActor.userId },
+      select: { displayName: true },
+    });
+    expect(user.displayName).toBe('Gogo Nomsa');
+
+    const entry = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'PARENT_PROFILE_UPDATED' },
+    });
+    expect(entry.afterValue).toMatchObject({ displayName: 'Gogo Nomsa' });
+  });
+
+  it('refuses an empty name', async () => {
+    await expect(
+      settings.updateDisplayName(fixture.parentActor, { displayName: '   ' }),
+    ).rejects.toThrow();
+  });
+
+  it('a child cannot rename a grown-up', async () => {
+    await expect(
+      settings.updateDisplayName(fixture.childActor, { displayName: 'Boss' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 

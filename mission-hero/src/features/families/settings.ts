@@ -73,9 +73,55 @@ function pickSettings(row: SettingsRow) {
   return Object.fromEntries(keys.map((key) => [key, row[key]]));
 }
 
+export const displayNameSchema = z.object({
+  displayName: z.string().trim().min(1).max(60),
+});
+
+/**
+ * A grown-up renaming themselves.
+ *
+ * The name is chosen once at registration and was not editable afterwards,
+ * which is a long time to live with a typo — and the name is what a child
+ * sees on every approval and word of encouragement.
+ *
+ * Scoped to the signed-in user: a parent changes their own name, never
+ * another member's, so there is no id to pass and nothing to authorize
+ * beyond the session itself.
+ */
+export async function updateDisplayName(actor: Actor, input: { displayName: string }) {
+  if (actor.type !== 'parent') throw notFound();
+  const parsed = displayNameSchema.parse(input);
+
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.user.findUnique({
+      where: { id: actor.userId },
+      select: { id: true, displayName: true },
+    });
+    if (!before) throw notFound();
+
+    const after = await tx.user.update({
+      where: { id: before.id },
+      data: { displayName: parsed.displayName },
+      select: { id: true, displayName: true },
+    });
+
+    await audit.record(tx, {
+      actor,
+      action: 'PARENT_PROFILE_UPDATED',
+      entityType: 'User',
+      entityId: after.id,
+      before: { displayName: before.displayName },
+      after: { displayName: after.displayName },
+    });
+
+    return after;
+  });
+}
+
 export const childSettingsSchema = z.object({
   childId: z.string().uuid(),
   nickname: z.string().trim().min(1).max(30),
+  avatarKey: z.string().trim().max(30),
   themeKey: z.string().trim().max(30),
   reducedMotion: z.boolean(),
   characterAutoApprove: z.boolean(),
@@ -99,7 +145,11 @@ export async function updateChildSettings(actor: Actor, input: ChildSettingsInpu
 
     await tx.childProfile.update({
       where: { id: child.id },
-      data: { nickname: parsed.nickname, themeKey: parsed.themeKey },
+      data: {
+        nickname: parsed.nickname,
+        avatarKey: parsed.avatarKey,
+        themeKey: parsed.themeKey,
+      },
     });
 
     await tx.childSetting.upsert({

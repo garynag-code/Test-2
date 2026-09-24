@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { selectChildAction } from '@/features/auth/actions';
 import { PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
+import { avatarEmoji } from '@/domain/avatars';
 
 interface Profile {
   id: string;
@@ -13,15 +14,6 @@ interface Profile {
   themeKey: string;
   pinRequired: boolean;
 }
-
-const AVATARS: Record<string, string> = {
-  'hero-1': '🦸',
-  'hero-2': '🧑‍🚀',
-  'hero-3': '🦊',
-  'hero-4': '🦄',
-  'hero-5': '🐲',
-  'hero-6': '🤖',
-};
 
 export function ProfilePicker({ familyId, profiles }: { familyId: string; profiles: Profile[] }) {
   const [state, action] = useActionState(selectChildAction, undefined);
@@ -55,7 +47,7 @@ export function ProfilePicker({ familyId, profiles }: { familyId: string; profil
         <input type="hidden" name="familyId" value={familyId} />
         <input type="hidden" name="childId" value={selected.id} />
         <p className="text-center text-6xl" aria-hidden>
-          {AVATARS[selected.avatarKey] ?? '🦸'}
+          {avatarEmoji(selected.avatarKey)}
         </p>
         <label htmlFor="pin" className="block text-center text-lg font-bold">
           Hi {selected.nickname}! Enter your PIN
@@ -100,7 +92,7 @@ export function ProfilePicker({ familyId, profiles }: { familyId: string; profil
                 className="flex w-full flex-col items-center gap-2 rounded-xl3 bg-white/15 p-5 text-white"
               >
                 <span aria-hidden className="text-5xl">
-                  {AVATARS[profile.avatarKey] ?? '🦸'}
+                  {avatarEmoji(profile.avatarKey)}
                 </span>
                 <span className="text-lg font-extrabold">{profile.nickname}</span>
                 <span className="text-xs text-white/70">PIN needed</span>
@@ -114,7 +106,7 @@ export function ProfilePicker({ familyId, profiles }: { familyId: string; profil
                   className="flex w-full flex-col items-center gap-2 rounded-xl3 bg-white/15 p-5 text-white active:scale-[0.98]"
                 >
                   <span aria-hidden className="text-5xl">
-                    {AVATARS[profile.avatarKey] ?? '🦸'}
+                    {avatarEmoji(profile.avatarKey)}
                   </span>
                   <span className="text-lg font-extrabold">{profile.nickname}</span>
                 </button>

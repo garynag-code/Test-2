@@ -4,6 +4,7 @@ import { useActionState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { AVATARS } from '@/domain/avatars';
 import { ToggleRow, NumberRow } from '@/components/parent/toggle-row';
 import {
   setChildPinAction,
@@ -26,6 +27,7 @@ const THEMES = [
 interface ChildRow {
   id: string;
   nickname: string;
+  avatarKey: string;
   themeKey: string;
   status: string;
   pinRequired: boolean;
@@ -67,6 +69,28 @@ export function ChildSettingsCard({ child }: { child: ChildRow }) {
             className="mh-tap-sm w-full rounded-xl2 border-2 border-border bg-card px-4 text-base"
           />
         </div>
+
+        <fieldset className="space-y-1">
+          <legend className="text-sm font-bold text-ink">Avatar</legend>
+          <div className="flex flex-wrap gap-2">
+            {AVATARS.map((avatar) => (
+              <label
+                key={avatar.key}
+                className="mh-tap-sm flex cursor-pointer items-center justify-center rounded-xl2 border-2 border-border px-3 text-2xl has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+              >
+                <input
+                  type="radio"
+                  name="avatarKey"
+                  value={avatar.key}
+                  defaultChecked={avatar.key === child.avatarKey}
+                  className="sr-only"
+                />
+                <span aria-hidden>{avatar.emoji}</span>
+                <span className="sr-only">{avatar.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="space-y-1">
           <label htmlFor={`theme-${child.id}`} className="block text-sm font-bold text-ink">
