@@ -5,6 +5,7 @@ import * as settings from '@/features/families/settings';
 import * as invites from '@/features/families/invites';
 import { FamilySettingsForm } from '@/components/parent/family-settings-form';
 import { ChildSettingsCard } from '@/components/parent/child-settings-card';
+import { appVersion, versionLabel } from '@/domain/version';
 import { DisplayNameForm } from '@/components/parent/display-name-form';
 import { InviteParentForm } from '@/components/parent/invite-parent-form';
 import { DeleteFamilyForm } from '@/components/parent/delete-family-form';
@@ -145,6 +146,13 @@ export default async function SettingsPage() {
           ) : null}
         </Card>
       </section>
+
+      <p className="pb-2 text-center text-xs text-muted">
+        Mission Hero {versionLabel()}
+        {appVersion().builtAt === 'unknown' ? null : (
+          <> · built {appVersion().builtAt.slice(0, 16).replace('T', ' ')} UTC</>
+        )}
+      </p>
     </div>
   );
 }
