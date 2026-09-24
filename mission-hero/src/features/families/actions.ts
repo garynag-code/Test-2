@@ -86,6 +86,25 @@ export async function updateDisplayNameAction(
   return { ok: true };
 }
 
+export async function updateFamilyCodeAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const actor = await requireParent();
+  try {
+    await settings.updateFamilyCode(actor, {
+      familyCode: String(formData.get('familyCode') ?? ''),
+    });
+  } catch (error) {
+    if (isAppError(error)) return { error: error.publicMessage };
+    return { error: 'That code could not be saved.' };
+  }
+  revalidatePath('/parent/settings');
+  revalidatePath('/parent/children');
+  revalidatePath('/parent');
+  return { ok: true };
+}
+
 export async function setChildPinAction(
   _state: ActionState,
   formData: FormData,

@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import { prisma } from '@/server/db/prisma';
-import { notFound } from '@/server/errors';
+import { conflict, notFound, validation } from '@/server/errors';
 import { hashPin } from '@/server/auth/passwords';
 import type { Actor } from '@/server/auth/actor';
-import { PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
+import {
+  FAMILY_CODE_MAX_LENGTH,
+  FAMILY_CODE_MIN_LENGTH,
+  PIN_MAX_LENGTH,
+  PIN_MIN_LENGTH,
+} from '@/domain/constants';
+import { isValidFamilyCodeShape, normaliseFamilyCode } from '@/server/auth/family-code';
 import * as audit from '@/features/audit/service';
 
 /**
@@ -71,6 +77,66 @@ type SettingsRow = Record<string, unknown>;
 function pickSettings(row: SettingsRow) {
   const keys = Object.keys(familySettingsSchema.shape);
   return Object.fromEntries(keys.map((key) => [key, row[key]]));
+}
+
+export const familyCodeSchema = z.object({
+  familyCode: z.string().trim().min(1),
+});
+
+/**
+ * The family's own code, chosen rather than inherited.
+ *
+ * Generated codes are unguessable and unmemorable, which is the right trade
+ * for a random string and the wrong one for something a child types every
+ * time they pick up a shared tablet. A family that would rather use its own
+ * name should be able to.
+ *
+ * Owner only, like the other things that change what the whole family sees.
+ * Changing it does not sign anybody out: a device is bound by family id, not
+ * by the code it was typed in with.
+ */
+export async function updateFamilyCode(actor: Actor, input: { familyCode: string }) {
+  if (actor.type !== 'parent' || actor.role !== 'OWNER') throw notFound();
+  const parsed = familyCodeSchema.parse(input);
+  const familyCode = normaliseFamilyCode(parsed.familyCode);
+
+  if (!isValidFamilyCodeShape(familyCode)) {
+    throw validation(
+      `A family code is ${FAMILY_CODE_MIN_LENGTH} to ${FAMILY_CODE_MAX_LENGTH} letters and numbers.`,
+    );
+  }
+
+  const taken = await prisma.family.findUnique({
+    where: { familyCode },
+    select: { id: true },
+  });
+  if (taken && taken.id !== actor.familyId) {
+    throw conflict('Another family is already using that code. Try a different one.');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.family.findUniqueOrThrow({
+      where: { id: actor.familyId },
+      select: { id: true, familyCode: true },
+    });
+
+    const after = await tx.family.update({
+      where: { id: before.id },
+      data: { familyCode },
+      select: { id: true, familyCode: true },
+    });
+
+    await audit.record(tx, {
+      actor,
+      action: 'FAMILY_SETTINGS_CHANGED',
+      entityType: 'Family',
+      entityId: after.id,
+      before: { familyCode: before.familyCode },
+      after: { familyCode: after.familyCode },
+    });
+
+    return after;
+  });
 }
 
 export const displayNameSchema = z.object({

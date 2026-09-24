@@ -24,6 +24,18 @@ export const COOKIE_DEVICE = 'mh_device';
 
 /** Family codes avoid characters a child could misread (0/O, 1/I/L). */
 export const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/*
+ * A code the app generates is always 8 characters from the alphabet above,
+ * which leaves out the pairs children misread: O/0, I/1 and L.
+ *
+ * A code a family chooses for itself is allowed to be anything typeable
+ * between these lengths. The restricted alphabet protects a random string
+ * nobody can predict; it has no business rejecting "MILLERS" because somebody
+ * wanted their own name on it. Short is fine too — a child types this.
+ */
+export const FAMILY_CODE_MIN_LENGTH = 4;
+export const FAMILY_CODE_MAX_LENGTH = 12;
 export const FAMILY_CODE_LENGTH = 8;
 
 /** Input caps, mirrored by the Zod schemas. */

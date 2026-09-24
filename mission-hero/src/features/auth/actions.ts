@@ -13,7 +13,12 @@ import {
   startChildSession,
   startParentSession,
 } from '@/server/auth/session';
-import { FAMILY_CODE_LENGTH, PIN_MAX_LENGTH, PIN_MIN_LENGTH } from '@/domain/constants';
+import {
+  FAMILY_CODE_MAX_LENGTH,
+  FAMILY_CODE_MIN_LENGTH,
+  PIN_MAX_LENGTH,
+  PIN_MIN_LENGTH,
+} from '@/domain/constants';
 import { isValidFamilyCodeShape } from '@/server/auth/family-code';
 import * as families from '@/features/families/service';
 import * as children from '@/features/children/service';
@@ -125,7 +130,7 @@ export async function bindDeviceAction(
 
   if (!isValidFamilyCodeShape(code)) {
     return {
-      error: `A family code is ${FAMILY_CODE_LENGTH} letters and numbers, like ADVENTUR — not your family's name. A grown-up can find yours in Mission Hero under Children.`,
+      error: `A family code is ${FAMILY_CODE_MIN_LENGTH} to ${FAMILY_CODE_MAX_LENGTH} letters and numbers, like ADVENTUR — not your family's name. A grown-up can find yours in Mission Hero under Children.`,
     };
   }
 

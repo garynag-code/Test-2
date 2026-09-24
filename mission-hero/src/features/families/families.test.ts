@@ -3,6 +3,7 @@ import { prisma } from '@/server/db/prisma';
 import * as invites from '@/features/families/invites';
 import * as settings from '@/features/families/settings';
 import * as familyData from '@/features/families/data';
+import * as families from '@/features/families/service';
 import { verifyPin } from '@/server/auth/passwords';
 import { createFamilyFixture, createTaskFixture, type FamilyFixture } from '@/test/factories';
 
@@ -275,6 +276,48 @@ describe('child settings', () => {
     expect(child.status).toBe('ARCHIVED');
     expect(child.deletedAt).toBeNull();
     expect(await prisma.taskAssignment.count({ where: { childId: fixture.childId } })).toBe(1);
+  });
+});
+
+describe('choosing the family code', () => {
+  it('replaces the generated code with a memorable one', async () => {
+    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'nagels' });
+
+    const family = await prisma.family.findUniqueOrThrow({
+      where: { id: fixture.familyId },
+      select: { familyCode: true },
+    });
+    // Stored the way a child will type it, however it was entered.
+    expect(family.familyCode).toBe('NAGELS');
+  });
+
+  it('accepts what the child sign-in accepts', async () => {
+    await settings.updateFamilyCode(fixture.parentActor, { familyCode: 'MILL-ERS' });
+
+    const found = await families.findFamilyByCode('millers');
+    expect(found?.id).toBe(fixture.familyId);
+  });
+
+  it('refuses one too short to be useful', async () => {
+    await expect(
+      settings.updateFamilyCode(fixture.parentActor, { familyCode: 'AB' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+
+  it('refuses a code another family already has', async () => {
+    await prisma.family.create({
+      data: { name: 'The Other Family', timezone: 'Africa/Johannesburg', familyCode: 'TAKENONE' },
+    });
+
+    await expect(
+      settings.updateFamilyCode(fixture.parentActor, { familyCode: 'takenone' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('only the owner may change it', async () => {
+    await expect(
+      settings.updateFamilyCode(fixture.childActor, { familyCode: 'KIDSRULE' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 

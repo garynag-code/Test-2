@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { readBoundFamilyId, readChildClaims } from '@/server/auth/session';
 import { FamilyCodeForm } from '@/components/kid/family-code-form';
-import { APP_NAME, APP_TAGLINE, FAMILY_CODE_LENGTH } from '@/domain/constants';
+import { APP_NAME, APP_TAGLINE } from '@/domain/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Enter your family code' };
@@ -23,8 +23,8 @@ export default async function KidsEntryPage() {
         <p className="mt-1 font-semibold text-white/80">{APP_TAGLINE}</p>
         <p className="mt-8 text-lg">Ask a grown-up for your family code.</p>
         <p className="mt-1 text-white/80">
-          It&apos;s {FAMILY_CODE_LENGTH} letters and numbers — not your family&apos;s name. A
-          grown-up finds it in Mission Hero under <strong className="font-bold">Children</strong>.
+          A short code of letters and numbers — not your family&apos;s name. A grown-up finds it in
+          Mission Hero under <strong className="font-bold">Children</strong>.
         </p>
         <FamilyCodeForm />
       </div>

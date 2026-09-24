@@ -3,6 +3,7 @@ import { prisma } from '@/server/db/prisma';
 import { Card, CardTitle, EmptyState } from '@/components/ui/card';
 import * as settings from '@/features/families/settings';
 import * as invites from '@/features/families/invites';
+import { FamilyCodeForm } from '@/components/parent/family-code-form';
 import { FamilySettingsForm } from '@/components/parent/family-settings-form';
 import { ChildSettingsCard } from '@/components/parent/child-settings-card';
 import { appVersion, versionLabel } from '@/domain/version';
@@ -44,6 +45,11 @@ export default async function SettingsPage() {
         <CardTitle>
           <span id="family-settings">Family</span>
         </CardTitle>
+        {actor.role === 'OWNER' ? (
+          <Card>
+            <FamilyCodeForm familyCode={family.familyCode} />
+          </Card>
+        ) : null}
         <Card>
           <FamilySettingsForm setting={setting} />
         </Card>
